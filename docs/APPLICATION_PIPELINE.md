@@ -18,6 +18,9 @@ shortlist / review / reject
 Draft export with warnings
       |
       v
+Dry-run application packet
+      |
+      v
 Human review
       |
       v
@@ -33,6 +36,7 @@ Application notes and draft
 - The system must stop when a job asks for unsupported must-have experience.
 - Duplicate jobs are detected before they can inflate the queue.
 - Drafts are written locally under `exports/`, which is git-ignored.
+- Application packets default to `Submit allowed: no`.
 
 ## Later Browser Layer
 

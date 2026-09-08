@@ -1,3 +1,3 @@
-"""Job Hunter v0.3."""
+"""Job Hunter v0.4."""
 
-__all__ = ["cli", "drafts", "profile", "queue", "queue_types", "scoring"]
+__all__ = ["application_packet", "cli", "drafts", "profile", "queue", "queue_types", "scoring"]

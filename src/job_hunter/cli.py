@@ -75,6 +75,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"draft exported: {draft_path}")
         return 0
 
+    if args.command == "packet":
+        packet_path = queue.export_application_packet(args.job_id, args.output_dir)
+        print(f"application packet exported: {packet_path}")
+        return 0
+
     parser.print_help()
     return 2
 
@@ -100,6 +105,10 @@ def _build_parser() -> argparse.ArgumentParser:
     draft = subparsers.add_parser("draft", help="Export a draft for a queued job")
     draft.add_argument("job_id", type=int)
     draft.add_argument("--output-dir", type=Path, default=Path("exports/drafts"))
+
+    packet = subparsers.add_parser("packet", help="Export a dry-run application packet")
+    packet.add_argument("job_id", type=int)
+    packet.add_argument("--output-dir", type=Path, default=Path("exports/application-packets"))
 
     return parser
 

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import csv
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
+from job_hunter.application_packet import build_application_packet
 from job_hunter.drafts import build_application_draft, draft_to_markdown
 from job_hunter.queue_types import JobInput
 from job_hunter.scoring import score_job
@@ -134,6 +136,23 @@ class JobQueue:
         draft_path.write_text(draft_to_markdown(draft), encoding="utf-8")
         return draft_path
 
+    def export_application_packet(self, job_id: int, output_dir: Path | str) -> Path:
+        job = self._get_job(job_id)
+        packet = build_application_packet(
+            JobInput(
+                title=job.title,
+                company=job.company,
+                location=job.location,
+                description=job.description,
+                source_url=job.source_url,
+            )
+        )
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        packet_path = output_path / f"job-{job.id}-application-packet-{_slug(job.title)}.md"
+        packet_path.write_text(packet.markdown, encoding="utf-8")
+        return packet_path
+
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -178,10 +197,18 @@ class JobQueue:
             raise ValueError(f"Job not found: {job_id}")
         return _record_from_row(row)
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
 
 def _record_from_row(row: sqlite3.Row) -> JobRecord:

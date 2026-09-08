@@ -23,6 +23,9 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
                   draft assistant
                           |
                           v
+              dry-run application packet
+                          |
+                          v
               shortlist / review / reject
 ```
 
@@ -35,6 +38,7 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
 | `queue.py` | Stores scored jobs locally and prevents duplicates |
 | `cli.py` | Provides add/import/list commands for the local workflow |
 | `drafts.py` | Builds local application drafts and warnings from supported evidence |
+| `application_packet.py` | Builds dry-run packets for human-reviewed application steps |
 | `config/` | Holds public template and private local override path |
 | `docs/` | Captures product and safety decisions |
 | `tests/` | Protects scoring behavior and privacy boundary |

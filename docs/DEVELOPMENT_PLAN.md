@@ -23,10 +23,11 @@
 
 ## v0.4 - Browser-Assisted Applications
 
-- Add dry-run browser form filling.
-- Add user confirmation before submit.
-- Add audit logs.
-- Add failure handling for captchas, logins, and missing required fields.
+- Added dry-run application packets.
+- Added user-confirmation defaults before submit.
+- Added audit-friendly packet exports.
+- Kept real browser automation, captchas, logins, and missing required-field
+  handling for a later explicit integration phase.
 
 ## v1.0 - Daily Application Workflow
 
