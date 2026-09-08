@@ -10,10 +10,10 @@
 
 ## v0.2 - Local Job Queue
 
-- Add SQLite storage for jobs, scores, decisions, and application status.
-- Add import from pasted job descriptions or CSV.
-- Add duplicate detection.
-- Add CLI commands for scoring and queue review.
+- Added SQLite storage for jobs, scores, decisions, and application status.
+- Added import from pasted job descriptions or CSV.
+- Added duplicate detection.
+- Added CLI commands for scoring and queue review.
 
 ## v0.3 - Draft Assistant
 

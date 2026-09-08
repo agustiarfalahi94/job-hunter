@@ -1,16 +1,23 @@
 # Job Hunter
 
-Local-first job matching and application planning assistant.
+Local-first job matching and application planning assistant. Current version:
+v0.2.0.
 
 The goal is to help review many job openings quickly without pretending the
-system can safely apply everywhere on its own. v0.1 builds the project brain:
-a factual candidate profile, preferences template, scoring rules, application
-pipeline notes, and a small tested Python scoring module.
+system can safely apply everywhere on its own. The current version builds the
+project brain and the first local queue: a factual candidate profile,
+preferences template, scoring rules, application pipeline notes, SQLite
+storage, CSV import, duplicate detection, and a small CLI.
 
-## What It Does In v0.1
+## What It Does
 
 - Scores a job against target roles, locations, preferred keywords, and avoid
   keywords.
+- Stores scored jobs in a local SQLite queue.
+- Deduplicates by `source_url`, or by title/company/location when no URL is
+  available.
+- Imports a simple CSV with `title`, `company`, `location`, `description`, and
+  `source_url` columns.
 - Separates public project templates from private candidate inputs.
 - Documents the first application workflow before browser automation exists.
 - Keeps the real CV, contact details, secrets, and local preferences out of Git.
@@ -34,6 +41,8 @@ working copy at `config/preferences.local.yaml`.
 |---|---|
 | `src/job_hunter/profile.py` | Public, CV-supported profile summary with contact details excluded |
 | `src/job_hunter/scoring.py` | Deterministic v0.1 scoring engine |
+| `src/job_hunter/queue.py` | SQLite queue, scoring-at-import, and duplicate detection |
+| `src/job_hunter/cli.py` | Local commands for adding, importing, and listing jobs |
 | `config/preferences.example.yaml` | Safe preferences template |
 | `docs/` | Product spec, profile, scoring, pipeline, architecture, and development plan |
 | `tests/` | Unit tests for scoring and the public profile boundary |
@@ -45,6 +54,31 @@ working copy at `config/preferences.local.yaml`.
 python -m venv .venv
 source .venv/bin/activate
 ./tool/check.sh
+```
+
+## CLI
+
+Add one pasted job:
+
+```sh
+PYTHONPATH=src python3 -m job_hunter.cli add \
+  --title "Data Engineer" \
+  --company "Example Analytics" \
+  --location "Kuala Lumpur" \
+  --description "SQL Python Airflow BigQuery migration pipelines" \
+  --source-url "https://example.com/jobs/1"
+```
+
+Import CSV:
+
+```sh
+PYTHONPATH=src python3 -m job_hunter.cli import-csv data/raw/jobs.csv
+```
+
+List queue:
+
+```sh
+PYTHONPATH=src python3 -m job_hunter.cli list
 ```
 
 ## Design Notes
@@ -59,8 +93,8 @@ The style follows the user's existing projects:
 
 ## Status
 
-v0.1 is a project foundation, not a website automation bot yet. The first
-usable loop is:
+This is a local assistant, not a website automation bot yet. The first usable
+loop is:
 
 1. Paste or import a job description.
 2. Score it against the candidate profile and preferences.

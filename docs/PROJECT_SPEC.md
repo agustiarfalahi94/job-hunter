@@ -7,7 +7,7 @@ human judgment needed for truthful applications. It should turn a CV-supported
 profile and local preferences into a shortlisting decision, application queue,
 and later, tailored drafts.
 
-## v0.1 Scope
+## Current Scope
 
 Included:
 
@@ -15,6 +15,10 @@ Included:
 - CV-supported candidate profile without contact details.
 - Job preference template.
 - Deterministic scoring engine.
+- SQLite-backed local job queue.
+- CSV import for job rows.
+- Duplicate detection by URL or title/company/location.
+- CLI commands for adding, importing, and listing jobs.
 - Tests and local verification script.
 
 Not included yet:

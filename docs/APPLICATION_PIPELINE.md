@@ -3,10 +3,13 @@
 ## v0.1 Flow
 
 ```text
-Job description
+Pasted job or CSV row
       |
       v
 Deterministic scoring
+      |
+      v
+Local SQLite queue
       |
       v
 shortlist / review / reject
@@ -25,6 +28,7 @@ Application notes and draft
 - The user decides whether to submit.
 - The system must not invent experience to fit a job.
 - The system must stop when a job asks for unsupported must-have experience.
+- Duplicate jobs are detected before they can inflate the queue.
 
 ## Later Browser Layer
 

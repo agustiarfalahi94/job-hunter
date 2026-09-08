@@ -17,6 +17,9 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
                    scoring engine
                           |
                           v
+                  SQLite job queue
+                          |
+                          v
               shortlist / review / reject
 ```
 
@@ -26,6 +29,8 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
 |---|---|
 | `profile.py` | Stores a public, contact-free candidate profile summary |
 | `scoring.py` | Scores one job dictionary against preferences |
+| `queue.py` | Stores scored jobs locally and prevents duplicates |
+| `cli.py` | Provides add/import/list commands for the local workflow |
 | `config/` | Holds public template and private local override path |
 | `docs/` | Captures product and safety decisions |
 | `tests/` | Protects scoring behavior and privacy boundary |
