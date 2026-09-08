@@ -1,0 +1,27 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Private inputs and run outputs
+.env
+.env.*
+!.env.example
+config/preferences.local.yaml
+data/private/
+data/raw/
+data/applications.db
+data/*.sqlite
+data/*.duckdb
+exports/
+
+# Personal documents must stay local.
+*.pdf
+*.docx

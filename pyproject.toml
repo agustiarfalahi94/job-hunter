@@ -1,0 +1,12 @@
+[project]
+name = "job-hunter"
+version = "0.1.0"
+description = "Local-first job matching and application planning assistant."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Agustiar Falahi" }]
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

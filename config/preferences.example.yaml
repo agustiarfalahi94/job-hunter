@@ -1,0 +1,49 @@
+# Copy this to config/preferences.local.yaml and adjust locally.
+# Do not commit preferences.local.yaml if it contains private notes.
+
+target_roles:
+  - Data Engineer
+  - Analytics Engineer
+  - BI Developer
+  - Data Analyst
+
+target_locations:
+  - Kuala Lumpur
+  - Malaysia
+  - Remote
+  - Singapore
+
+remote_policy:
+  - Remote
+  - Hybrid
+
+preferred_keywords:
+  - SQL
+  - Python
+  - BigQuery
+  - MaxCompute
+  - Airflow
+  - Docker
+  - CI/CD
+  - data migration
+  - Power BI
+  - SSRS
+  - PostgreSQL
+  - MySQL
+  - analytics engineering
+  - data modeling
+
+avoid_keywords:
+  - unpaid
+  - commission only
+  - senior manager
+  - sales quota
+  - cold calling
+
+minimum_score_to_apply: 70
+
+application_rules:
+  auto_submit: false
+  require_human_review: true
+  daily_target: 100
+  stop_when_job_requires_unsupplied_experience: true
