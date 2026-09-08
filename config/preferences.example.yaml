@@ -2,48 +2,77 @@
 # Do not commit preferences.local.yaml if it contains private notes.
 
 target_roles:
-  - Data Engineer
-  - Analytics Engineer
-  - BI Developer
   - Data Analyst
+  - Data Engineer
+  - BI Developer
+  - Reporting Analyst
+  - Reporting Engineer
+  - Business Intelligence Analyst
+  - BI Analyst
+  - BI Engineer
 
 target_locations:
   - Kuala Lumpur
-  - Malaysia
-  - Remote
-  - Singapore
 
-remote_policy:
-  - Remote
-  - Hybrid
-
-preferred_keywords:
-  - SQL
-  - Python
-  - BigQuery
-  - MaxCompute
-  - Airflow
-  - Docker
-  - CI/CD
-  - data migration
+primary_keywords:
   - Power BI
   - SSRS
+  - Google BigQuery
+  - BigQuery
+
+bonus_keywords:
   - PostgreSQL
+  - Alibaba MaxCompute
+  - MaxCompute
+  - Domo
   - MySQL
-  - analytics engineering
-  - data modeling
+  - T-SQL
+  - MSSQL
+  - data migration
+  - Apache Airflow
+  - Airflow
+  - Docker
+  - Python
+  - Python scripts
+  - PySpark
+  - Git
+  - GitHub
+  - GitLab
+  - CI/CD pipeline variables
+  - CI/CD
+  - Agile
+  - Scrum
+  - CAB deployment
 
-avoid_keywords:
-  - unpaid
-  - commission only
-  - senior manager
-  - sales quota
-  - cold calling
+avoid_keywords: []
 
-minimum_score_to_apply: 70
+hard_skip_keywords:
+  - locals/malaysian only
+  - mandarin speaker is mandatory
+
+allow_managerial_if_description_matches: true
+
+minimum_score_to_apply: 90
+
+daily_targets:
+  strong_matches: 20
+  suitable_matches: 50
 
 application_rules:
   auto_submit: false
   require_human_review: true
-  daily_target: 100
+  daily_target: 20
   stop_when_job_requires_unsupplied_experience: true
+
+source_job_boards:
+  - LinkedIn
+  - JobStreet
+  - Indeed
+  - Foundit
+
+source_company_career_pages:
+  - Accord
+  - Accenture
+  - HCLTech
+  - Razer
+  - Prudential

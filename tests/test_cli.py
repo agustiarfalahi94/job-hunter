@@ -53,6 +53,82 @@ class CliTest(unittest.TestCase):
         self.assertIn("Daily target: 100", output.getvalue())
         self.assertIn("Remaining today: 100", output.getvalue())
 
+    def test_add_command_can_load_preferences_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "jobs.db"
+            prefs_path = Path(tmpdir) / "prefs.yaml"
+            prefs_path.write_text(
+                """
+target_roles:
+  - Reporting Analyst
+primary_keywords:
+  - Power BI
+minimum_score_to_apply: 90
+""",
+                encoding="utf-8",
+            )
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "--db",
+                        str(db_path),
+                        "--preferences",
+                        str(prefs_path),
+                        "add",
+                        "--title",
+                        "Reporting Analyst",
+                        "--company",
+                        "Acme",
+                        "--location",
+                        "Kuala Lumpur",
+                        "--description",
+                        "Power BI dashboards",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("decision=shortlist", output.getvalue())
+
+    def test_list_command_prints_remarks_when_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "jobs.db"
+            prefs_path = Path(tmpdir) / "prefs.yaml"
+            prefs_path.write_text(
+                """
+target_roles:
+  - Data Engineer
+primary_keywords:
+  - Power BI
+minimum_score_to_apply: 90
+""",
+                encoding="utf-8",
+            )
+            with redirect_stdout(StringIO()):
+                main(
+                    [
+                        "--db",
+                        str(db_path),
+                        "--preferences",
+                        str(prefs_path),
+                        "add",
+                        "--title",
+                        "Customer Support",
+                        "--company",
+                        "Acme",
+                        "--location",
+                        "Kuala Lumpur",
+                        "--description",
+                        "General support tickets",
+                    ]
+                )
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["--db", str(db_path), "list"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Missing primary keyword", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

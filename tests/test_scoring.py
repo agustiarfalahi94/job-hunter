@@ -76,6 +76,77 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual(result.weights, DEFAULT_WEIGHTS)
         self.assertIn(result.decision, {"shortlist", "review", "reject"})
 
+    def test_requires_primary_keyword_for_strong_match(self):
+        job = {
+            "title": "Data Engineer",
+            "description": "SQL Python Airflow Docker pipeline migration work",
+            "location": "Kuala Lumpur",
+        }
+        preferences = {
+            "target_roles": ["Data Engineer"],
+            "target_locations": ["Kuala Lumpur"],
+            "primary_keywords": ["Power BI", "SSRS", "Google BigQuery"],
+            "bonus_keywords": ["SQL", "Python", "Airflow", "Docker", "data migration"],
+            "minimum_score_to_apply": 90,
+        }
+
+        result = score_job(job, preferences)
+
+        self.assertEqual(result.decision, "review")
+        self.assertIn(
+            "Missing primary keyword: job should mention at least one of Power BI, SSRS, Google BigQuery",
+            result.remarks,
+        )
+
+    def test_hard_skips_malaysian_only_and_mandarin_mandatory_roles(self):
+        preferences = {
+            "target_roles": ["Data Analyst"],
+            "hard_skip_keywords": ["locals/malaysian only", "mandarin speaker is mandatory"],
+        }
+
+        local_only = score_job(
+            {
+                "title": "Data Analyst",
+                "description": "Power BI dashboard role. Locals/Malaysian only.",
+                "location": "Kuala Lumpur",
+            },
+            preferences,
+        )
+        mandarin = score_job(
+            {
+                "title": "BI Analyst",
+                "description": "SSRS reports. Mandarin speaker is mandatory.",
+                "location": "Kuala Lumpur",
+            },
+            preferences,
+        )
+
+        self.assertEqual(local_only.score, 0)
+        self.assertEqual(local_only.decision, "skip")
+        self.assertIn("Hard skip keyword found: locals/malaysian only", local_only.remarks)
+        self.assertEqual(mandarin.decision, "skip")
+        self.assertIn("Hard skip keyword found: mandarin speaker is mandatory", mandarin.remarks)
+
+    def test_managerial_title_is_allowed_when_description_matches(self):
+        job = {
+            "title": "BI Manager",
+            "description": "Hands-on Power BI, SSRS, SQL, BigQuery reporting migration role.",
+            "location": "Kuala Lumpur",
+        }
+        preferences = {
+            "target_roles": ["BI Developer", "BI Analyst"],
+            "target_locations": ["Kuala Lumpur"],
+            "primary_keywords": ["Power BI", "SSRS", "Google BigQuery"],
+            "bonus_keywords": ["SQL", "data migration"],
+            "allow_managerial_if_description_matches": True,
+            "minimum_score_to_apply": 90,
+        }
+
+        result = score_job(job, preferences)
+
+        self.assertNotEqual(result.decision, "skip")
+        self.assertIn("Managerial title allowed because the description matches core experience", result.remarks)
+
 
 if __name__ == "__main__":
     unittest.main()

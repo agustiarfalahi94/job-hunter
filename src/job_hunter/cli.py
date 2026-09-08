@@ -6,38 +6,20 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
+from job_hunter.preferences import load_preferences
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
 from job_hunter.workflow import daily_summary, summary_to_text
 
 
 DEFAULT_DB = Path("data/applications.db")
-DEFAULT_PREFERENCES = {
-    "target_roles": ["Data Engineer", "Analytics Engineer", "BI Developer", "Data Analyst"],
-    "target_locations": ["Kuala Lumpur", "Malaysia", "Remote", "Singapore"],
-    "preferred_keywords": [
-        "SQL",
-        "Python",
-        "BigQuery",
-        "MaxCompute",
-        "Airflow",
-        "Docker",
-        "CI/CD",
-        "data migration",
-        "Power BI",
-        "SSRS",
-        "PostgreSQL",
-        "MySQL",
-    ],
-    "avoid_keywords": ["unpaid", "commission only", "senior manager", "sales quota", "cold calling"],
-    "minimum_score_to_apply": 70,
-}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     queue = JobQueue(args.db)
+    preferences = load_preferences(args.preferences)
 
     if args.command == "add":
         result = queue.add_job(
@@ -48,14 +30,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 description=args.description,
                 source_url=args.source_url,
             ),
-            DEFAULT_PREFERENCES,
+            preferences,
         )
         action = "created" if result.created else "duplicate"
         print(f"{action}: job_id={result.job_id} score={result.score} decision={result.decision}")
         return 0
 
     if args.command == "import-csv":
-        summary = queue.import_csv(args.path, DEFAULT_PREFERENCES)
+        summary = queue.import_csv(args.path, preferences)
         print(f"imported: created={summary.created} duplicates={summary.duplicates}")
         return 0
 
@@ -65,9 +47,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("No jobs in queue.")
             return 0
         for job in jobs:
+            remarks = f"\t{job.remarks}" if job.remarks else ""
             print(
                 f"{job.id}\t{job.score}\t{job.decision}\t{job.status}\t"
-                f"{job.title}\t{job.company}\t{job.location}"
+                f"{job.title}\t{job.company}\t{job.location}{remarks}"
             )
         return 0
 
@@ -97,6 +80,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="job-hunter")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
+    parser.add_argument("--preferences", type=Path, default=Path("config/preferences.local.yaml"))
     subparsers = parser.add_subparsers(dest="command")
 
     add = subparsers.add_parser("add", help="Add one job to the local queue")

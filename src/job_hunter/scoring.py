@@ -1,4 +1,4 @@
-"""Deterministic v0.1 job scoring."""
+"""Deterministic job scoring."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ class ScoreResult:
     score: int
     decision: str
     reasons: tuple[str, ...]
+    remarks: tuple[str, ...]
     weights: dict[str, int]
 
 
@@ -31,18 +32,36 @@ def score_job(job: dict[str, Any], preferences: dict[str, Any]) -> ScoreResult:
     weights = dict(DEFAULT_WEIGHTS)
     score = 0
     reasons: list[str] = []
+    remarks: list[str] = []
+
+    hard_skip_matches = _all_contains(text, preferences.get("hard_skip_keywords", ()))
+    if hard_skip_matches:
+        remarks.extend(f"Hard skip keyword found: {match}" for match in hard_skip_matches)
+        return ScoreResult(score=0, decision="skip", reasons=tuple(remarks), remarks=tuple(remarks), weights=weights)
 
     matched_role = _first_contains(title, preferences.get("target_roles", ()))
     if matched_role:
         score += weights["role"]
         reasons.append(f"Role title matches target role: {matched_role}")
 
-    preferred_matches = _all_contains(text, preferences.get("preferred_keywords", ()))
+    primary_matches = _all_contains(text, preferences.get("primary_keywords", ()))
+    if primary_matches:
+        primary_score = 60 if len(tuple(preferences.get("primary_keywords", ()))) == 1 else 50
+        score += primary_score
+        reasons.append(f"Matched primary keywords: {', '.join(primary_matches)}")
+    elif preferences.get("primary_keywords"):
+        primary_list = ", ".join(str(item) for item in preferences.get("primary_keywords", ()))
+        remarks.append(f"Missing primary keyword: job should mention at least one of {primary_list}")
+
+    preferred_source = preferences.get("preferred_keywords", preferences.get("bonus_keywords", ()))
+    preferred_matches = _all_contains(text, preferred_source)
     if preferred_matches:
-        keyword_total = _count(preferences.get("preferred_keywords", ()))
-        keyword_score = round(weights["keywords"] * len(preferred_matches) / keyword_total)
+        keyword_total = _count(preferred_source)
+        keyword_weight = 10 if preferences.get("primary_keywords") else weights["keywords"]
+        keyword_score = round(keyword_weight * len(preferred_matches) / keyword_total)
         score += keyword_score
-        reasons.append(f"Matched preferred keywords: {', '.join(preferred_matches)}")
+        label = "bonus" if preferences.get("bonus_keywords") else "preferred"
+        reasons.append(f"Matched {label} keywords: {', '.join(preferred_matches)}")
 
     matched_location = _first_contains(location, preferences.get("target_locations", ()))
     if matched_location:
@@ -60,10 +79,17 @@ def score_job(job: dict[str, Any], preferences: dict[str, Any]) -> ScoreResult:
         reasons.append(f"Avoid keywords found: {', '.join(avoid_matches)}")
 
     final_score = max(0, min(100, score))
+    if _is_managerial(title) and preferences.get("allow_managerial_if_description_matches") and primary_matches:
+        remarks.append("Managerial title allowed because the description matches core experience")
+    if final_score < 50:
+        remarks.append("Low suitability: score below 50, review reasons before spending time on this job")
+    if final_score == 0 and not remarks:
+        remarks.append("0% suitability: no matching role, location, or keyword signals found")
     return ScoreResult(
         score=final_score,
-        decision=_decision(final_score),
+        decision=_decision(final_score, int(preferences.get("minimum_score_to_apply", 70))),
         reasons=tuple(reasons or ["No strong match signals found"]),
+        remarks=tuple(remarks),
         weights=weights,
     )
 
@@ -98,9 +124,13 @@ def _count(items: Any) -> int:
     return max(1, len(tuple(items or ())))
 
 
-def _decision(score: int) -> str:
-    if score >= 70:
+def _decision(score: int, minimum_score_to_apply: int = 70) -> str:
+    if score >= minimum_score_to_apply:
         return "shortlist"
     if score >= 50:
         return "review"
     return "reject"
+
+
+def _is_managerial(title: str) -> bool:
+    return any(word in title.casefold() for word in ("manager", "lead", "head"))
