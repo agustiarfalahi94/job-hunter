@@ -42,6 +42,17 @@ class CliTest(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(output.getvalue(), "No jobs in queue.\n")
 
+    def test_today_command_prints_progress_summary(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "jobs.db"
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["--db", str(db_path), "today", "--target", "100"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Daily target: 100", output.getvalue())
+        self.assertIn("Remaining today: 100", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

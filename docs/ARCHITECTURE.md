@@ -26,6 +26,9 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
               dry-run application packet
                           |
                           v
+                 daily workflow summary
+                          |
+                          v
               shortlist / review / reject
 ```
 
@@ -39,6 +42,7 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
 | `cli.py` | Provides add/import/list commands for the local workflow |
 | `drafts.py` | Builds local application drafts and warnings from supported evidence |
 | `application_packet.py` | Builds dry-run packets for human-reviewed application steps |
+| `workflow.py` | Summarises submitted count, remaining target, status counts, and next action |
 | `config/` | Holds public template and private local override path |
 | `docs/` | Captures product and safety decisions |
 | `tests/` | Protects scoring behavior and privacy boundary |

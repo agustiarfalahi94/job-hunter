@@ -31,7 +31,8 @@
 
 ## v1.0 - Daily Application Workflow
 
-- Combine queue, scoring, drafts, and assisted browser filling into a repeatable
-  workflow.
-- Track daily progress toward the user's target.
-- Keep quality controls strong enough that volume does not turn into spam.
+- Combined queue, scoring, drafts, packets, status updates, and daily progress
+  into a repeatable local workflow.
+- Added daily progress tracking toward the user's target.
+- Kept quality controls explicit: dry-run packets and human submission remain
+  the boundary until browser automation gets a separate integration design.

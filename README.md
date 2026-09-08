@@ -1,7 +1,7 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v0.4.0.
+v1.0.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version builds the
@@ -21,6 +21,8 @@ storage, CSV import, duplicate detection, and a small CLI.
 - Exports a local Markdown application draft for a queued job.
 - Exports a dry-run application packet for human review.
 - Flags unsupported job requirements instead of inventing matching experience.
+- Tracks daily application progress against a target.
+- Updates local application status after human action.
 - Separates public project templates from private candidate inputs.
 - Documents the first application workflow before browser automation exists.
 - Keeps the real CV, contact details, secrets, and local preferences out of Git.
@@ -48,6 +50,7 @@ working copy at `config/preferences.local.yaml`.
 | `src/job_hunter/cli.py` | Local commands for adding, importing, and listing jobs |
 | `src/job_hunter/drafts.py` | Truthful draft generation and unsupported-claim warnings |
 | `src/job_hunter/application_packet.py` | Dry-run application packets with submit safety notes |
+| `src/job_hunter/workflow.py` | Daily progress summary and next-action guidance |
 | `config/preferences.example.yaml` | Safe preferences template |
 | `docs/` | Product spec, profile, scoring, pipeline, architecture, and development plan |
 | `tests/` | Unit tests for scoring and the public profile boundary |
@@ -98,6 +101,18 @@ Export a dry-run application packet for queued job `1`:
 PYTHONPATH=src python3 -m job_hunter.cli packet 1
 ```
 
+Mark a job as submitted after you submit it yourself:
+
+```sh
+PYTHONPATH=src python3 -m job_hunter.cli status 1 submitted
+```
+
+Check today's progress toward 100 applications:
+
+```sh
+PYTHONPATH=src python3 -m job_hunter.cli today --target 100
+```
+
 ## Design Notes
 
 The style follows the user's existing projects:
@@ -110,11 +125,12 @@ The style follows the user's existing projects:
 
 ## Status
 
-This is a local assistant, not a website automation bot yet. The first usable
-loop is:
+This is a local daily workflow assistant, not a live website automation bot.
+The first usable loop is:
 
 1. Paste or import a job description.
 2. Score it against the candidate profile and preferences.
 3. Put promising jobs into a human-reviewed application queue.
 4. Generate tailored drafts only from supported experience.
 5. Submit manually until browser automation is designed and tested.
+6. Mark submitted jobs locally and check daily progress.

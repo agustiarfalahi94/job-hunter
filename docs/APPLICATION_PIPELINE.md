@@ -24,6 +24,12 @@ Dry-run application packet
 Human review
       |
       v
+Manual submit
+      |
+      v
+Status update + daily progress
+      |
+      v
 Application notes and draft
 ```
 
@@ -37,6 +43,8 @@ Application notes and draft
 - Duplicate jobs are detected before they can inflate the queue.
 - Drafts are written locally under `exports/`, which is git-ignored.
 - Application packets default to `Submit allowed: no`.
+- The daily target is measured from local statuses, not assumed from generated
+  drafts.
 
 ## Later Browser Layer
 

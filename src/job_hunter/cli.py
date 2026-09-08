@@ -8,6 +8,7 @@ from typing import Sequence
 
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
+from job_hunter.workflow import daily_summary, summary_to_text
 
 
 DEFAULT_DB = Path("data/applications.db")
@@ -80,6 +81,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"application packet exported: {packet_path}")
         return 0
 
+    if args.command == "status":
+        queue.update_status(args.job_id, args.status)
+        print(f"status updated: job_id={args.job_id} status={args.status}")
+        return 0
+
+    if args.command == "today":
+        print(summary_to_text(daily_summary(queue, args.target)), end="")
+        return 0
+
     parser.print_help()
     return 2
 
@@ -109,6 +119,13 @@ def _build_parser() -> argparse.ArgumentParser:
     packet = subparsers.add_parser("packet", help="Export a dry-run application packet")
     packet.add_argument("job_id", type=int)
     packet.add_argument("--output-dir", type=Path, default=Path("exports/application-packets"))
+
+    status = subparsers.add_parser("status", help="Update a queued job status")
+    status.add_argument("job_id", type=int)
+    status.add_argument("status", choices=["new", "reviewing", "drafted", "submitted", "rejected"])
+
+    today = subparsers.add_parser("today", help="Show today's application workflow summary")
+    today.add_argument("--target", type=int, default=100)
 
     return parser
 
