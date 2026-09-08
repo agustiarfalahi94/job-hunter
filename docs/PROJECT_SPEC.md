@@ -23,6 +23,9 @@ Included:
 - Unsupported-claim warnings for requirements not supported by the public profile.
 - Dry-run application packets that default to no submission.
 - Status updates and daily workflow summaries toward the application target.
+- User criteria loaded from `config/preferences.local.yaml` when present.
+- Hard skips for local-only and mandatory Mandarin requirements.
+- Mandatory remarks for weak or skipped matches.
 - Tests and local verification script.
 
 Not included yet:

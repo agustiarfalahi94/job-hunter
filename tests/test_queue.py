@@ -116,6 +116,30 @@ class JobQueueTest(unittest.TestCase):
         self.assertEqual(summary.created, 1)
         self.assertEqual(summary.duplicates, 1)
 
+    def test_stores_remarks_for_low_suitability_job(self):
+        preferences = {
+            "target_roles": ["Data Engineer"],
+            "primary_keywords": ["Power BI"],
+            "hard_skip_keywords": ["locals/malaysian only"],
+            "minimum_score_to_apply": 90,
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            queue.add_job(
+                JobInput(
+                    title="Customer Support",
+                    company="Acme",
+                    location="Kuala Lumpur",
+                    description="Handle general customer tickets.",
+                ),
+                preferences,
+            )
+
+            job = queue.list_jobs()[0]
+
+        self.assertIn("Missing primary keyword", job.remarks)
+        self.assertIn("Low suitability", job.remarks)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -36,3 +36,10 @@
 - Added daily progress tracking toward the user's target.
 - Kept quality controls explicit: dry-run packets and human submission remain
   the boundary until browser automation gets a separate integration design.
+
+## v1.1 - User Criteria
+
+- Added the user's job-title, primary-keyword, bonus-keyword, hard-skip, and
+  daily target criteria.
+- Added private local preference loading from `config/preferences.local.yaml`.
+- Added mandatory remarks for weak matches and hard skips.

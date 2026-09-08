@@ -26,6 +26,8 @@ class JobRecord:
     score: int
     decision: str
     status: str
+    reasons: str = ""
+    remarks: str = ""
 
 
 @dataclass(frozen=True)
@@ -67,9 +69,9 @@ class JobQueue:
                 """
                 INSERT INTO jobs (
                     title, company, location, description, source_url,
-                    dedupe_key, score, decision, status
+                    dedupe_key, score, decision, status, reasons, remarks
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)
                 """,
                 (
                     job.title.strip(),
@@ -80,6 +82,8 @@ class JobQueue:
                     _dedupe_key(job),
                     scoring.score,
                     scoring.decision,
+                    "\n".join(scoring.reasons),
+                    "\n".join(scoring.remarks),
                 ),
             )
         return AddResult(int(cursor.lastrowid), created=True, score=scoring.score, decision=scoring.decision)
@@ -107,7 +111,8 @@ class JobQueue:
 
     def list_jobs(self, status: str | None = None) -> list[JobRecord]:
         query = """
-            SELECT id, title, company, location, description, source_url, score, decision, status
+            SELECT id, title, company, location, description, source_url,
+                   score, decision, status, reasons, remarks
             FROM jobs
         """
         params: tuple[str, ...] = ()
@@ -177,10 +182,14 @@ class JobQueue:
                     score INTEGER NOT NULL,
                     decision TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'new',
+                    reasons TEXT NOT NULL DEFAULT '',
+                    remarks TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
+            _ensure_column(conn, "jobs", "reasons", "TEXT NOT NULL DEFAULT ''")
+            _ensure_column(conn, "jobs", "remarks", "TEXT NOT NULL DEFAULT ''")
 
     def _find_duplicate(self, job: JobInput) -> int | None:
         with self._connect() as conn:
@@ -196,7 +205,8 @@ class JobQueue:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, title, company, location, description, source_url, score, decision, status
+                SELECT id, title, company, location, description, source_url,
+                       score, decision, status, reasons, remarks
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -231,6 +241,8 @@ def _record_from_row(row: sqlite3.Row) -> JobRecord:
         score=int(row["score"]),
         decision=str(row["decision"]),
         status=str(row["status"]),
+        reasons=str(row["reasons"]),
+        remarks=str(row["remarks"]),
     )
 
 
@@ -249,3 +261,9 @@ def _slug(value: str) -> str:
     cleaned = "".join(char.lower() if char.isalnum() else "-" for char in value.strip())
     parts = [part for part in cleaned.split("-") if part]
     return "-".join(parts) or "draft"
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaration: str) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")

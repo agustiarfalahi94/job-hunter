@@ -1,7 +1,7 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v1.0.0.
+v1.1.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version builds the
@@ -23,6 +23,8 @@ storage, CSV import, duplicate detection, and a small CLI.
 - Flags unsupported job requirements instead of inventing matching experience.
 - Tracks daily application progress against a target.
 - Updates local application status after human action.
+- Loads private local preferences from `config/preferences.local.yaml`.
+- Applies hard skips for local-only and mandatory Mandarin requirements.
 - Separates public project templates from private candidate inputs.
 - Documents the first application workflow before browser automation exists.
 - Keeps the real CV, contact details, secrets, and local preferences out of Git.
@@ -51,6 +53,7 @@ working copy at `config/preferences.local.yaml`.
 | `src/job_hunter/drafts.py` | Truthful draft generation and unsupported-claim warnings |
 | `src/job_hunter/application_packet.py` | Dry-run application packets with submit safety notes |
 | `src/job_hunter/workflow.py` | Daily progress summary and next-action guidance |
+| `src/job_hunter/preferences.py` | Simple local preference loading |
 | `config/preferences.example.yaml` | Safe preferences template |
 | `docs/` | Product spec, profile, scoring, pipeline, architecture, and development plan |
 | `tests/` | Unit tests for scoring and the public profile boundary |
@@ -112,6 +115,9 @@ Check today's progress toward 100 applications:
 ```sh
 PYTHONPATH=src python3 -m job_hunter.cli today --target 100
 ```
+
+The current local target is 20 strong matches, with up to 50 suitable matches
+for review.
 
 ## Design Notes
 
