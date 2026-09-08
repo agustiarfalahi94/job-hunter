@@ -153,6 +153,15 @@ class JobQueue:
         packet_path.write_text(packet.markdown, encoding="utf-8")
         return packet_path
 
+    def update_status(self, job_id: int, status: str) -> None:
+        allowed = {"new", "reviewing", "drafted", "submitted", "rejected"}
+        if status not in allowed:
+            raise ValueError(f"Unsupported status: {status}")
+        with self._connect() as conn:
+            cursor = conn.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
+            if cursor.rowcount != 1:
+                raise ValueError(f"Job not found: {job_id}")
+
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(
