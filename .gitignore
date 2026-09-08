@@ -9,6 +9,8 @@ venv/
 dist/
 build/
 *.egg-info/
+.agents/
+.claude/
 
 # Private inputs and run outputs
 .env

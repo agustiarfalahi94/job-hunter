@@ -18,6 +18,7 @@ Included:
 - SQLite-backed local job queue.
 - CSV import for job rows.
 - Duplicate detection by URL or title/company/location.
+- Cross-platform duplicate detection by exact title/company/location.
 - CLI commands for adding, importing, and listing jobs.
 - Local Markdown draft export for queued jobs.
 - Unsupported-claim warnings for requirements not supported by the public profile.
@@ -26,6 +27,9 @@ Included:
 - User criteria loaded from `config/preferences.local.yaml` when present.
 - Hard skips for local-only and mandatory Mandarin requirements.
 - Mandatory remarks for weak or skipped matches.
+- Streamlit web dashboard for local/manual real-world testing.
+- Local CV upload, replace, remove, and status display in the Streamlit app.
+- Page-level descriptions and sample data for the web app.
 - Tests and local verification script.
 
 Not included yet:
@@ -34,6 +38,7 @@ Not included yet:
 - Auto-submission.
 - LLM-generated cover letters.
 - Live job-board browser automation.
+- Public deployment authentication and per-user storage.
 
 ## Success Criteria
 

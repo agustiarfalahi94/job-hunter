@@ -43,3 +43,19 @@
   daily target criteria.
 - Added private local preference loading from `config/preferences.local.yaml`.
 - Added mandatory remarks for weak matches and hard skips.
+
+## v1.2 - Streamlit Web App
+
+- Added a Streamlit dashboard for queue review, single-job entry, CSV import,
+  draft and packet exports, status updates, and daily progress.
+- Added Streamlit runtime dependency and Community Cloud entry-point docs.
+
+## v1.3 - Guided Streamlit Workflow
+
+- Added a Profile & CV page for local CV upload, replacement, removal, and
+  status display.
+- Added page descriptions, examples, and sample CSV data to reduce confusion.
+- Added a Search setup page that previews the intended 50-job search flow
+  without pretending job-board scraping is implemented.
+- Updated duplicate handling so exact same roles across platforms are skipped.
+- Clarified public deployment limits around authentication and per-user data.

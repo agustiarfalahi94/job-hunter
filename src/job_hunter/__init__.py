@@ -1,8 +1,9 @@
-"""Job Hunter v1.1."""
+"""Job Hunter v1.3."""
 
 __all__ = [
     "application_packet",
     "cli",
+    "cv_store",
     "drafts",
     "preferences",
     "profile",

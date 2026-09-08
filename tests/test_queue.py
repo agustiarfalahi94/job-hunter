@@ -69,6 +69,35 @@ class JobQueueTest(unittest.TestCase):
         self.assertEqual(first.job_id, second.job_id)
         self.assertEqual(len(jobs), 1)
 
+    def test_add_job_deduplicates_cross_platform_exact_same_role(self):
+        preferences = {"target_roles": ["Data Analyst"], "primary_keywords": ["Power BI"]}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            first = queue.add_job(
+                JobInput(
+                    title="Data Analyst",
+                    company="Acme",
+                    location="Kuala Lumpur",
+                    description="Power BI reporting role",
+                    source_url="https://linkedin.example/jobs/123",
+                ),
+                preferences,
+            )
+            second = queue.add_job(
+                JobInput(
+                    title="data analyst",
+                    company=" ACME ",
+                    location=" kuala lumpur ",
+                    description="Power BI and SQL reporting role",
+                    source_url="https://foundit.example/jobs/abc",
+                ),
+                preferences,
+            )
+
+        self.assertTrue(first.created)
+        self.assertFalse(second.created)
+        self.assertEqual(first.job_id, second.job_id)
+
     def test_add_job_deduplicates_by_title_company_location_when_url_missing(self):
         preferences = {"target_roles": ["Analytics Engineer"]}
         with tempfile.TemporaryDirectory() as tmpdir:

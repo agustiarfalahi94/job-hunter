@@ -247,9 +247,11 @@ def _record_from_row(row: sqlite3.Row) -> JobRecord:
 
 
 def _dedupe_key(job: JobInput) -> str:
+    parts = [job.title, job.company, job.location]
+    if all(part.strip() for part in parts):
+        return "job:" + "|".join(_normalize(part) for part in parts)
     if job.source_url.strip():
         return f"url:{job.source_url.strip().casefold()}"
-    parts = [job.title, job.company, job.location]
     return "job:" + "|".join(_normalize(part) for part in parts)
 
 

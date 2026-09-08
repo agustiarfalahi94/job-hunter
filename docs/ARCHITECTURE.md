@@ -4,7 +4,8 @@
 
 Job Hunter starts as a small Python package plus documentation. The core rule
 is local-first: private files stay on the user's Mac, while the public
-repository holds templates, deterministic logic, and tests.
+repository holds templates, deterministic logic, a Streamlit dashboard, and
+tests.
 
 ```text
 config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
@@ -30,6 +31,9 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
                           |
                           v
               shortlist / review / reject
+
+data/private/cv/current_cv.pdf stays outside Git and is managed separately by
+the Streamlit profile page.
 ```
 
 ## Components
@@ -39,11 +43,13 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
 | `profile.py` | Stores a public, contact-free candidate profile summary |
 | `scoring.py` | Scores one job dictionary against preferences |
 | `queue.py` | Stores scored jobs locally and prevents duplicates |
+| `cv_store.py` | Saves, replaces, removes, and reports local private CV status |
 | `cli.py` | Provides add/import/list commands for the local workflow |
 | `drafts.py` | Builds local application drafts and warnings from supported evidence |
 | `application_packet.py` | Builds dry-run packets for human-reviewed application steps |
 | `workflow.py` | Summarises submitted count, remaining target, status counts, and next action |
 | `config/` | Holds public template and private local override path |
+| `src/app.py` | Streamlit dashboard over the local queue |
 | `docs/` | Captures product and safety decisions |
 | `tests/` | Protects scoring behavior and privacy boundary |
 

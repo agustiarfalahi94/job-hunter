@@ -1,0 +1,372 @@
+from __future__ import annotations
+
+import sys
+import tempfile
+from io import StringIO
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from job_hunter.app_ui import filter_jobs, jobs_to_rows, status_counts
+from job_hunter.cv_store import CVStore, format_size
+from job_hunter.preferences import load_preferences
+from job_hunter.queue import JobQueue
+from job_hunter.queue_types import JobInput
+from job_hunter.workflow import daily_summary, summary_to_text
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DB_PATH = ROOT / "data" / "applications.db"
+PREFERENCES_PATH = ROOT / "config" / "preferences.local.yaml"
+CV_STORAGE_DIR = ROOT / "data" / "private" / "cv"
+HERO_IMAGE_URL = "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1600"
+
+TARGET_TITLES = [
+    "Data Analyst",
+    "Data Engineer",
+    "BI Developer",
+    "Reporting Analyst",
+    "Reporting Engineer",
+    "Business Intelligence Analyst",
+    "BI Analyst",
+    "BI Engineer",
+]
+PRIMARY_KEYWORDS = ["Power BI", "SSRS", "Google BigQuery"]
+SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit", "Company career pages"]
+CITY_OPTIONS = ["Kuala Lumpur", "Petaling Jaya", "Subang Jaya", "Shah Alam", "Cyberjaya"]
+SAMPLE_CSV = """title,company,location,description,source_url
+BI Developer,Example Analytics,Kuala Lumpur,"Build Power BI dashboards, SSRS reports, and SQL datasets.",https://example.com/jobs/bi-developer
+Data Engineer,Example Bank,Kuala Lumpur,"Maintain BigQuery pipelines with Python, Airflow, Docker, and CI/CD.",https://example.com/jobs/data-engineer
+Reporting Analyst,Example Retail,Kuala Lumpur,"Prepare recurring business reports in SSRS and support MSSQL data checks.",https://example.com/jobs/reporting-analyst
+"""
+
+
+def main() -> None:
+    st.set_page_config(page_title="Job Hunter", page_icon=":material/work:", layout="wide")
+
+    queue = JobQueue(DB_PATH)
+    preferences = load_preferences(PREFERENCES_PATH)
+    cv_store = CVStore(CV_STORAGE_DIR)
+
+    _render_header()
+    _render_sidebar(queue, cv_store)
+
+    tabs = st.tabs(
+        [
+            ":material/person: Profile & CV",
+            ":material/tune: Search setup",
+            ":material/table_chart: Job queue",
+            ":material/add_circle: Add job",
+            ":material/upload_file: Import CSV",
+            ":material/draft: Drafts & packets",
+            ":material/query_stats: Progress",
+        ]
+    )
+    with tabs[0]:
+        _render_profile(cv_store, preferences)
+    with tabs[1]:
+        _render_search_setup()
+    with tabs[2]:
+        _render_queue(queue)
+    with tabs[3]:
+        _render_add_job(queue, preferences)
+    with tabs[4]:
+        _render_import(queue, preferences)
+    with tabs[5]:
+        _render_exports(queue)
+    with tabs[6]:
+        _render_progress(queue, preferences)
+
+
+def _render_header() -> None:
+    left, right = st.columns([1.7, 1], vertical_alignment="center")
+    with left:
+        st.title("Job Hunter")
+        st.caption("A local-first Streamlit app for scoring Kuala Lumpur data jobs against your CV-backed criteria.")
+        with st.container(horizontal=True, wrap=True):
+            st.badge("Current: manual scoring", icon=":material/check_circle:", color="green")
+            st.badge("Next: guided web search", icon=":material/pending:", color="blue")
+            st.badge("Private CV stays local", icon=":material/lock:", color="gray")
+    with right:
+        st.image(HERO_IMAGE_URL)
+
+
+def _render_sidebar(queue: JobQueue, cv_store: CVStore) -> None:
+    jobs = queue.list_jobs()
+    counts = status_counts(jobs)
+    cv_status = cv_store.status()
+    with st.sidebar:
+        st.header("Today")
+        st.metric("Queued jobs", len(jobs))
+        st.metric("New", counts["new"])
+        st.metric("Submitted", counts["submitted"])
+        st.caption("The app stores queue data in `data/applications.db`.")
+        if cv_status.exists:
+            st.success(f"CV saved locally ({format_size(cv_status.size_bytes)}).")
+        else:
+            st.caption("No local CV is saved yet.")
+
+
+def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
+    st.subheader("Profile & CV")
+    st.write(
+        "This page is where your CV belongs. The repository never commits your actual CV; uploaded files are saved only under the local private data folder."
+    )
+    status = cv_store.status()
+    with st.container(border=True):
+        if status.exists:
+            st.success(f"Saved CV: `{status.path.name}` - {format_size(status.size_bytes)}")
+            if st.button("Remove saved CV", icon=":material/delete:"):
+                cv_store.remove()
+                st.toast("Saved CV removed.")
+                st.rerun()
+        else:
+            st.info("No CV is saved for this local app yet.")
+
+        uploaded = st.file_uploader("Upload or replace CV", type=["pdf"])
+        if uploaded is not None and st.button("Save CV locally", icon=":material/save:"):
+            cv_store.save_pdf(uploaded.getvalue())
+            st.toast("CV saved locally.")
+            st.rerun()
+
+    with st.container(border=True):
+        st.markdown("**What the app currently knows from your CV-backed profile**")
+        cols = st.columns(3)
+        cols[0].metric("Primary strengths", "Power BI / SSRS / BigQuery")
+        cols[1].metric("Strong target", "20 jobs")
+        cols[2].metric("Session cap", "50 jobs")
+        st.caption("The current scoring profile comes from the documented candidate profile and your latest criteria.")
+        _render_keyword_chips("Target titles", TARGET_TITLES)
+        _render_keyword_chips("Primary description keywords", PRIMARY_KEYWORDS)
+        hard_skips = preferences.get("hard_skip_keywords", [])
+        if isinstance(hard_skips, list):
+            _render_keyword_chips("Hard skips", [str(item) for item in hard_skips])
+
+
+def _render_search_setup() -> None:
+    st.subheader("Search setup")
+    st.write(
+        "This is the flow you described: set title, description keywords, exact location, and selected platforms, then run up to 50 job checks in one session."
+    )
+    with st.container(border=True):
+        title_contains = st.multiselect(
+            "Job title contains",
+            TARGET_TITLES,
+            default=["Data Analyst", "Data Engineer", "BI Developer", "Reporting Analyst"],
+        )
+        description_contains = st.multiselect("Job description contains at least one", PRIMARY_KEYWORDS, default=PRIMARY_KEYWORDS)
+        location = st.selectbox("Exact location", CITY_OPTIONS, index=0, accept_new_options=True)
+        platforms = st.multiselect("Platforms to search", SOURCES, default=SOURCES)
+        max_jobs = st.slider("Maximum jobs in one session", min_value=1, max_value=50, value=50)
+
+        disabled = not title_contains or not description_contains or not platforms
+        if st.button("Preview search run", icon=":material/play_arrow:", disabled=disabled):
+            _render_search_preview(max_jobs=max_jobs, location=str(location), platforms=platforms)
+
+    with st.expander("Current workflow vs target workflow", expanded=True):
+        st.markdown(
+            """
+**Current workflow**
+
+1. Upload or keep your CV locally.
+2. Add jobs manually, or import a CSV gathered from job boards.
+3. Job Hunter scores each job, explains why it matched or did not match, and keeps skipped/low-suitability remarks.
+4. You review the queue and export a draft or application packet.
+5. You apply outside the app, then update the job status.
+
+**Target workflow**
+
+1. You choose platforms and search rules.
+2. The app searches up to 50 jobs, logs each checked job, and scores them.
+3. Exact duplicates across platforms are skipped using title, company, and location.
+4. You apply one by one, or review a batch before applying all.
+5. Real job-board login and submission automation will be added only when the browser/login flow is safe and reliable.
+"""
+        )
+
+    with st.container(border=True):
+        st.markdown("**Duplicate handling**")
+        st.write(
+            "If LinkedIn and Foundit show the same exact role at the same company and location, Job Hunter keeps one queue item and treats the other as a duplicate. Later we can store the extra platform links as alternate sources."
+        )
+
+
+def _render_search_preview(max_jobs: int, location: str, platforms: list[str]) -> None:
+    progress = st.progress(0, text="Preparing search session")
+    log_box = st.empty()
+    sample_jobs = [
+        "BI Developer at Example Analytics",
+        "Data Engineer at Example Bank",
+        "Reporting Analyst at Example Retail",
+        "Business Intelligence Analyst at Example Insurance",
+    ]
+    logs = []
+    for step, job in enumerate(sample_jobs, start=1):
+        pct = min(100, int(step / min(max_jobs, len(sample_jobs)) * 100))
+        source = platforms[(step - 1) % len(platforms)]
+        logs.append(f"Checked {step}/{max_jobs}: {job} - {location} - {source}")
+        progress.progress(pct, text=f"Preview only: {step}/{max_jobs} checked")
+        log_box.code("\n".join(logs), language="text")
+    st.info("This preview shows the intended search experience. It does not scrape or log in to job boards yet.")
+
+
+def _render_queue(queue: JobQueue) -> None:
+    st.subheader("Job queue")
+    st.write("This is the ranked list after jobs are added or imported. Start here when you want to review the strongest matches first.")
+    jobs = queue.list_jobs()
+    if not jobs:
+        st.info("No jobs are queued yet. Add one manually or import the sample CSV format from the Import CSV page.")
+        _render_example_jobs()
+        return
+
+    col1, col2 = st.columns(2)
+    with col1:
+        decision = st.segmented_control("Decision", ["all", "shortlist", "review", "reject", "skip"], default="all")
+    with col2:
+        status = st.segmented_control("Status", ["all", "new", "reviewing", "drafted", "submitted", "rejected"], default="all")
+    filtered = filter_jobs(jobs, decision=str(decision), status=str(status))
+
+    if not filtered:
+        st.info("No jobs match the current filters.")
+        return
+
+    st.dataframe(
+        jobs_to_rows(filtered),
+        column_config={
+            "Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100),
+            "Source URL": st.column_config.LinkColumn("Source"),
+        },
+        hide_index=True,
+    )
+
+
+def _render_add_job(queue: JobQueue, preferences: dict[str, object]) -> None:
+    st.subheader("Add job")
+    st.write(
+        "Use this for one job you already found. Yes, this means copy-pasting the job description for now; the automated platform search is the next major version."
+    )
+    with st.expander("Example job data", expanded=True):
+        st.code(
+            """Title: BI Developer
+Company: Example Analytics
+Location: Kuala Lumpur
+Source URL: https://example.com/jobs/bi-developer
+Description: Build Power BI dashboards, SSRS reports, SQL datasets, and reporting automation for business teams.""",
+            language="text",
+        )
+
+    with st.form("add_job"):
+        title = st.text_input("Job title", placeholder="BI Developer")
+        company = st.text_input("Company", placeholder="Example Analytics")
+        location = st.selectbox("Location", CITY_OPTIONS, index=0, accept_new_options=True)
+        source_url = st.text_input("Source URL", placeholder="https://...")
+        description = st.text_area(
+            "Job description",
+            height=240,
+            placeholder="Paste the job description here. Power BI / SSRS / BigQuery are treated as primary match signals.",
+        )
+        submitted = st.form_submit_button("Score and add", icon=":material/add_circle:")
+
+    if submitted:
+        if not title.strip() or not description.strip():
+            st.error("Job title and description are required.")
+            return
+        result = queue.add_job(
+            JobInput(
+                title=title,
+                company=company,
+                location=str(location),
+                description=description,
+                source_url=source_url,
+            ),
+            preferences,
+        )
+        if result.created:
+            st.success(f"Added job #{result.job_id}: {result.score}/100 - {result.decision}")
+        else:
+            st.warning(f"Duplicate job #{result.job_id}: {result.score}/100 - {result.decision}")
+
+
+def _render_import(queue: JobQueue, preferences: dict[str, object]) -> None:
+    st.subheader("Import CSV")
+    st.write(
+        "Use this when you already have many job rows from a spreadsheet, export, or manual research list. It saves you from adding job descriptions one by one."
+    )
+    with st.container(border=True):
+        st.markdown("**Expected columns**")
+        st.code("title, company, location, description, source_url", language="text")
+        st.download_button("Download example CSV", SAMPLE_CSV, file_name="job-hunter-example.csv", mime="text/csv", icon=":material/download:")
+        st.dataframe(pd.read_csv(StringIO(SAMPLE_CSV)), hide_index=True)
+
+    uploaded = st.file_uploader("Upload CSV", type=["csv"])
+    if uploaded is None:
+        return
+
+    if st.button("Import and score CSV", icon=":material/upload_file:"):
+        with tempfile.NamedTemporaryFile("wb", suffix=".csv", delete=False) as handle:
+            handle.write(uploaded.getbuffer())
+            temp_path = Path(handle.name)
+        summary = queue.import_csv(temp_path, preferences)
+        st.success(f"Imported {summary.created}; skipped {summary.duplicates} duplicates.")
+
+
+def _render_exports(queue: JobQueue) -> None:
+    st.subheader("Drafts & packets")
+    st.write(
+        "A draft is a short application message. A packet is a fuller review bundle with job details, fit notes, and application material you can check before applying."
+    )
+    jobs = queue.list_jobs()
+    if not jobs:
+        st.info("Add jobs before exporting drafts or packets.")
+        return
+
+    options = {f"#{job.id} - {job.title} - {job.company}": job.id for job in jobs}
+    selected = st.selectbox("Job", list(options))
+    job_id = options[selected]
+
+    with st.container(horizontal=True, wrap=True):
+        if st.button("Export draft", icon=":material/edit_document:"):
+            path = queue.export_draft(job_id, ROOT / "exports" / "drafts")
+            queue.update_status(job_id, "drafted")
+            st.success(f"Draft exported to {path}")
+        if st.button("Export packet", icon=":material/folder:"):
+            path = queue.export_application_packet(job_id, ROOT / "exports" / "application-packets")
+            queue.update_status(job_id, "reviewing")
+            st.success(f"Packet exported to {path}")
+
+    st.caption("Apply buttons are intentionally disabled until real platform login and browser submission flows are implemented.")
+    with st.container(horizontal=True, wrap=True):
+        st.button("Apply selected", icon=":material/send:", disabled=True)
+        st.button("Apply all shortlisted", icon=":material/done_all:", disabled=True)
+
+    new_status = st.selectbox("Set status", ["new", "reviewing", "drafted", "submitted", "rejected"])
+    if st.button("Update status", icon=":material/save:"):
+        queue.update_status(job_id, new_status)
+        st.success(f"Job #{job_id} is now {new_status}.")
+
+
+def _render_progress(queue: JobQueue, preferences: dict[str, object]) -> None:
+    st.subheader("Progress")
+    st.write("This page shows whether today's queue is moving toward your target of 20 strong job candidates.")
+    daily_targets = preferences.get("daily_targets", {})
+    target = 20
+    if isinstance(daily_targets, dict):
+        target = int(daily_targets.get("strong_matches", target))
+    summary = daily_summary(queue, daily_target=target)
+    st.text(summary_to_text(summary))
+
+
+def _render_keyword_chips(label: str, values: list[str]) -> None:
+    st.markdown(f"**{label}**")
+    st.pills(label, values, selection_mode="multi", default=values, disabled=True, label_visibility="collapsed", wrap=True)
+
+
+def _render_example_jobs() -> None:
+    st.dataframe(pd.read_csv(StringIO(SAMPLE_CSV)), hide_index=True)
+
+
+if __name__ == "__main__":
+    main()
