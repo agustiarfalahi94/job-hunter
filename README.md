@@ -1,7 +1,7 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v0.2.0.
+v0.3.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version builds the
@@ -18,6 +18,8 @@ storage, CSV import, duplicate detection, and a small CLI.
   available.
 - Imports a simple CSV with `title`, `company`, `location`, `description`, and
   `source_url` columns.
+- Exports a local Markdown application draft for a queued job.
+- Flags unsupported job requirements instead of inventing matching experience.
 - Separates public project templates from private candidate inputs.
 - Documents the first application workflow before browser automation exists.
 - Keeps the real CV, contact details, secrets, and local preferences out of Git.
@@ -43,6 +45,7 @@ working copy at `config/preferences.local.yaml`.
 | `src/job_hunter/scoring.py` | Deterministic v0.1 scoring engine |
 | `src/job_hunter/queue.py` | SQLite queue, scoring-at-import, and duplicate detection |
 | `src/job_hunter/cli.py` | Local commands for adding, importing, and listing jobs |
+| `src/job_hunter/drafts.py` | Truthful draft generation and unsupported-claim warnings |
 | `config/preferences.example.yaml` | Safe preferences template |
 | `docs/` | Product spec, profile, scoring, pipeline, architecture, and development plan |
 | `tests/` | Unit tests for scoring and the public profile boundary |
@@ -79,6 +82,12 @@ List queue:
 
 ```sh
 PYTHONPATH=src python3 -m job_hunter.cli list
+```
+
+Export a draft for queued job `1`:
+
+```sh
+PYTHONPATH=src python3 -m job_hunter.cli draft 1
 ```
 
 ## Design Notes

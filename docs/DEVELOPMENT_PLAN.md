@@ -17,9 +17,9 @@
 
 ## v0.3 - Draft Assistant
 
-- Add prompt templates that cite candidate-profile evidence.
-- Add a guard that flags unsupported claims.
-- Add local draft exports for cover letters and form answers.
+- Added draft generation that cites candidate-profile evidence.
+- Added a guard that flags unsupported claims.
+- Added local draft exports for cover letters and form answers.
 
 ## v0.4 - Browser-Assisted Applications
 

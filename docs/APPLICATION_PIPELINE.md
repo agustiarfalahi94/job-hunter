@@ -15,6 +15,9 @@ Local SQLite queue
 shortlist / review / reject
       |
       v
+Draft export with warnings
+      |
+      v
 Human review
       |
       v
@@ -29,6 +32,7 @@ Application notes and draft
 - The system must not invent experience to fit a job.
 - The system must stop when a job asks for unsupported must-have experience.
 - Duplicate jobs are detected before they can inflate the queue.
+- Drafts are written locally under `exports/`, which is git-ignored.
 
 ## Later Browser Layer
 

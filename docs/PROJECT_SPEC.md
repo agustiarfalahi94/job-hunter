@@ -19,6 +19,8 @@ Included:
 - CSV import for job rows.
 - Duplicate detection by URL or title/company/location.
 - CLI commands for adding, importing, and listing jobs.
+- Local Markdown draft export for queued jobs.
+- Unsupported-claim warnings for requirements not supported by the public profile.
 - Tests and local verification script.
 
 Not included yet:
