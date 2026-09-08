@@ -6,7 +6,8 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
-from job_hunter.queue import JobInput, JobQueue
+from job_hunter.queue import JobQueue
+from job_hunter.queue_types import JobInput
 
 
 DEFAULT_DB = Path("data/applications.db")
@@ -69,6 +70,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "draft":
+        draft_path = queue.export_draft(args.job_id, args.output_dir)
+        print(f"draft exported: {draft_path}")
+        return 0
+
     parser.print_help()
     return 2
 
@@ -90,6 +96,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     list_jobs = subparsers.add_parser("list", help="List queued jobs")
     list_jobs.add_argument("--status", default=None)
+
+    draft = subparsers.add_parser("draft", help="Export a draft for a queued job")
+    draft.add_argument("job_id", type=int)
+    draft.add_argument("--output-dir", type=Path, default=Path("exports/drafts"))
 
     return parser
 

@@ -8,16 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from job_hunter.drafts import build_application_draft, draft_to_markdown
+from job_hunter.queue_types import JobInput
 from job_hunter.scoring import score_job
-
-
-@dataclass(frozen=True)
-class JobInput:
-    title: str
-    company: str = ""
-    location: str = ""
-    description: str = ""
-    source_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -124,6 +117,23 @@ class JobQueue:
             rows = conn.execute(query, params).fetchall()
         return [_record_from_row(row) for row in rows]
 
+    def export_draft(self, job_id: int, output_dir: Path | str) -> Path:
+        job = self._get_job(job_id)
+        draft = build_application_draft(
+            JobInput(
+                title=job.title,
+                company=job.company,
+                location=job.location,
+                description=job.description,
+                source_url=job.source_url,
+            )
+        )
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        draft_path = output_path / f"job-{job.id}-{_slug(job.title)}.md"
+        draft_path.write_text(draft_to_markdown(draft), encoding="utf-8")
+        return draft_path
+
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -197,3 +207,9 @@ def _dedupe_key(job: JobInput) -> str:
 
 def _normalize(value: str) -> str:
     return " ".join(value.casefold().strip().split())
+
+
+def _slug(value: str) -> str:
+    cleaned = "".join(char.lower() if char.isalnum() else "-" for char in value.strip())
+    parts = [part for part in cleaned.split("-") if part]
+    return "-".join(parts) or "draft"

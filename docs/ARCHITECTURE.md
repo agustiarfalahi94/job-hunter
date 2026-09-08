@@ -20,6 +20,9 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
                   SQLite job queue
                           |
                           v
+                  draft assistant
+                          |
+                          v
               shortlist / review / reject
 ```
 
@@ -31,6 +34,7 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
 | `scoring.py` | Scores one job dictionary against preferences |
 | `queue.py` | Stores scored jobs locally and prevents duplicates |
 | `cli.py` | Provides add/import/list commands for the local workflow |
+| `drafts.py` | Builds local application drafts and warnings from supported evidence |
 | `config/` | Holds public template and private local override path |
 | `docs/` | Captures product and safety decisions |
 | `tests/` | Protects scoring behavior and privacy boundary |
