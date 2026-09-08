@@ -21,6 +21,7 @@ Included:
 - CLI commands for adding, importing, and listing jobs.
 - Local Markdown draft export for queued jobs.
 - Unsupported-claim warnings for requirements not supported by the public profile.
+- Dry-run application packets that default to no submission.
 - Tests and local verification script.
 
 Not included yet:
