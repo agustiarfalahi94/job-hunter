@@ -1,7 +1,7 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v1.9.0.
+v1.9.1.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version includes

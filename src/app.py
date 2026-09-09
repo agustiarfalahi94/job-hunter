@@ -11,11 +11,9 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent))
 
 from job_hunter.app_ui import (
-    editable_criteria_defaults,
     filter_jobs,
     jobs_to_rows,
     provider_status_label,
-    queue_column_widths,
     search_summary_to_rows,
     status_counts,
 )
@@ -53,6 +51,8 @@ TARGET_TITLES = [
 ]
 PRIMARY_KEYWORDS = ["Power BI", "SSRS", "Google BigQuery"]
 SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit", "Company career pages"]
+DEFAULT_STRONG_TARGET = 20
+DEFAULT_SESSION_CAP = 50
 SAMPLE_CSV = """title,company,location,description,source_url
 BI Developer,Example Analytics,Kuala Lumpur,"Build Power BI dashboards, SSRS reports, and SQL datasets.",https://example.com/jobs/bi-developer
 Data Engineer,Example Bank,Kuala Lumpur,"Maintain BigQuery pipelines with Python, Airflow, Docker, and CI/CD.",https://example.com/jobs/data-engineer
@@ -309,7 +309,7 @@ def _render_queue(queue: JobQueue) -> None:
             "Source URL": st.column_config.LinkColumn("Source"),
             **{
                 column: st.column_config.TextColumn(column, width=width)
-                for column, width in queue_column_widths().items()
+                for column, width in _queue_column_widths().items()
                 if column != "Source URL"
             },
         },
@@ -437,12 +437,44 @@ def _cached_malaysia_cities() -> tuple[str, ...]:
 
 
 def _criteria_defaults(preferences: dict[str, object]) -> dict[str, object]:
-    defaults = editable_criteria_defaults(preferences)
+    defaults = _editable_criteria_defaults(preferences)
     if not defaults["target_roles"]:
         defaults["target_roles"] = TARGET_TITLES
     if not defaults["primary_keywords"]:
         defaults["primary_keywords"] = PRIMARY_KEYWORDS
     return defaults
+
+
+def _editable_criteria_defaults(preferences: dict[str, object]) -> dict[str, object]:
+    daily_targets = preferences.get("daily_targets", {})
+    if not isinstance(daily_targets, dict):
+        daily_targets = {}
+    return {
+        "target_roles": _string_list(preferences.get("target_roles")),
+        "primary_keywords": _string_list(preferences.get("primary_keywords")),
+        "bonus_keywords": _string_list(preferences.get("bonus_keywords")),
+        "hard_skip_keywords": _string_list(preferences.get("hard_skip_keywords")),
+        "strong_target": int(daily_targets.get("strong_matches", DEFAULT_STRONG_TARGET)),
+        "session_cap": int(daily_targets.get("suitable_matches", DEFAULT_SESSION_CAP)),
+    }
+
+
+def _queue_column_widths() -> dict[str, str]:
+    return {
+        "Title": "large",
+        "Company": "medium",
+        "Location": "medium",
+        "Reasons": "large",
+        "Remarks": "large",
+        "Description": "large",
+        "Source URL": "medium",
+    }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
 
 
 def _active_preferences(preferences: dict[str, object]) -> dict[str, object]:

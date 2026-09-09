@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.1 - 2026-09-09
+
+- Fixed Streamlit Cloud import-time compatibility after the v1.9.0 UI cleanup.
+- Added a regression test so the Streamlit entrypoint does not directly import
+  newly added app UI helper names that can be stale during Cloud hot reloads.
+
 ## 1.9.0 - 2026-09-09
 
 - Simplified the Streamlit app into two clear workflows: Automated search and
