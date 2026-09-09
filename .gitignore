@@ -11,6 +11,7 @@ build/
 *.egg-info/
 .agents/
 .claude/
+.worktrees/
 
 # Private inputs and run outputs
 .env
