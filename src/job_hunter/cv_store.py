@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 CV_FILENAME = "current_cv.pdf"
+CV_TEXT_FILENAME = "current_cv.txt"
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class CVStore:
     def __init__(self, storage_dir: Path | str) -> None:
         self.storage_dir = Path(storage_dir)
         self.path = self.storage_dir / CV_FILENAME
+        self.text_path = self.storage_dir / CV_TEXT_FILENAME
 
     def status(self) -> CVStatus:
         if not self.path.exists():
@@ -36,6 +38,17 @@ class CVStore:
     def remove(self) -> None:
         if self.path.exists():
             self.path.unlink()
+        if self.text_path.exists():
+            self.text_path.unlink()
+
+    def save_text(self, text: str) -> None:
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.text_path.write_text(text.strip(), encoding="utf-8")
+
+    def load_text(self) -> str:
+        if not self.text_path.exists():
+            return ""
+        return self.text_path.read_text(encoding="utf-8")
 
 
 def format_size(size_bytes: int) -> str:

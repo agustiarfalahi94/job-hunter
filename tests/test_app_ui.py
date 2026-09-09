@@ -1,7 +1,8 @@
 import unittest
 
-from job_hunter.app_ui import filter_jobs, jobs_to_rows, status_counts
+from job_hunter.app_ui import filter_jobs, jobs_to_rows, search_summary_to_rows, status_counts
 from job_hunter.queue import JobRecord
+from job_hunter.search import SearchRunSummary
 
 
 class AppUiTest(unittest.TestCase):
@@ -48,6 +49,21 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(counts["new"], 1)
         self.assertEqual(counts["submitted"], 1)
         self.assertEqual(counts["drafted"], 0)
+
+    def test_search_summary_to_rows_formats_counts_and_logs(self):
+        summary = SearchRunSummary(
+            checked=2,
+            added=1,
+            duplicates=1,
+            skipped=0,
+            logs=("Searching LinkedIn", "Duplicate skipped: BI Developer at Acme"),
+        )
+
+        rows = search_summary_to_rows(summary)
+
+        self.assertEqual(rows[0]["Metric"], "Checked")
+        self.assertEqual(rows[0]["Value"], 2)
+        self.assertIn("Duplicate skipped", rows[-1]["Detail"])
 
 
 if __name__ == "__main__":

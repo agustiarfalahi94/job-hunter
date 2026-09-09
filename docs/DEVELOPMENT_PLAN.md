@@ -59,3 +59,13 @@
   without pretending job-board scraping is implemented.
 - Updated duplicate handling so exact same roles across platforms are skipped.
 - Clarified public deployment limits around authentication and per-user data.
+
+## v1.4 - Public Search Automation
+
+- Added CV PDF text extraction and private extracted-text storage.
+- Added CV signal detection for primary and bonus matching keywords.
+- Added public web-result search for selected platforms.
+- Added real Streamlit search execution with logs, scoring, queue insertion,
+  and duplicate handling.
+- Added production dependency list for Streamlit Cloud.
+- Added changelog and implementation-plan documentation.

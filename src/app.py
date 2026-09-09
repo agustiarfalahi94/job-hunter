@@ -10,11 +10,13 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from job_hunter.app_ui import filter_jobs, jobs_to_rows, status_counts
+from job_hunter.app_ui import filter_jobs, jobs_to_rows, search_summary_to_rows, status_counts
+from job_hunter.cv_parser import detect_cv_signals, extract_cv_text_from_pdf_bytes
 from job_hunter.cv_store import CVStore, format_size
 from job_hunter.preferences import load_preferences
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
+from job_hunter.search import SearchCriteria, build_search_queries, run_public_search
 from job_hunter.workflow import daily_summary, summary_to_text
 
 
@@ -68,7 +70,7 @@ def main() -> None:
     with tabs[0]:
         _render_profile(cv_store, preferences)
     with tabs[1]:
-        _render_search_setup()
+        _render_search_setup(queue, preferences, cv_store)
     with tabs[2]:
         _render_queue(queue)
     with tabs[3]:
@@ -128,12 +130,25 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
 
         uploaded = st.file_uploader("Upload or replace CV", type=["pdf"])
         if uploaded is not None and st.button("Save CV locally", icon=":material/save:"):
-            cv_store.save_pdf(uploaded.getvalue())
-            st.toast("CV saved locally.")
+            content = uploaded.getvalue()
+            cv_store.save_pdf(content)
+            try:
+                cv_store.save_text(extract_cv_text_from_pdf_bytes(content))
+                st.toast("CV saved and readable text extracted.")
+            except Exception as exc:
+                st.warning(f"CV was saved, but text extraction failed: {exc}")
             st.rerun()
 
     with st.container(border=True):
         st.markdown("**What the app currently knows from your CV-backed profile**")
+        cv_text = cv_store.load_text()
+        if cv_text:
+            signals = detect_cv_signals(cv_text, preferences)
+            st.success(f"Extracted CV text is available. Detected {signals.total_matches} matching profile signals.")
+            _render_keyword_chips("Detected primary CV signals", list(signals.primary_matches))
+            _render_keyword_chips("Detected bonus CV signals", list(signals.bonus_matches))
+        else:
+            st.caption("Upload your CV to extract local text signals. The scoring fallback still uses the documented public profile.")
         cols = st.columns(3)
         cols[0].metric("Primary strengths", "Power BI / SSRS / BigQuery")
         cols[1].metric("Strong target", "20 jobs")
@@ -146,11 +161,18 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
             _render_keyword_chips("Hard skips", [str(item) for item in hard_skips])
 
 
-def _render_search_setup() -> None:
+def _render_search_setup(queue: JobQueue, preferences: dict[str, object], cv_store: CVStore) -> None:
     st.subheader("Search setup")
     st.write(
-        "This is the flow you described: set title, description keywords, exact location, and selected platforms, then run up to 50 job checks in one session."
+        "Set title, description keywords, exact location, and selected platforms, then run up to 50 public search-result checks in one session."
     )
+    cv_text = cv_store.load_text()
+    if cv_text:
+        signals = detect_cv_signals(cv_text, preferences)
+        st.success(f"CV text loaded for this session. Detected {signals.total_matches} matching signals.")
+    else:
+        st.warning("No extracted CV text is available yet. Upload a CV on the Profile & CV page, or continue with the documented profile fallback.")
+
     with st.container(border=True):
         title_contains = st.multiselect(
             "Job title contains",
@@ -163,8 +185,29 @@ def _render_search_setup() -> None:
         max_jobs = st.slider("Maximum jobs in one session", min_value=1, max_value=50, value=50)
 
         disabled = not title_contains or not description_contains or not platforms
-        if st.button("Preview search run", icon=":material/play_arrow:", disabled=disabled):
-            _render_search_preview(max_jobs=max_jobs, location=str(location), platforms=platforms)
+        criteria = SearchCriteria(
+            title_terms=tuple(str(item) for item in title_contains),
+            description_terms=tuple(str(item) for item in description_contains),
+            location=str(location),
+            platforms=tuple(str(item) for item in platforms),
+            max_results=int(max_jobs),
+        )
+        with st.expander("Queries that will run"):
+            for query in build_search_queries(criteria):
+                st.markdown(f"**{query.platform}**")
+                st.code(query.query, language="text")
+
+        with st.container(horizontal=True, wrap=True):
+            if st.button("Run search and score jobs", icon=":material/search:", disabled=disabled):
+                with st.status("Searching public results and scoring jobs", expanded=True) as status:
+                    summary = run_public_search(criteria, preferences, queue)
+                    for log in summary.logs:
+                        st.write(log)
+                    status.update(label="Search run finished", state="complete")
+                st.dataframe(search_summary_to_rows(summary), hide_index=True)
+                st.success("Open Job queue to review the scored results.")
+            if st.button("Preview search run", icon=":material/play_arrow:", disabled=disabled):
+                _render_search_preview(max_jobs=max_jobs, location=str(location), platforms=platforms)
 
     with st.expander("Current workflow vs target workflow", expanded=True):
         st.markdown(
@@ -172,7 +215,7 @@ def _render_search_setup() -> None:
 **Current workflow**
 
 1. Upload or keep your CV locally.
-2. Add jobs manually, or import a CSV gathered from job boards.
+2. Search public web results for selected platforms, add jobs manually, or import a CSV.
 3. Job Hunter scores each job, explains why it matched or did not match, and keeps skipped/low-suitability remarks.
 4. You review the queue and export a draft or application packet.
 5. You apply outside the app, then update the job status.
@@ -180,10 +223,10 @@ def _render_search_setup() -> None:
 **Target workflow**
 
 1. You choose platforms and search rules.
-2. The app searches up to 50 jobs, logs each checked job, and scores them.
+2. The app searches public search-result pages for up to 50 jobs, logs each checked job, and scores them.
 3. Exact duplicates across platforms are skipped using title, company, and location.
 4. You apply one by one, or review a batch before applying all.
-5. Real job-board login and submission automation will be added only when the browser/login flow is safe and reliable.
+5. Job-board login and submission automation will be added only when the browser/login flow is safe and reliable.
 """
         )
 

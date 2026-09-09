@@ -1,18 +1,24 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v1.3.0.
+v1.4.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version includes
 the project brain, a factual candidate profile, preferences template, scoring
-rules, Streamlit dashboard, local CV upload storage, SQLite queue, CSV import,
-duplicate detection, draft exports, and a small CLI.
+rules, Streamlit dashboard, local CV upload and text extraction, public
+web-result search, SQLite queue, CSV import, duplicate detection, draft
+exports, and a small CLI.
 
 ## What It Does
 
 - Scores a job against target roles, locations, preferred keywords, and avoid
   keywords.
+- Extracts readable text from a locally uploaded CV PDF.
+- Detects primary and bonus CV signals from the extracted text.
+- Searches public LinkedIn job cards and public web-result pages for selected
+  job platforms.
+- Adds and scores discovered search results into the local queue.
 - Stores scored jobs in a local SQLite queue.
 - Deduplicates exact same jobs by title/company/location, even when different
   platforms have different URLs.
@@ -27,6 +33,7 @@ duplicate detection, draft exports, and a small CLI.
 - Applies hard skips for local-only and mandatory Mandarin requirements.
 - Runs as a Streamlit web app for daily use.
 - Saves/replaces/removes a local CV file under a git-ignored private folder.
+- Saves extracted CV text under the same git-ignored private folder.
 - Explains every Streamlit page with sample data and current/future workflow
   boundaries.
 - Separates public project templates from private candidate inputs.
@@ -54,6 +61,8 @@ working copy at `config/preferences.local.yaml`.
 | `src/job_hunter/scoring.py` | Deterministic v0.1 scoring engine |
 | `src/job_hunter/queue.py` | SQLite queue, scoring-at-import, and duplicate detection |
 | `src/job_hunter/cv_store.py` | Local private CV save, replace, remove, and status helpers |
+| `src/job_hunter/cv_parser.py` | Extracts CV text and detects CV keyword signals |
+| `src/job_hunter/search.py` | Builds public search queries, parses result pages, and ingests results |
 | `src/job_hunter/cli.py` | Local commands for adding, importing, and listing jobs |
 | `src/job_hunter/drafts.py` | Truthful draft generation and unsupported-claim warnings |
 | `src/job_hunter/application_packet.py` | Dry-run application packets with submit safety notes |
@@ -84,8 +93,8 @@ streamlit run src/app.py
 The web app currently has these pages:
 
 - `Profile & CV`: upload, replace, or remove the local private CV file.
-- `Search setup`: configure the intended 50-job search flow and preview the
-  future scraping progress log.
+- `Search setup`: configure the 50-job search flow, preview public queries,
+  then run public search and score results.
 - `Job queue`: review scored jobs, remarks, decisions, and source links.
 - `Add job`: paste one job description and score it immediately.
 - `Import CSV`: bulk-load jobs with example CSV data.
@@ -102,6 +111,18 @@ src/app.py
 The hosted app will use its own Streamlit Cloud storage. Treat a public
 deployment as a demo until authentication and per-user storage exist. Do not
 upload private CV files or secrets to a public deployment.
+
+### Production Search Boundary
+
+The Streamlit search button reads public LinkedIn job cards when available,
+then uses public web-result search for the other selected platforms. It scores
+the visible title/company/location/snippet/source URL. It does not log in to
+LinkedIn, JobStreet, Indeed, Foundit, or company portals. It also does not
+bypass CAPTCHA, submit forms, or use saved browser sessions.
+
+For stronger production search later, add a provider behind `search.py`, such
+as SerpAPI, Google Custom Search, Adzuna, a paid job-search API, or official
+company ATS feeds. Put provider keys in Streamlit secrets, never in Git.
 
 ## CLI
 
@@ -149,7 +170,7 @@ PYTHONPATH=src python3 -m job_hunter.cli status 1 submitted
 Check today's progress toward 20 strong matches:
 
 ```sh
-PYTHONPATH=src python3 -m job_hunter.cli today --target 100
+PYTHONPATH=src python3 -m job_hunter.cli today --target 20
 ```
 
 The current local target is 20 strong matches, with up to 50 suitable matches
@@ -167,15 +188,16 @@ The style follows the user's existing projects:
 
 ## Status
 
-This is a local daily workflow assistant, not a live website automation bot
-yet. The first usable loop is:
+This is a local daily workflow assistant with public search support, not a live
+job-board login or auto-apply bot yet. The first usable loop is:
 
-1. Paste or import a job description.
-2. Score it against the candidate profile and preferences.
-3. Put promising jobs into a human-reviewed application queue.
-4. Generate tailored drafts only from supported experience.
-5. Submit manually until browser automation is designed and tested.
-6. Mark submitted jobs locally and check daily progress.
+1. Upload a CV locally.
+2. Search public web results, paste a job description, or import a CSV.
+3. Score jobs against the candidate profile and preferences.
+4. Put promising jobs into a human-reviewed application queue.
+5. Generate tailored drafts only from supported experience.
+6. Submit manually until browser automation is designed and tested.
+7. Mark submitted jobs locally and check daily progress.
 
 The target automated loop is documented in the Streamlit `Search setup` page:
 choose platforms, search up to 50 jobs, score and deduplicate them, then review

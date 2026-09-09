@@ -29,12 +29,16 @@ Included:
 - Mandatory remarks for weak or skipped matches.
 - Streamlit web dashboard for local/manual real-world testing.
 - Local CV upload, replace, remove, and status display in the Streamlit app.
+- Local CV text extraction and keyword signal detection.
+- Public LinkedIn job-card search and public web-result search for selected
+  platforms.
+- Search run logs, scoring, dedupe, and queue insertion for up to 50 results.
 - Page-level descriptions and sample data for the web app.
 - Tests and local verification script.
 
 Not included yet:
 
-- Job-board scraping.
+- Authenticated job-board scraping.
 - Auto-submission.
 - LLM-generated cover letters.
 - Live job-board browser automation.
@@ -46,6 +50,7 @@ Not included yet:
 - A developer can run the tests on a fresh clone.
 - The candidate profile does not include unsupported or private claims.
 - The scoring rules are easy to inspect and adjust.
+- The Streamlit app can run a real public search and insert scored results.
 - The next development phase is clear.
 
 ## Reference Projects Studied
