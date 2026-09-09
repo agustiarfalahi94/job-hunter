@@ -33,8 +33,9 @@ config/preferences.local.yaml   docs/CANDIDATE_PROFILE.md
               shortlist / review / reject
 
 data/private/cv/current_cv.pdf stays outside Git and is managed separately by
-the Streamlit profile page. Extracted CV text is saved beside the PDF and used
-for Streamlit signal display.
+the Streamlit profile page. Word uploads use the same private folder with the
+original supported extension. Extracted CV text is saved beside the uploaded
+file and used for Streamlit signal display.
 ```
 
 ## Components
@@ -47,6 +48,8 @@ for Streamlit signal display.
 | `cv_store.py` | Saves, replaces, removes, and reports local private CV status |
 | `cv_parser.py` | Extracts CV text and detects primary/bonus keyword signals |
 | `search.py` | Builds public search queries, parses result pages, and ingests candidates |
+| `locations.py` | Fetches Malaysia city names and filters autocomplete options |
+| `runtime_config.py` | Loads optional search provider keys from secrets or environment |
 | `cli.py` | Provides add/import/list commands for the local workflow |
 | `drafts.py` | Builds local application drafts and warnings from supported evidence |
 | `application_packet.py` | Builds dry-run packets for human-reviewed application steps |
@@ -71,6 +74,7 @@ Private:
 - Local preferences.
 - Application records.
 - Job-board credentials/session data.
+- Streamlit secrets.
 
 ## Provider Boundary
 
@@ -80,11 +84,10 @@ changing application workflow code.
 
 ## Search Boundary
 
-The v1.4 search provider reads public LinkedIn job cards when available and
-public search-result pages for the remaining selected platforms. It scores the
-visible title/company/location/snippet/source URL. This is production-testable
-on Streamlit Cloud without credentials, but it is intentionally weaker than
-authenticated job-board integration. Authenticated search and auto-apply flows
-must be added as explicit provider modules with user-controlled credentials,
-rate limits, site-specific permission checks, and human confirmation before
-submission.
+The search provider reads optional SerpAPI results when configured, public
+LinkedIn job cards when available, and public search-result pages for remaining
+selected platforms. It scores the visible title/company/location/snippet/source
+URL. This is production-testable on Streamlit Cloud, but authenticated search
+and auto-apply flows must be added as explicit provider modules with
+user-controlled credentials, rate limits, site-specific permission checks, and
+human confirmation before submission.

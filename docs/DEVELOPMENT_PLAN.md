@@ -69,3 +69,27 @@
   and duplicate handling.
 - Added production dependency list for Streamlit Cloud.
 - Added changelog and implementation-plan documentation.
+
+## v1.5 - Word CV Uploads
+
+- Added PDF, DOCX, and best-effort legacy DOC CV upload handling.
+- Added DOCX paragraph/table text extraction with `python-docx`.
+- Preserved private CV storage and expanded Word file ignore rules.
+
+## v1.6 - API-Ready Search
+
+- Added optional SerpAPI configuration through Streamlit secrets or environment.
+- Added API search query construction and JSON result parsing.
+- Kept free public search fallback when no key is configured.
+
+## v1.7 - City Autocomplete
+
+- Added Malaysia city lookup through the CountriesNow public API.
+- Added local fallback city data and filtered city options.
+- Wired location selection into the Streamlit search flow.
+
+## v1.8 - Production Readiness
+
+- Added Streamlit production-readiness tab.
+- Added secrets example file and deployment documentation.
+- Added final release documentation, versioning, review, and verification pass.

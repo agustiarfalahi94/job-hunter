@@ -17,6 +17,8 @@ build/
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
+!.streamlit/secrets.example.toml
 config/preferences.local.yaml
 data/private/
 data/raw/
@@ -28,3 +30,4 @@ exports/
 # Personal documents must stay local.
 *.pdf
 *.docx
+*.doc

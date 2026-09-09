@@ -12,6 +12,25 @@ class CVStoreTest(unittest.TestCase):
 
             self.assertFalse(store.status().exists)
 
+    def test_saves_file_with_original_supported_extension(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = CVStore(Path(tmpdir) / "private" / "cv")
+
+            status = store.save_file(b"docx-content", "Resume.DOCX")
+
+            self.assertTrue(status.exists)
+            self.assertEqual(status.path.name, "current_cv.docx")
+            self.assertEqual(status.size_bytes, 12)
+
+    def test_save_file_clears_previous_extracted_text(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = CVStore(Path(tmpdir) / "private" / "cv")
+            store.save_text("old extracted text")
+
+            store.save_file(b"new-doc", "resume.doc")
+
+            self.assertEqual(store.load_text(), "")
+
             first = store.save_pdf(b"%PDF-first")
             self.assertTrue(first.exists)
             self.assertEqual(first.size_bytes, 10)

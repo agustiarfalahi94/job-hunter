@@ -1,6 +1,6 @@
 import unittest
 
-from job_hunter.app_ui import filter_jobs, jobs_to_rows, search_summary_to_rows, status_counts
+from job_hunter.app_ui import filter_jobs, jobs_to_rows, provider_status_label, search_summary_to_rows, status_counts
 from job_hunter.queue import JobRecord
 from job_hunter.search import SearchRunSummary
 
@@ -64,6 +64,10 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(rows[0]["Metric"], "Checked")
         self.assertEqual(rows[0]["Value"], 2)
         self.assertIn("Duplicate skipped", rows[-1]["Detail"])
+
+    def test_provider_status_label_explains_api_and_fallback_modes(self):
+        self.assertEqual(provider_status_label(True), "API search enabled")
+        self.assertEqual(provider_status_label(False), "Free public search fallback")
 
 
 if __name__ == "__main__":

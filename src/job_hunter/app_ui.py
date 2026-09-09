@@ -53,3 +53,7 @@ def search_summary_to_rows(summary: SearchRunSummary) -> list[dict[str, object]]
     ]
     rows.extend({"Metric": "Log", "Value": "", "Detail": log} for log in summary.logs)
     return rows
+
+
+def provider_status_label(has_api_search: bool) -> str:
+    return "API search enabled" if has_api_search else "Free public search fallback"

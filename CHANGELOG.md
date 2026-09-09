@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.8.0 - 2026-09-09
+
+- Added Streamlit production-readiness guidance inside the app.
+- Added `.streamlit/secrets.example.toml` for optional API search configuration.
+- Added deployment, privacy, and automation-boundary documentation.
+- Added final release verification and code-review workflow notes.
+
+## 1.7.0 - 2026-09-09
+
+- Added Malaysia city autocomplete backed by the CountriesNow public API.
+- Added local city fallback data so the app still works when the API is down.
+- Wired location selection into Search setup and Add job.
+
+## 1.6.0 - 2026-09-09
+
+- Added optional SerpAPI-backed search configuration through Streamlit secrets
+  or environment variables.
+- Kept free public LinkedIn search and public-result fallback when no API key is
+  configured.
+- Added provider status labels and blocked-provider logging.
+
+## 1.5.0 - 2026-09-09
+
+- Added CV upload support for PDF, DOCX, and best-effort legacy DOC files.
+- Added DOCX text extraction from paragraphs and tables.
+- Added private CV storage with the original supported extension.
+- Expanded private file ignore rules for Word documents.
+
 ## 1.4.0 - 2026-09-09
 
 - Added local CV text extraction from uploaded PDF files.

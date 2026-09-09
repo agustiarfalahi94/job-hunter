@@ -30,10 +30,14 @@ Included:
 - Streamlit web dashboard for local/manual real-world testing.
 - Local CV upload, replace, remove, and status display in the Streamlit app.
 - Local CV text extraction and keyword signal detection.
+- PDF, DOCX, and best-effort legacy DOC CV uploads.
 - Public LinkedIn job-card search and public web-result search for selected
   platforms.
+- Optional SerpAPI-backed search through Streamlit secrets or environment.
+- Malaysia city autocomplete with CountriesNow API and local fallback.
 - Search run logs, scoring, dedupe, and queue insertion for up to 50 results.
 - Page-level descriptions and sample data for the web app.
+- Production-readiness page and secrets template.
 - Tests and local verification script.
 
 Not included yet:
@@ -43,6 +47,7 @@ Not included yet:
 - LLM-generated cover letters.
 - Live job-board browser automation.
 - Public deployment authentication and per-user storage.
+- Guaranteed legacy `.doc` extraction for every old Word binary format.
 
 ## Success Criteria
 

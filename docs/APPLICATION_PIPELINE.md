@@ -58,3 +58,16 @@ Browser automation should be designed as a separate phase. It must handle:
 
 The first safe target is assisted form filling, not fully autonomous
 submission.
+
+## Production Testing Notes
+
+In Streamlit Community Cloud, the current safe production path is:
+
+1. Upload a PDF, DOCX, or legacy DOC CV file.
+2. Confirm readable CV text signals appear.
+3. Choose a Malaysia city and selected platforms.
+4. Run search and review the queue.
+5. Open application links manually and update status after human submission.
+
+Optional API search requires `SERPAPI_API_KEY` in Streamlit secrets. Without it,
+the app uses free public search fallbacks that can be blocked or incomplete.

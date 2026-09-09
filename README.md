@@ -1,23 +1,26 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v1.4.0.
+v1.8.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version includes
 the project brain, a factual candidate profile, preferences template, scoring
-rules, Streamlit dashboard, local CV upload and text extraction, public
-web-result search, SQLite queue, CSV import, duplicate detection, draft
-exports, and a small CLI.
+rules, Streamlit dashboard, PDF/Word CV upload and text extraction, public
+and optional API-backed search, city autocomplete, SQLite queue, CSV import,
+duplicate detection, draft exports, and a small CLI.
 
 ## What It Does
 
 - Scores a job against target roles, locations, preferred keywords, and avoid
   keywords.
-- Extracts readable text from a locally uploaded CV PDF.
+- Extracts readable text from locally uploaded PDF, DOCX, and best-effort DOC
+  CV files.
 - Detects primary and bonus CV signals from the extracted text.
 - Searches public LinkedIn job cards and public web-result pages for selected
   job platforms.
+- Supports optional SerpAPI search through Streamlit secrets.
+- Loads Malaysia city options from a public city API with local fallback.
 - Adds and scores discovered search results into the local queue.
 - Stores scored jobs in a local SQLite queue.
 - Deduplicates exact same jobs by title/company/location, even when different
@@ -49,6 +52,7 @@ This repository is intended to be public. Do not commit:
 - Job-board session cookies, exported browser profiles, or application drafts
   containing private information.
 - API keys or model provider credentials.
+- `.streamlit/secrets.toml`.
 
 Use `config/preferences.example.yaml` as the public template. Keep the real
 working copy at `config/preferences.local.yaml`.
@@ -63,6 +67,8 @@ working copy at `config/preferences.local.yaml`.
 | `src/job_hunter/cv_store.py` | Local private CV save, replace, remove, and status helpers |
 | `src/job_hunter/cv_parser.py` | Extracts CV text and detects CV keyword signals |
 | `src/job_hunter/search.py` | Builds public search queries, parses result pages, and ingests results |
+| `src/job_hunter/locations.py` | Loads/filter Malaysia city choices for autocomplete |
+| `src/job_hunter/runtime_config.py` | Reads optional API search config from secrets/env |
 | `src/job_hunter/cli.py` | Local commands for adding, importing, and listing jobs |
 | `src/job_hunter/drafts.py` | Truthful draft generation and unsupported-claim warnings |
 | `src/job_hunter/application_packet.py` | Dry-run application packets with submit safety notes |
@@ -100,6 +106,8 @@ The web app currently has these pages:
 - `Import CSV`: bulk-load jobs with example CSV data.
 - `Drafts & packets`: export application drafts and review packets.
 - `Progress`: check progress toward the current 20-strong-match target.
+- `Production readiness`: review Streamlit deployment, secrets, storage, and
+  automation limits.
 
 For free hosting, deploy this repository on Streamlit Community Cloud and set
 the app entry point to:
@@ -112,6 +120,15 @@ The hosted app will use its own Streamlit Cloud storage. Treat a public
 deployment as a demo until authentication and per-user storage exist. Do not
 upload private CV files or secrets to a public deployment.
 
+Optional API search uses this secret:
+
+```toml
+SERPAPI_API_KEY = "your-key-here"
+```
+
+You can set that in Streamlit Community Cloud secrets. Do not commit a real
+`.streamlit/secrets.toml` file.
+
 ### Production Search Boundary
 
 The Streamlit search button reads public LinkedIn job cards when available,
@@ -120,9 +137,10 @@ the visible title/company/location/snippet/source URL. It does not log in to
 LinkedIn, JobStreet, Indeed, Foundit, or company portals. It also does not
 bypass CAPTCHA, submit forms, or use saved browser sessions.
 
-For stronger production search later, add a provider behind `search.py`, such
-as SerpAPI, Google Custom Search, Adzuna, a paid job-search API, or official
-company ATS feeds. Put provider keys in Streamlit secrets, never in Git.
+For stronger production search, configure SerpAPI first. Future providers can
+be added behind `search.py`, such as Google Custom Search, Adzuna, a paid
+job-search API, or official company ATS feeds. Put provider keys in Streamlit
+secrets, never in Git.
 
 ## CLI
 

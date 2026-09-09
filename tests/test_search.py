@@ -3,10 +3,13 @@ import unittest
 from pathlib import Path
 
 from job_hunter.queue import JobQueue
+from job_hunter.runtime_config import SearchProviderConfig
 from job_hunter.search import (
     SearchCriteria,
+    build_serpapi_queries,
     build_direct_platform_queries,
     build_search_queries,
+    parse_serpapi_results,
     parse_linkedin_jobs,
     parse_duckduckgo_results,
     run_public_search,
@@ -54,6 +57,23 @@ LINKEDIN_HTML = """
 </html>
 """
 
+SERPAPI_JSON = """
+{
+  "organic_results": [
+    {
+      "title": "BI Developer - HCLTech",
+      "link": "https://my.linkedin.com/jobs/view/123",
+      "snippet": "Power BI reporting role in Kuala Lumpur."
+    },
+    {
+      "title": "Data Analyst - Example Bank",
+      "link": "https://my.jobstreet.com/job/456",
+      "snippet": "BigQuery dashboards and Python scripts."
+    }
+  ]
+}
+"""
+
 
 class SearchTest(unittest.TestCase):
     def test_build_search_queries_targets_selected_platforms(self):
@@ -89,6 +109,30 @@ class SearchTest(unittest.TestCase):
         self.assertEqual(queries[0].platform, "LinkedIn")
         self.assertIn("linkedin.com/jobs/search", queries[0].url)
         self.assertIn("BI+Developer+Power+BI", queries[0].url)
+
+    def test_build_serpapi_queries_uses_key_without_exposing_it_in_query(self):
+        criteria = SearchCriteria(
+            title_terms=("Data Analyst",),
+            description_terms=("Power BI",),
+            location="Kuala Lumpur",
+            platforms=("JobStreet",),
+            max_results=10,
+        )
+
+        queries = build_serpapi_queries(criteria, api_key="secret-key")
+
+        self.assertEqual(len(queries), 1)
+        self.assertEqual(queries[0].parser, "serpapi")
+        self.assertIn("api_key=secret-key", queries[0].url)
+        self.assertNotIn("secret-key", queries[0].query)
+
+    def test_parse_serpapi_results_extracts_candidates(self):
+        candidates = parse_serpapi_results(SERPAPI_JSON, platform="JobStreet", location="Kuala Lumpur", limit=5)
+
+        self.assertEqual(len(candidates), 2)
+        self.assertEqual(candidates[0].title, "BI Developer")
+        self.assertEqual(candidates[0].company, "HCLTech")
+        self.assertIn("Power BI", candidates[0].description)
 
     def test_parse_linkedin_jobs_extracts_public_job_cards(self):
         candidates = parse_linkedin_jobs(LINKEDIN_HTML, location="Kuala Lumpur", limit=5)
@@ -150,6 +194,61 @@ class SearchTest(unittest.TestCase):
         self.assertEqual(summary.duplicates, 0)
         self.assertEqual(len(jobs), 2)
         self.assertTrue(any("Added Power BI Developer" in line for line in summary.logs))
+
+    def test_run_public_search_uses_serpapi_when_key_is_available(self):
+        preferences = {
+            "target_roles": ["Data Analyst"],
+            "target_locations": ["Kuala Lumpur"],
+            "primary_keywords": ["BigQuery"],
+            "minimum_score_to_apply": 90,
+        }
+        criteria = SearchCriteria(
+            title_terms=("Data Analyst",),
+            description_terms=("BigQuery",),
+            location="Kuala Lumpur",
+            platforms=("JobStreet",),
+            max_results=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            summary = run_public_search(
+                criteria,
+                preferences,
+                queue,
+                fetcher=lambda url: SERPAPI_JSON,
+                provider_config=SearchProviderConfig(serpapi_key="secret-key"),
+            )
+
+        self.assertEqual(summary.checked, 1)
+        self.assertEqual(summary.added, 1)
+        self.assertTrue(any("API search JobStreet" in line for line in summary.logs))
+
+    def test_run_public_search_does_not_log_api_key_from_provider_errors(self):
+        criteria = SearchCriteria(
+            title_terms=("Data Analyst",),
+            description_terms=("BigQuery",),
+            location="Kuala Lumpur",
+            platforms=("JobStreet",),
+            max_results=1,
+        )
+
+        def failing_fetcher(url):
+            raise RuntimeError(f"403 for {url}")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            summary = run_public_search(
+                criteria,
+                {},
+                queue,
+                fetcher=failing_fetcher,
+                provider_config=SearchProviderConfig(serpapi_key="secret-key"),
+            )
+
+        self.assertEqual(summary.skipped, 1)
+        self.assertNotIn("secret-key", "\n".join(summary.logs))
+        self.assertIn("request failed", "\n".join(summary.logs))
 
 
 if __name__ == "__main__":

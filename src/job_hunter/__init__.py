@@ -1,4 +1,4 @@
-"""Job Hunter v1.4."""
+"""Job Hunter v1.8."""
 
 __all__ = [
     "application_packet",
@@ -6,11 +6,13 @@ __all__ = [
     "cv_store",
     "cv_parser",
     "drafts",
+    "locations",
     "preferences",
     "profile",
     "queue",
     "queue_types",
     "scoring",
     "search",
+    "runtime_config",
     "workflow",
 ]

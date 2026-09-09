@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+import json
+from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urlparse
 
 from bs4 import BeautifulSoup
 
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
+from job_hunter.runtime_config import SearchProviderConfig
 
 
 DUCKDUCKGO_HTML_URL = "https://duckduckgo.com/html/?q={query}"
 LINKEDIN_SEARCH_URL = "https://www.linkedin.com/jobs/search/?keywords={keywords}&location={location}"
+SERPAPI_URL = "https://serpapi.com/search.json?{params}"
 PLATFORM_SITE_FILTERS = {
     "LinkedIn": "site:linkedin.com/jobs",
     "JobStreet": "site:my.jobstreet.com",
@@ -106,6 +109,50 @@ def build_direct_platform_queries(criteria: SearchCriteria) -> list[PlatformQuer
     return queries
 
 
+def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[PlatformQuery]:
+    if not api_key:
+        return []
+    queries = []
+    for platform_query in build_search_queries(criteria):
+        params = urlencode({"engine": "google", "q": platform_query.query, "api_key": api_key, "num": criteria.max_results})
+        queries.append(
+            PlatformQuery(
+                platform=platform_query.platform,
+                query=platform_query.query,
+                url=SERPAPI_URL.format(params=params),
+                parser="serpapi",
+            )
+        )
+    return queries
+
+
+def parse_serpapi_results(payload: str, platform: str, location: str, limit: int) -> list[SearchCandidate]:
+    data = json.loads(payload or "{}")
+    candidates: list[SearchCandidate] = []
+    for item in data.get("organic_results", []):
+        if len(candidates) >= limit:
+            break
+        title_text = str(item.get("title", "")).strip()
+        href = str(item.get("link", "")).strip()
+        snippet = str(item.get("snippet", "")).strip()
+        title, company = _split_title_company(title_text)
+        if not title or not href:
+            continue
+        if not _looks_like_job_result(href, title_text, platform):
+            continue
+        candidates.append(
+            SearchCandidate(
+                title=title,
+                company=company,
+                location=location,
+                description=snippet or title_text,
+                source_url=href,
+                platform=platform,
+            )
+        )
+    return candidates
+
+
 def parse_linkedin_jobs(html: str, location: str, limit: int) -> list[SearchCandidate]:
     soup = BeautifulSoup(html, "html.parser")
     candidates: list[SearchCandidate] = []
@@ -175,6 +222,7 @@ def run_public_search(
     preferences: dict[str, object],
     queue: JobQueue,
     fetcher: Callable[[str], str] | None = None,
+    provider_config: SearchProviderConfig | None = None,
 ) -> SearchRunSummary:
     fetch = fetcher or fetch_public_html
     checked = 0
@@ -183,18 +231,23 @@ def run_public_search(
     skipped = 0
     logs: list[str] = []
     remaining = max(0, min(50, criteria.max_results))
-    platform_queries = build_direct_platform_queries(criteria)
-    direct_platforms = {query.platform for query in platform_queries}
-    platform_queries.extend(query for query in build_search_queries(criteria) if query.platform not in direct_platforms)
+    provider = provider_config or SearchProviderConfig()
+    if provider.has_api_search:
+        platform_queries = build_serpapi_queries(criteria, provider.serpapi_key)
+    else:
+        platform_queries = build_direct_platform_queries(criteria)
+        direct_platforms = {query.platform for query in platform_queries}
+        platform_queries.extend(query for query in build_search_queries(criteria) if query.platform not in direct_platforms)
     for platform_query in platform_queries:
         if remaining <= 0:
             break
-        logs.append(f"Searching {platform_query.platform}: {platform_query.query}")
+        prefix = "API search" if platform_query.parser == "serpapi" else "Searching"
+        logs.append(f"{prefix} {platform_query.platform}: {platform_query.query}")
         try:
             html = fetch(platform_query.url)
-        except Exception as exc:
+        except Exception:
             skipped += 1
-            logs.append(f"Skipped {platform_query.platform}: {exc}")
+            logs.append(f"Skipped {platform_query.platform}: request failed")
             continue
         if _is_blocked_search_page(html):
             skipped += 1
@@ -202,6 +255,8 @@ def run_public_search(
             continue
         if platform_query.parser == "linkedin":
             candidates = parse_linkedin_jobs(html, criteria.location, remaining)
+        elif platform_query.parser == "serpapi":
+            candidates = parse_serpapi_results(html, platform_query.platform, criteria.location, remaining)
         else:
             candidates = parse_duckduckgo_results(html, platform_query.platform, criteria.location, remaining)
         if not candidates:

@@ -1,8 +1,18 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 
-from job_hunter.cv_parser import CVPage, detect_cv_signals, extract_text_from_pages
+from docx import Document
+
+from job_hunter.cv_parser import (
+    CVPage,
+    detect_cv_signals,
+    extract_cv_text,
+    extract_cv_text_from_docx_bytes,
+    extract_cv_text_from_legacy_doc_bytes,
+    extract_text_from_pages,
+)
 from job_hunter.cv_store import CVStore
 
 
@@ -37,6 +47,43 @@ class CVParserTest(unittest.TestCase):
             store.save_text("Power BI and BigQuery")
 
             self.assertEqual(store.load_text(), "Power BI and BigQuery")
+
+    def test_extract_cv_text_from_docx_bytes_reads_paragraphs_and_tables(self):
+        doc = Document()
+        doc.add_paragraph("Power BI Developer")
+        table = doc.add_table(rows=1, cols=2)
+        table.cell(0, 0).text = "SSRS"
+        table.cell(0, 1).text = "BigQuery"
+        stream = BytesIO()
+        doc.save(stream)
+
+        text = extract_cv_text_from_docx_bytes(stream.getvalue())
+
+        self.assertIn("Power BI Developer", text)
+        self.assertIn("SSRS", text)
+        self.assertIn("BigQuery", text)
+
+    def test_extract_cv_text_routes_by_filename_extension(self):
+        doc = Document()
+        doc.add_paragraph("Python and Airflow")
+        stream = BytesIO()
+        doc.save(stream)
+
+        text = extract_cv_text(stream.getvalue(), "resume.docx")
+
+        self.assertIn("Python and Airflow", text)
+
+    def test_extract_cv_text_from_legacy_doc_bytes_returns_readable_best_effort_text(self):
+        content = b"\x00\x01Power BI\x00\x00SSRS\x00BigQuery\x00"
+
+        text = extract_cv_text_from_legacy_doc_bytes(content)
+
+        self.assertIn("Power BI", text)
+        self.assertIn("SSRS", text)
+
+    def test_extract_cv_text_rejects_unsupported_extension(self):
+        with self.assertRaises(ValueError):
+            extract_cv_text(b"plain text", "resume.txt")
 
 
 if __name__ == "__main__":

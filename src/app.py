@@ -10,13 +10,27 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from job_hunter.app_ui import filter_jobs, jobs_to_rows, search_summary_to_rows, status_counts
-from job_hunter.cv_parser import detect_cv_signals, extract_cv_text_from_pdf_bytes
+from job_hunter.app_ui import (
+    filter_jobs,
+    jobs_to_rows,
+    provider_status_label,
+    search_summary_to_rows,
+    status_counts,
+)
+from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
 from job_hunter.cv_store import CVStore, format_size
+from job_hunter.locations import city_options, fetch_malaysia_cities
 from job_hunter.preferences import load_preferences
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
-from job_hunter.search import SearchCriteria, build_search_queries, run_public_search
+from job_hunter.runtime_config import SearchProviderConfig, load_search_provider_config
+from job_hunter.search import (
+    SearchCriteria,
+    build_direct_platform_queries,
+    build_search_queries,
+    build_serpapi_queries,
+    run_public_search,
+)
 from job_hunter.workflow import daily_summary, summary_to_text
 
 
@@ -38,7 +52,6 @@ TARGET_TITLES = [
 ]
 PRIMARY_KEYWORDS = ["Power BI", "SSRS", "Google BigQuery"]
 SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit", "Company career pages"]
-CITY_OPTIONS = ["Kuala Lumpur", "Petaling Jaya", "Subang Jaya", "Shah Alam", "Cyberjaya"]
 SAMPLE_CSV = """title,company,location,description,source_url
 BI Developer,Example Analytics,Kuala Lumpur,"Build Power BI dashboards, SSRS reports, and SQL datasets.",https://example.com/jobs/bi-developer
 Data Engineer,Example Bank,Kuala Lumpur,"Maintain BigQuery pipelines with Python, Airflow, Docker, and CI/CD.",https://example.com/jobs/data-engineer
@@ -52,9 +65,10 @@ def main() -> None:
     queue = JobQueue(DB_PATH)
     preferences = load_preferences(PREFERENCES_PATH)
     cv_store = CVStore(CV_STORAGE_DIR)
+    provider_config = load_search_provider_config(st.secrets)
 
     _render_header()
-    _render_sidebar(queue, cv_store)
+    _render_sidebar(queue, cv_store, provider_config)
 
     tabs = st.tabs(
         [
@@ -65,12 +79,13 @@ def main() -> None:
             ":material/upload_file: Import CSV",
             ":material/draft: Drafts & packets",
             ":material/query_stats: Progress",
+            ":material/rocket_launch: Production readiness",
         ]
     )
     with tabs[0]:
         _render_profile(cv_store, preferences)
     with tabs[1]:
-        _render_search_setup(queue, preferences, cv_store)
+        _render_search_setup(queue, preferences, cv_store, provider_config)
     with tabs[2]:
         _render_queue(queue)
     with tabs[3]:
@@ -81,6 +96,8 @@ def main() -> None:
         _render_exports(queue)
     with tabs[6]:
         _render_progress(queue, preferences)
+    with tabs[7]:
+        _render_production_readiness(provider_config)
 
 
 def _render_header() -> None:
@@ -96,7 +113,7 @@ def _render_header() -> None:
         st.image(HERO_IMAGE_URL)
 
 
-def _render_sidebar(queue: JobQueue, cv_store: CVStore) -> None:
+def _render_sidebar(queue: JobQueue, cv_store: CVStore, provider_config: SearchProviderConfig) -> None:
     jobs = queue.list_jobs()
     counts = status_counts(jobs)
     cv_status = cv_store.status()
@@ -110,6 +127,7 @@ def _render_sidebar(queue: JobQueue, cv_store: CVStore) -> None:
             st.success(f"CV saved locally ({format_size(cv_status.size_bytes)}).")
         else:
             st.caption("No local CV is saved yet.")
+        st.caption(provider_status_label(provider_config.has_api_search))
 
 
 def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
@@ -128,12 +146,13 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
         else:
             st.info("No CV is saved for this local app yet.")
 
-        uploaded = st.file_uploader("Upload or replace CV", type=["pdf"])
+        uploaded = st.file_uploader("Upload or replace CV", type=["pdf", "docx", "doc"])
         if uploaded is not None and st.button("Save CV locally", icon=":material/save:"):
             content = uploaded.getvalue()
-            cv_store.save_pdf(content)
+            cv_store.save_file(content, uploaded.name)
             try:
-                cv_store.save_text(extract_cv_text_from_pdf_bytes(content))
+                extracted_text = extract_cv_text(content, uploaded.name)
+                cv_store.save_text(extracted_text)
                 st.toast("CV saved and readable text extracted.")
             except Exception as exc:
                 st.warning(f"CV was saved, but text extraction failed: {exc}")
@@ -161,7 +180,12 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
             _render_keyword_chips("Hard skips", [str(item) for item in hard_skips])
 
 
-def _render_search_setup(queue: JobQueue, preferences: dict[str, object], cv_store: CVStore) -> None:
+def _render_search_setup(
+    queue: JobQueue,
+    preferences: dict[str, object],
+    cv_store: CVStore,
+    provider_config: SearchProviderConfig,
+) -> None:
     st.subheader("Search setup")
     st.write(
         "Set title, description keywords, exact location, and selected platforms, then run up to 50 public search-result checks in one session."
@@ -173,6 +197,7 @@ def _render_search_setup(queue: JobQueue, preferences: dict[str, object], cv_sto
     else:
         st.warning("No extracted CV text is available yet. Upload a CV on the Profile & CV page, or continue with the documented profile fallback.")
 
+    cities = _cached_malaysia_cities()
     with st.container(border=True):
         title_contains = st.multiselect(
             "Job title contains",
@@ -180,9 +205,14 @@ def _render_search_setup(queue: JobQueue, preferences: dict[str, object], cv_sto
             default=["Data Analyst", "Data Engineer", "BI Developer", "Reporting Analyst"],
         )
         description_contains = st.multiselect("Job description contains at least one", PRIMARY_KEYWORDS, default=PRIMARY_KEYWORDS)
-        location = st.selectbox("Exact location", CITY_OPTIONS, index=0, accept_new_options=True)
+        location_search = st.text_input("City autocomplete", value="Kuala Lumpur", placeholder="Type a Malaysia city")
+        filtered_cities = city_options(location_search, cities=cities, limit=25)
+        if "Kuala Lumpur" not in filtered_cities:
+            filtered_cities = ("Kuala Lumpur",) + filtered_cities
+        location = st.selectbox("Exact location", filtered_cities, index=0, accept_new_options=True)
         platforms = st.multiselect("Platforms to search", SOURCES, default=SOURCES)
         max_jobs = st.slider("Maximum jobs in one session", min_value=1, max_value=50, value=50)
+        st.caption(provider_status_label(provider_config.has_api_search))
 
         disabled = not title_contains or not description_contains or not platforms
         criteria = SearchCriteria(
@@ -193,14 +223,14 @@ def _render_search_setup(queue: JobQueue, preferences: dict[str, object], cv_sto
             max_results=int(max_jobs),
         )
         with st.expander("Queries that will run"):
-            for query in build_search_queries(criteria):
+            for query in _planned_queries(criteria, provider_config):
                 st.markdown(f"**{query.platform}**")
                 st.code(query.query, language="text")
 
         with st.container(horizontal=True, wrap=True):
             if st.button("Run search and score jobs", icon=":material/search:", disabled=disabled):
                 with st.status("Searching public results and scoring jobs", expanded=True) as status:
-                    summary = run_public_search(criteria, preferences, queue)
+                    summary = run_public_search(criteria, preferences, queue, provider_config=provider_config)
                     for log in summary.logs:
                         st.write(log)
                     status.update(label="Search run finished", state="complete")
@@ -304,7 +334,8 @@ Description: Build Power BI dashboards, SSRS reports, SQL datasets, and reportin
     with st.form("add_job"):
         title = st.text_input("Job title", placeholder="BI Developer")
         company = st.text_input("Company", placeholder="Example Analytics")
-        location = st.selectbox("Location", CITY_OPTIONS, index=0, accept_new_options=True)
+        cities = _cached_malaysia_cities()
+        location = st.selectbox("Location", city_options("Kuala Lumpur", cities=cities, limit=25), index=0, accept_new_options=True)
         source_url = st.text_input("Source URL", placeholder="https://...")
         description = st.text_area(
             "Job description",
@@ -402,6 +433,37 @@ def _render_progress(queue: JobQueue, preferences: dict[str, object]) -> None:
     st.text(summary_to_text(summary))
 
 
+def _render_production_readiness(provider_config: SearchProviderConfig) -> None:
+    st.subheader("Production readiness")
+    st.write("Use this checklist before testing on Streamlit Community Cloud.")
+    with st.container(border=True):
+        st.markdown("**Deployment**")
+        st.write("Deploy the GitHub repository and set the app entry point to `src/app.py`.")
+        st.markdown("**Secrets**")
+        if provider_config.has_api_search:
+            st.success("SerpAPI key detected. API search mode is available.")
+        else:
+            st.warning("No SerpAPI key detected. The app will use free public search fallback.")
+        st.code(
+            """# .streamlit/secrets.toml or Streamlit Cloud secrets
+SERPAPI_API_KEY = "your-key-here"
+
+[search]
+serpapi_api_key = "your-key-here"
+""",
+            language="toml",
+        )
+    with st.container(border=True):
+        st.markdown("**Data privacy**")
+        st.write(
+            "A public Streamlit app is not per-user private storage. For your own testing, deploy privately or avoid uploading sensitive CV files until authentication and external private storage are added."
+        )
+        st.markdown("**Automation boundary**")
+        st.write(
+            "The app searches public job listings and result pages. It does not log in, solve CAPTCHA, submit applications, or use saved browser sessions."
+        )
+
+
 def _render_keyword_chips(label: str, values: list[str]) -> None:
     st.markdown(f"**{label}**")
     st.pills(label, values, selection_mode="multi", default=values, disabled=True, label_visibility="collapsed", wrap=True)
@@ -409,6 +471,20 @@ def _render_keyword_chips(label: str, values: list[str]) -> None:
 
 def _render_example_jobs() -> None:
     st.dataframe(pd.read_csv(StringIO(SAMPLE_CSV)), hide_index=True)
+
+
+@st.cache_data(ttl=3600)
+def _cached_malaysia_cities() -> tuple[str, ...]:
+    return fetch_malaysia_cities()
+
+
+def _planned_queries(criteria: SearchCriteria, provider_config: SearchProviderConfig):
+    if provider_config.has_api_search:
+        return build_serpapi_queries(criteria, provider_config.serpapi_key)
+    queries = build_direct_platform_queries(criteria)
+    direct_platforms = {query.platform for query in queries}
+    queries.extend(query for query in build_search_queries(criteria) if query.platform not in direct_platforms)
+    return queries
 
 
 if __name__ == "__main__":
