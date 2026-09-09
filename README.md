@@ -1,14 +1,14 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v1.8.0.
+v1.9.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version includes
 the project brain, a factual candidate profile, preferences template, scoring
 rules, Streamlit dashboard, PDF/Word CV upload and text extraction, public
-and optional API-backed search, city autocomplete, SQLite queue, CSV import,
-duplicate detection, draft exports, and a small CLI.
+and optional API-backed search, editable search criteria, city lookup, SQLite
+queue, CSV import, duplicate detection, draft exports, and a small CLI.
 
 ## What It Does
 
@@ -21,6 +21,8 @@ duplicate detection, draft exports, and a small CLI.
   job platforms.
 - Supports optional SerpAPI search through Streamlit secrets.
 - Loads Malaysia city options from a public city API with local fallback.
+- Lets the user edit target titles, primary keywords, bonus keywords, hard
+  skips, strong target, and session cap inside the app.
 - Adds and scores discovered search results into the local queue.
 - Stores scored jobs in a local SQLite queue.
 - Deduplicates exact same jobs by title/company/location, even when different
@@ -30,15 +32,14 @@ duplicate detection, draft exports, and a small CLI.
 - Exports a local Markdown application draft for a queued job.
 - Exports a dry-run application packet for human review.
 - Flags unsupported job requirements instead of inventing matching experience.
-- Tracks daily application progress against a target.
+- Shows the daily strong-match target in the sidebar.
 - Updates local application status after human action.
 - Loads private local preferences from `config/preferences.local.yaml`.
 - Applies hard skips for local-only and mandatory Mandarin requirements.
 - Runs as a Streamlit web app for daily use.
 - Saves/replaces/removes a local CV file under a git-ignored private folder.
 - Saves extracted CV text under the same git-ignored private folder.
-- Explains every Streamlit page with sample data and current/future workflow
-  boundaries.
+- Separates automated platform search from fully manual scoring.
 - Separates public project templates from private candidate inputs.
 - Documents the first application workflow before browser automation exists.
 - Keeps the real CV, contact details, secrets, and local preferences out of Git.
@@ -96,18 +97,50 @@ Run locally:
 streamlit run src/app.py
 ```
 
-The web app currently has these pages:
+The web app has two modes in the sidebar.
 
-- `Profile & CV`: upload, replace, or remove the local private CV file.
-- `Search setup`: configure the 50-job search flow, preview public queries,
-  then run public search and score results.
-- `Job queue`: review scored jobs, remarks, decisions, and source links.
-- `Add job`: paste one job description and score it immediately.
-- `Import CSV`: bulk-load jobs with example CSV data.
-- `Drafts & packets`: export application drafts and review packets.
-- `Progress`: check progress toward the current 20-strong-match target.
-- `Production readiness`: review Streamlit deployment, secrets, storage, and
-  automation limits.
+### Automated Search
+
+Use this when you want Job Hunter to search selected platforms, score results,
+and fill the queue.
+
+1. Open `Profile & CV`.
+2. Upload or replace your CV. PDF and DOCX are preferred; legacy DOC is
+   best-effort.
+3. Open `Search setup`.
+4. Edit the search and scoring criteria:
+   - `Target titles`
+   - `Primary strengths / description keywords`
+   - `Bonus keywords`
+   - `Hard skip keywords`
+   - `Strong target`
+   - `Session cap`
+5. Choose `Location`. The dropdown is searchable and uses Malaysia city data
+   from a public API with a fallback list.
+6. Choose platforms. With `SERPAPI_API_KEY` configured, the app uses API-backed
+   search. Without it, the app falls back to public search pages.
+7. Start with a low session cap such as `10` while testing, especially on the
+   SerpAPI free tier.
+8. Click `Run search and score jobs`.
+9. Open `Job queue` to review scores, decisions, descriptions, remarks, and
+   source links.
+
+### Manual Scoring
+
+Use this when you already found jobs yourself and only want Job Hunter to score
+them.
+
+1. Select `Manual scoring` in the sidebar.
+2. Use `Add job` for one pasted job description.
+3. Use `Import CSV` for many rows from a spreadsheet or saved research list.
+4. Open `Job queue` to review the results.
+
+### Job Queue
+
+The queue is shared by both modes. It shows score, decision, status, title,
+company, location, full description, reasons, remarks, and source link. Use the
+actions below the table to export a draft, export an application packet, or
+update the status after you apply manually.
 
 For free hosting, deploy this repository on Streamlit Community Cloud and set
 the app entry point to:
@@ -117,8 +150,8 @@ src/app.py
 ```
 
 The hosted app will use its own Streamlit Cloud storage. Treat a public
-deployment as a demo until authentication and per-user storage exist. Do not
-upload private CV files or secrets to a public deployment.
+deployment as a personal demo until authentication and per-user storage exist.
+Do not publish private CV files or secrets in the repository.
 
 Optional API search uses this secret:
 
@@ -131,7 +164,8 @@ You can set that in Streamlit Community Cloud secrets. Do not commit a real
 
 ### Production Search Boundary
 
-The Streamlit search button reads public LinkedIn job cards when available,
+The Streamlit search button reads API-backed search results when SerpAPI is
+configured. Without SerpAPI, it reads public LinkedIn job cards when available,
 then uses public web-result search for the other selected platforms. It scores
 the visible title/company/location/snippet/source URL. It does not log in to
 LinkedIn, JobStreet, Indeed, Foundit, or company portals. It also does not
@@ -206,17 +240,13 @@ The style follows the user's existing projects:
 
 ## Status
 
-This is a local daily workflow assistant with public search support, not a live
-job-board login or auto-apply bot yet. The first usable loop is:
+This is a local daily workflow assistant with public/API search support, not a
+live job-board login or auto-apply bot yet. The first usable loop is:
 
 1. Upload a CV locally.
-2. Search public web results, paste a job description, or import a CSV.
+2. Search platform results, paste a job description, or import a CSV.
 3. Score jobs against the candidate profile and preferences.
 4. Put promising jobs into a human-reviewed application queue.
 5. Generate tailored drafts only from supported experience.
 6. Submit manually until browser automation is designed and tested.
-7. Mark submitted jobs locally and check daily progress.
-
-The target automated loop is documented in the Streamlit `Search setup` page:
-choose platforms, search up to 50 jobs, score and deduplicate them, then review
-before any apply action.
+7. Mark submitted jobs locally in the queue.

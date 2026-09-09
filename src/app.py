@@ -11,9 +11,11 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent))
 
 from job_hunter.app_ui import (
+    editable_criteria_defaults,
     filter_jobs,
     jobs_to_rows,
     provider_status_label,
+    queue_column_widths,
     search_summary_to_rows,
     status_counts,
 )
@@ -31,7 +33,6 @@ from job_hunter.search import (
     build_serpapi_queries,
     run_public_search,
 )
-from job_hunter.workflow import daily_summary, summary_to_text
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,37 +68,26 @@ def main() -> None:
     cv_store = CVStore(CV_STORAGE_DIR)
     provider_config = load_search_provider_config(st.secrets)
 
+    _inject_table_styles()
     _render_header()
-    _render_sidebar(queue, cv_store, provider_config)
+    workflow = _render_sidebar(queue, cv_store, provider_config, preferences)
 
-    tabs = st.tabs(
-        [
-            ":material/person: Profile & CV",
-            ":material/tune: Search setup",
-            ":material/table_chart: Job queue",
-            ":material/add_circle: Add job",
-            ":material/upload_file: Import CSV",
-            ":material/draft: Drafts & packets",
-            ":material/query_stats: Progress",
-            ":material/rocket_launch: Production readiness",
-        ]
-    )
-    with tabs[0]:
-        _render_profile(cv_store, preferences)
-    with tabs[1]:
-        _render_search_setup(queue, preferences, cv_store, provider_config)
-    with tabs[2]:
-        _render_queue(queue)
-    with tabs[3]:
-        _render_add_job(queue, preferences)
-    with tabs[4]:
-        _render_import(queue, preferences)
-    with tabs[5]:
-        _render_exports(queue)
-    with tabs[6]:
-        _render_progress(queue, preferences)
-    with tabs[7]:
-        _render_production_readiness(provider_config)
+    if workflow == "Automated search":
+        tabs = st.tabs([":material/person: Profile & CV", ":material/tune: Search setup", ":material/table_chart: Job queue"])
+        with tabs[0]:
+            _render_profile(cv_store, preferences)
+        with tabs[1]:
+            _render_search_setup(queue, preferences, cv_store, provider_config)
+        with tabs[2]:
+            _render_queue(queue)
+    else:
+        tabs = st.tabs([":material/add_circle: Add job", ":material/upload_file: Import CSV", ":material/table_chart: Job queue"])
+        with tabs[0]:
+            _render_add_job(queue, _active_preferences(preferences))
+        with tabs[1]:
+            _render_import(queue, _active_preferences(preferences))
+        with tabs[2]:
+            _render_queue(queue)
 
 
 def _render_header() -> None:
@@ -106,28 +96,54 @@ def _render_header() -> None:
         st.title("Job Hunter")
         st.caption("A local-first Streamlit app for scoring Kuala Lumpur data jobs against your CV-backed criteria.")
         with st.container(horizontal=True, wrap=True):
-            st.badge("Current: manual scoring", icon=":material/check_circle:", color="green")
-            st.badge("Next: guided web search", icon=":material/pending:", color="blue")
+            st.badge("Automated search + scoring", icon=":material/search:", color="green")
+            st.badge("Manual scoring when needed", icon=":material/edit_note:", color="blue")
             st.badge("Private CV stays local", icon=":material/lock:", color="gray")
     with right:
         st.image(HERO_IMAGE_URL)
 
 
-def _render_sidebar(queue: JobQueue, cv_store: CVStore, provider_config: SearchProviderConfig) -> None:
+def _inject_table_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        [data-testid="stDataFrame"] div {
+            white-space: normal;
+        }
+        [data-testid="stDataFrame"] [role="gridcell"] {
+            align-items: start;
+            line-height: 1.35;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_sidebar(
+    queue: JobQueue,
+    cv_store: CVStore,
+    provider_config: SearchProviderConfig,
+    preferences: dict[str, object],
+) -> str:
     jobs = queue.list_jobs()
     counts = status_counts(jobs)
     cv_status = cv_store.status()
+    defaults = _criteria_defaults(preferences)
     with st.sidebar:
+        workflow = st.radio("Workflow", ["Automated search", "Manual scoring"], horizontal=False)
         st.header("Today")
         st.metric("Queued jobs", len(jobs))
         st.metric("New", counts["new"])
         st.metric("Submitted", counts["submitted"])
-        st.caption("The app stores queue data in `data/applications.db`.")
+        st.metric("Strong target", defaults["strong_target"])
+        st.caption("Automated search finds jobs from platforms. Manual scoring is for jobs you already collected.")
         if cv_status.exists:
             st.success(f"CV saved locally ({format_size(cv_status.size_bytes)}).")
         else:
             st.caption("No local CV is saved yet.")
         st.caption(provider_status_label(provider_config.has_api_search))
+    return str(workflow)
 
 
 def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
@@ -168,16 +184,7 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
             _render_keyword_chips("Detected bonus CV signals", list(signals.bonus_matches))
         else:
             st.caption("Upload your CV to extract local text signals. The scoring fallback still uses the documented public profile.")
-        cols = st.columns(3)
-        cols[0].metric("Primary strengths", "Power BI / SSRS / BigQuery")
-        cols[1].metric("Strong target", "20 jobs")
-        cols[2].metric("Session cap", "50 jobs")
-        st.caption("The current scoring profile comes from the documented candidate profile and your latest criteria.")
-        _render_keyword_chips("Target titles", TARGET_TITLES)
-        _render_keyword_chips("Primary description keywords", PRIMARY_KEYWORDS)
-        hard_skips = preferences.get("hard_skip_keywords", [])
-        if isinstance(hard_skips, list):
-            _render_keyword_chips("Hard skips", [str(item) for item in hard_skips])
+        st.caption("Search criteria are editable on the Search setup page.")
 
 
 def _render_search_setup(
@@ -197,21 +204,31 @@ def _render_search_setup(
     else:
         st.warning("No extracted CV text is available yet. Upload a CV on the Profile & CV page, or continue with the documented profile fallback.")
 
+    active_preferences = _render_editable_criteria(preferences)
+    criteria_defaults = _criteria_defaults(active_preferences)
     cities = _cached_malaysia_cities()
     with st.container(border=True):
         title_contains = st.multiselect(
             "Job title contains",
-            TARGET_TITLES,
-            default=["Data Analyst", "Data Engineer", "BI Developer", "Reporting Analyst"],
+            criteria_defaults["target_roles"],
+            default=criteria_defaults["target_roles"][:4],
+            accept_new_options=True,
         )
-        description_contains = st.multiselect("Job description contains at least one", PRIMARY_KEYWORDS, default=PRIMARY_KEYWORDS)
-        location_search = st.text_input("City autocomplete", value="Kuala Lumpur", placeholder="Type a Malaysia city")
-        filtered_cities = city_options(location_search, cities=cities, limit=25)
-        if "Kuala Lumpur" not in filtered_cities:
-            filtered_cities = ("Kuala Lumpur",) + filtered_cities
-        location = st.selectbox("Exact location", filtered_cities, index=0, accept_new_options=True)
+        description_contains = st.multiselect(
+            "Job description contains at least one primary strength",
+            criteria_defaults["primary_keywords"],
+            default=criteria_defaults["primary_keywords"],
+            accept_new_options=True,
+        )
+        location_options = _location_options(cities)
+        location = st.selectbox("Location", location_options, index=0, accept_new_options=True)
         platforms = st.multiselect("Platforms to search", SOURCES, default=SOURCES)
-        max_jobs = st.slider("Maximum jobs in one session", min_value=1, max_value=50, value=50)
+        max_jobs = st.slider(
+            "Maximum jobs in one session",
+            min_value=1,
+            max_value=50,
+            value=min(50, int(criteria_defaults["session_cap"])),
+        )
         st.caption(provider_status_label(provider_config.has_api_search))
 
         disabled = not title_contains or not description_contains or not platforms
@@ -230,7 +247,7 @@ def _render_search_setup(
         with st.container(horizontal=True, wrap=True):
             if st.button("Run search and score jobs", icon=":material/search:", disabled=disabled):
                 with st.status("Searching public results and scoring jobs", expanded=True) as status:
-                    summary = run_public_search(criteria, preferences, queue, provider_config=provider_config)
+                    summary = run_public_search(criteria, active_preferences, queue, provider_config=provider_config)
                     for log in summary.logs:
                         st.write(log)
                     status.update(label="Search run finished", state="complete")
@@ -238,27 +255,6 @@ def _render_search_setup(
                 st.success("Open Job queue to review the scored results.")
             if st.button("Preview search run", icon=":material/play_arrow:", disabled=disabled):
                 _render_search_preview(max_jobs=max_jobs, location=str(location), platforms=platforms)
-
-    with st.expander("Current workflow vs target workflow", expanded=True):
-        st.markdown(
-            """
-**Current workflow**
-
-1. Upload or keep your CV locally.
-2. Search public web results for selected platforms, add jobs manually, or import a CSV.
-3. Job Hunter scores each job, explains why it matched or did not match, and keeps skipped/low-suitability remarks.
-4. You review the queue and export a draft or application packet.
-5. You apply outside the app, then update the job status.
-
-**Target workflow**
-
-1. You choose platforms and search rules.
-2. The app searches public search-result pages for up to 50 jobs, logs each checked job, and scores them.
-3. Exact duplicates across platforms are skipped using title, company, and location.
-4. You apply one by one, or review a batch before applying all.
-5. Job-board login and submission automation will be added only when the browser/login flow is safe and reliable.
-"""
-        )
 
     with st.container(border=True):
         st.markdown("**Duplicate handling**")
@@ -311,9 +307,17 @@ def _render_queue(queue: JobQueue) -> None:
         column_config={
             "Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100),
             "Source URL": st.column_config.LinkColumn("Source"),
+            **{
+                column: st.column_config.TextColumn(column, width=width)
+                for column, width in queue_column_widths().items()
+                if column != "Source URL"
+            },
         },
         hide_index=True,
+        use_container_width=True,
+        height=520,
     )
+    _render_queue_actions(queue, filtered)
 
 
 def _render_add_job(queue: JobQueue, preferences: dict[str, object]) -> None:
@@ -335,7 +339,7 @@ Description: Build Power BI dashboards, SSRS reports, SQL datasets, and reportin
         title = st.text_input("Job title", placeholder="BI Developer")
         company = st.text_input("Company", placeholder="Example Analytics")
         cities = _cached_malaysia_cities()
-        location = st.selectbox("Location", city_options("Kuala Lumpur", cities=cities, limit=25), index=0, accept_new_options=True)
+        location = st.selectbox("Location", _location_options(cities), index=0, accept_new_options=True)
         source_url = st.text_input("Source URL", placeholder="https://...")
         description = st.text_area(
             "Job description",
@@ -387,14 +391,10 @@ def _render_import(queue: JobQueue, preferences: dict[str, object]) -> None:
         st.success(f"Imported {summary.created}; skipped {summary.duplicates} duplicates.")
 
 
-def _render_exports(queue: JobQueue) -> None:
-    st.subheader("Drafts & packets")
-    st.write(
-        "A draft is a short application message. A packet is a fuller review bundle with job details, fit notes, and application material you can check before applying."
-    )
-    jobs = queue.list_jobs()
+def _render_queue_actions(queue: JobQueue, jobs) -> None:
+    st.subheader("Application actions")
+    jobs = list(jobs)
     if not jobs:
-        st.info("Add jobs before exporting drafts or packets.")
         return
 
     options = {f"#{job.id} - {job.title} - {job.company}": job.id for job in jobs}
@@ -422,48 +422,6 @@ def _render_exports(queue: JobQueue) -> None:
         st.success(f"Job #{job_id} is now {new_status}.")
 
 
-def _render_progress(queue: JobQueue, preferences: dict[str, object]) -> None:
-    st.subheader("Progress")
-    st.write("This page shows whether today's queue is moving toward your target of 20 strong job candidates.")
-    daily_targets = preferences.get("daily_targets", {})
-    target = 20
-    if isinstance(daily_targets, dict):
-        target = int(daily_targets.get("strong_matches", target))
-    summary = daily_summary(queue, daily_target=target)
-    st.text(summary_to_text(summary))
-
-
-def _render_production_readiness(provider_config: SearchProviderConfig) -> None:
-    st.subheader("Production readiness")
-    st.write("Use this checklist before testing on Streamlit Community Cloud.")
-    with st.container(border=True):
-        st.markdown("**Deployment**")
-        st.write("Deploy the GitHub repository and set the app entry point to `src/app.py`.")
-        st.markdown("**Secrets**")
-        if provider_config.has_api_search:
-            st.success("SerpAPI key detected. API search mode is available.")
-        else:
-            st.warning("No SerpAPI key detected. The app will use free public search fallback.")
-        st.code(
-            """# .streamlit/secrets.toml or Streamlit Cloud secrets
-SERPAPI_API_KEY = "your-key-here"
-
-[search]
-serpapi_api_key = "your-key-here"
-""",
-            language="toml",
-        )
-    with st.container(border=True):
-        st.markdown("**Data privacy**")
-        st.write(
-            "A public Streamlit app is not per-user private storage. For your own testing, deploy privately or avoid uploading sensitive CV files until authentication and external private storage are added."
-        )
-        st.markdown("**Automation boundary**")
-        st.write(
-            "The app searches public job listings and result pages. It does not log in, solve CAPTCHA, submit applications, or use saved browser sessions."
-        )
-
-
 def _render_keyword_chips(label: str, values: list[str]) -> None:
     st.markdown(f"**{label}**")
     st.pills(label, values, selection_mode="multi", default=values, disabled=True, label_visibility="collapsed", wrap=True)
@@ -476,6 +434,61 @@ def _render_example_jobs() -> None:
 @st.cache_data(ttl=3600)
 def _cached_malaysia_cities() -> tuple[str, ...]:
     return fetch_malaysia_cities()
+
+
+def _criteria_defaults(preferences: dict[str, object]) -> dict[str, object]:
+    defaults = editable_criteria_defaults(preferences)
+    if not defaults["target_roles"]:
+        defaults["target_roles"] = TARGET_TITLES
+    if not defaults["primary_keywords"]:
+        defaults["primary_keywords"] = PRIMARY_KEYWORDS
+    return defaults
+
+
+def _active_preferences(preferences: dict[str, object]) -> dict[str, object]:
+    defaults = _criteria_defaults(preferences)
+    active = dict(preferences)
+    active["target_roles"] = st.session_state.get("target_roles", defaults["target_roles"])
+    active["primary_keywords"] = st.session_state.get("primary_keywords", defaults["primary_keywords"])
+    active["bonus_keywords"] = st.session_state.get("bonus_keywords", defaults["bonus_keywords"])
+    active["hard_skip_keywords"] = st.session_state.get("hard_skip_keywords", defaults["hard_skip_keywords"])
+    active["daily_targets"] = {
+        "strong_matches": st.session_state.get("strong_target", defaults["strong_target"]),
+        "suitable_matches": st.session_state.get("session_cap", defaults["session_cap"]),
+    }
+    return active
+
+
+def _render_editable_criteria(preferences: dict[str, object]) -> dict[str, object]:
+    defaults = _criteria_defaults(preferences)
+    with st.expander("Edit search and scoring criteria", expanded=True):
+        st.multiselect("Target titles", defaults["target_roles"], default=defaults["target_roles"], accept_new_options=True, key="target_roles")
+        st.multiselect(
+            "Primary strengths / description keywords",
+            defaults["primary_keywords"],
+            default=defaults["primary_keywords"],
+            accept_new_options=True,
+            key="primary_keywords",
+        )
+        st.multiselect("Bonus keywords", defaults["bonus_keywords"], default=defaults["bonus_keywords"], accept_new_options=True, key="bonus_keywords")
+        st.multiselect(
+            "Hard skip keywords",
+            defaults["hard_skip_keywords"],
+            default=defaults["hard_skip_keywords"],
+            accept_new_options=True,
+            key="hard_skip_keywords",
+        )
+        left, right = st.columns(2)
+        left.number_input("Strong target", min_value=1, max_value=50, value=int(defaults["strong_target"]), key="strong_target")
+        right.number_input("Session cap", min_value=1, max_value=50, value=min(50, int(defaults["session_cap"])), key="session_cap")
+    return _active_preferences(preferences)
+
+
+def _location_options(cities: tuple[str, ...]) -> tuple[str, ...]:
+    options = city_options("", cities=cities, limit=300)
+    if "Kuala Lumpur" not in options:
+        return ("Kuala Lumpur",) + options
+    return ("Kuala Lumpur",) + tuple(city for city in options if city != "Kuala Lumpur")
 
 
 def _planned_queries(criteria: SearchCriteria, provider_config: SearchProviderConfig):

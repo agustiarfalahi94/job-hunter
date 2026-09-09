@@ -1,6 +1,14 @@
 import unittest
 
-from job_hunter.app_ui import filter_jobs, jobs_to_rows, provider_status_label, search_summary_to_rows, status_counts
+from job_hunter.app_ui import (
+    editable_criteria_defaults,
+    filter_jobs,
+    jobs_to_rows,
+    provider_status_label,
+    queue_column_widths,
+    search_summary_to_rows,
+    status_counts,
+)
 from job_hunter.queue import JobRecord
 from job_hunter.search import SearchRunSummary
 
@@ -27,6 +35,7 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(rows[0]["Score"], 96)
         self.assertEqual(rows[0]["Decision"], "shortlist")
         self.assertEqual(rows[0]["Remarks"], "Strong match")
+        self.assertEqual(rows[0]["Description"], "Power BI role")
 
     def test_filter_jobs_can_show_only_shortlisted_jobs(self):
         jobs = [
@@ -68,6 +77,32 @@ class AppUiTest(unittest.TestCase):
     def test_provider_status_label_explains_api_and_fallback_modes(self):
         self.assertEqual(provider_status_label(True), "API search enabled")
         self.assertEqual(provider_status_label(False), "Free public search fallback")
+
+    def test_editable_criteria_defaults_reads_preferences(self):
+        defaults = editable_criteria_defaults(
+            {
+                "target_roles": ["BI Developer", "Data Analyst"],
+                "primary_keywords": ["Power BI", "SSRS"],
+                "bonus_keywords": ["Python", "Airflow"],
+                "hard_skip_keywords": ["mandarin speaker is mandatory"],
+                "daily_targets": {"strong_matches": 20, "suitable_matches": 50},
+            }
+        )
+
+        self.assertEqual(defaults["target_roles"], ["BI Developer", "Data Analyst"])
+        self.assertEqual(defaults["primary_keywords"], ["Power BI", "SSRS"])
+        self.assertEqual(defaults["bonus_keywords"], ["Python", "Airflow"])
+        self.assertEqual(defaults["hard_skip_keywords"], ["mandarin speaker is mandatory"])
+        self.assertEqual(defaults["strong_target"], 20)
+        self.assertEqual(defaults["session_cap"], 50)
+
+    def test_queue_column_widths_make_text_fields_readable(self):
+        widths = queue_column_widths()
+
+        self.assertEqual(widths["Title"], "large")
+        self.assertEqual(widths["Description"], "large")
+        self.assertEqual(widths["Remarks"], "large")
+        self.assertEqual(widths["Source URL"], "medium")
 
 
 if __name__ == "__main__":

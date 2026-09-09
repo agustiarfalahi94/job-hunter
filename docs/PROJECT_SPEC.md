@@ -36,8 +36,14 @@ Included:
 - Optional SerpAPI-backed search through Streamlit secrets or environment.
 - Malaysia city autocomplete with CountriesNow API and local fallback.
 - Search run logs, scoring, dedupe, and queue insertion for up to 50 results.
-- Page-level descriptions and sample data for the web app.
-- Production-readiness page and secrets template.
+- Two Streamlit workflows: Automated search and Manual scoring.
+- Editable in-app criteria for target titles, primary strengths/description
+  keywords, bonus keywords, hard skips, strong target, and session cap.
+- One searchable Location dropdown backed by Malaysia city data.
+- Queue actions for draft export, packet export, and status updates.
+- Readable queue table with full descriptions and wide text columns.
+- Step-by-step README tutorial for the web app.
+- Secrets template for production configuration.
 - Tests and local verification script.
 
 Not included yet:

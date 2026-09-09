@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.0 - 2026-09-09
+
+- Simplified the Streamlit app into two clear workflows: Automated search and
+  Manual scoring.
+- Made target titles, primary strengths/description keywords, bonus keywords,
+  hard-skip keywords, strong target, and session cap editable in Search setup.
+- Replaced separate city-autocomplete and exact-location controls with one
+  searchable Location dropdown.
+- Removed user-facing production-readiness, workflow-comparison, drafts, and
+  progress pages from the main app flow.
+- Folded draft, packet, and status actions into the Job queue page.
+- Added full job descriptions to the queue table and widened/wrapped readable
+  text columns.
+- Updated the README with a step-by-step web-app tutorial.
+
 ## 1.8.0 - 2026-09-09
 
 - Added Streamlit production-readiness guidance inside the app.

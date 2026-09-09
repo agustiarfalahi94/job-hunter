@@ -26,6 +26,7 @@ data/applications.db
 data/*.sqlite
 data/*.duckdb
 exports/
+work/
 
 # Personal documents must stay local.
 *.pdf

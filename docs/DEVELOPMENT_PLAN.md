@@ -93,3 +93,17 @@
 - Added Streamlit production-readiness tab.
 - Added secrets example file and deployment documentation.
 - Added final release documentation, versioning, review, and verification pass.
+
+## v1.9 - Streamlit User Flow Cleanup
+
+- Replaced the broad tab set with two sidebar workflows: Automated search and
+  Manual scoring.
+- Made search/scoring criteria editable in the app instead of showing read-only
+  hardcoded values.
+- Collapsed city autocomplete and exact location into one searchable Location
+  dropdown.
+- Removed user-facing production-readiness, workflow-comparison, drafts, and
+  progress pages from the main app flow.
+- Moved draft, packet, and status actions into the Job queue page.
+- Added full descriptions and wider readable text columns to the queue table.
+- Added a README tutorial for real Streamlit usage.

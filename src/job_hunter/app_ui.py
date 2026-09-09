@@ -10,6 +10,8 @@ from job_hunter.search import SearchRunSummary
 
 
 STATUSES = ("new", "reviewing", "drafted", "submitted", "rejected")
+DEFAULT_STRONG_TARGET = 20
+DEFAULT_SESSION_CAP = 50
 
 
 def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
@@ -22,6 +24,7 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
             "Title": job.title,
             "Company": job.company,
             "Location": job.location,
+            "Description": job.description,
             "Source URL": job.source_url,
             "Reasons": job.reasons,
             "Remarks": job.remarks,
@@ -57,3 +60,35 @@ def search_summary_to_rows(summary: SearchRunSummary) -> list[dict[str, object]]
 
 def provider_status_label(has_api_search: bool) -> str:
     return "API search enabled" if has_api_search else "Free public search fallback"
+
+
+def editable_criteria_defaults(preferences: dict[str, object]) -> dict[str, object]:
+    daily_targets = preferences.get("daily_targets", {})
+    if not isinstance(daily_targets, dict):
+        daily_targets = {}
+    return {
+        "target_roles": _string_list(preferences.get("target_roles")),
+        "primary_keywords": _string_list(preferences.get("primary_keywords")),
+        "bonus_keywords": _string_list(preferences.get("bonus_keywords")),
+        "hard_skip_keywords": _string_list(preferences.get("hard_skip_keywords")),
+        "strong_target": int(daily_targets.get("strong_matches", DEFAULT_STRONG_TARGET)),
+        "session_cap": int(daily_targets.get("suitable_matches", DEFAULT_SESSION_CAP)),
+    }
+
+
+def queue_column_widths() -> dict[str, str]:
+    return {
+        "Title": "large",
+        "Company": "medium",
+        "Location": "medium",
+        "Reasons": "large",
+        "Remarks": "large",
+        "Description": "large",
+        "Source URL": "medium",
+    }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
