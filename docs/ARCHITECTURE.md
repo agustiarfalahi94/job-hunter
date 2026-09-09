@@ -47,7 +47,7 @@ file and used for Streamlit signal display.
 | `queue.py` | Stores scored jobs locally and prevents duplicates |
 | `cv_store.py` | Saves, replaces, removes, and reports local private CV status |
 | `cv_parser.py` | Extracts CV text and detects primary/bonus keyword signals |
-| `search.py` | Builds public search queries, parses result pages, and ingests candidates |
+| `search.py` | Builds date-filtered public queries, validates trusted job domains, checks availability, emits progress, and ingests candidates |
 | `locations.py` | Fetches Malaysia city names and filters autocomplete options |
 | `runtime_config.py` | Loads optional search provider keys from secrets or environment |
 | `cli.py` | Provides add/import/list commands for the local workflow |
@@ -87,7 +87,11 @@ changing application workflow code.
 The search provider reads optional SerpAPI results when configured, public
 LinkedIn job cards when available, and public search-result pages for remaining
 selected platforms. It scores the visible title/company/location/snippet/source
-URL. This is production-testable on Streamlit Cloud, but authenticated search
+URL. The provider applies a user-selected posting-age filter where supported,
+rejects visible closed-job wording, and checks only trusted platform domains for
+destination availability. A callback sends real search events to Streamlit's
+progress bar and activity log. This is production-testable on Streamlit Cloud,
+but authenticated search
 and auto-apply flows must be added as explicit provider modules with
 user-controlled credentials, rate limits, site-specific permission checks, and
 human confirmation before submission.

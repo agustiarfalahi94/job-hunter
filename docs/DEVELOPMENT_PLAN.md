@@ -107,3 +107,13 @@
 - Moved draft, packet, and status actions into the Job queue page.
 - Added full descriptions and wider readable text columns to the queue table.
 - Added a README tutorial for real Streamlit usage.
+
+## v1.10 - Search Freshness and Live Progress
+
+- Added user-controlled posting-age filters with a past-month default.
+- Added search-result and trusted destination-page checks for closed jobs.
+- Added real-time search progress and activity messages.
+- Added one-click navigation from a completed search to Job queue.
+- Clarified Strong-match goal as a planning goal and Session cap as the actual
+  per-run maximum.
+- Added trusted-domain validation before destination-page availability checks.

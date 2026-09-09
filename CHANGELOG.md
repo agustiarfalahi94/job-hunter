@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.10.0 - 2026-09-09
+
+- Added user-controlled posting-age filters for the past 24 hours, past week,
+  past month, or any time; the past month is the default.
+- Added search-card and destination-page checks that skip jobs marked as no
+  longer accepting applications, closed, filled, unavailable, or expired.
+- Added live search progress with provider, availability-check, scoring,
+  duplicate, skip, and completion messages.
+- Replaced the post-search instruction with a button that opens Job queue.
+- Renamed Strong target to Strong-match goal and documented that it is a goal,
+  while Session cap is the actual per-run maximum.
+- Restricted destination-page checks to the selected platform's trusted job
+  domains.
+
 ## 1.9.1 - 2026-09-09
 
 - Fixed Streamlit Cloud import-time compatibility after the v1.9.0 UI cleanup.

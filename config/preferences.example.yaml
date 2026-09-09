@@ -55,7 +55,9 @@ allow_managerial_if_description_matches: true
 minimum_score_to_apply: 90
 
 daily_targets:
+  # Goal count only; this does not stop or cap a search.
   strong_matches: 20
+  # Maximum suitable jobs to collect for review.
   suitable_matches: 50
 
 application_rules:

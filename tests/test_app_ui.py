@@ -1,5 +1,8 @@
 import unittest
 
+import pandas as pd
+import pyarrow as pa
+
 from job_hunter.app_ui import (
     editable_criteria_defaults,
     filter_jobs,
@@ -73,6 +76,21 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(rows[0]["Metric"], "Checked")
         self.assertEqual(rows[0]["Value"], 2)
         self.assertIn("Duplicate skipped", rows[-1]["Detail"])
+
+    def test_search_summary_rows_convert_to_arrow_without_mixed_value_types(self):
+        summary = SearchRunSummary(
+            checked=2,
+            added=1,
+            duplicates=0,
+            skipped=1,
+            logs=("Search complete",),
+        )
+
+        frame = pd.DataFrame(search_summary_to_rows(summary))
+        self.assertFalse(any(isinstance(value, str) for value in frame["Value"]))
+        table = pa.Table.from_pandas(frame, preserve_index=False)
+
+        self.assertEqual(table.column("Value").to_pylist(), [2.0, 1.0, 0.0, 1.0, None])
 
     def test_provider_status_label_explains_api_and_fallback_modes(self):
         self.assertEqual(provider_status_label(True), "API search enabled")

@@ -1,7 +1,7 @@
 # Job Hunter
 
 Local-first job matching and application planning assistant. Current version:
-v1.9.1.
+v1.10.0.
 
 The goal is to help review many job openings quickly without pretending the
 system can safely apply everywhere on its own. The current version includes
@@ -20,9 +20,12 @@ queue, CSV import, duplicate detection, draft exports, and a small CLI.
 - Searches public LinkedIn job cards and public web-result pages for selected
   job platforms.
 - Supports optional SerpAPI search through Streamlit secrets.
+- Lets the user limit results to the past 24 hours, week, month, or any time.
+- Checks search cards and trusted destination pages for closed-job labels before
+  adding a result to the queue.
 - Loads Malaysia city options from a public city API with local fallback.
 - Lets the user edit target titles, primary keywords, bonus keywords, hard
-  skips, strong target, and session cap inside the app.
+  skips, strong-match goal, and session cap inside the app.
 - Adds and scores discovered search results into the local queue.
 - Stores scored jobs in a local SQLite queue.
 - Deduplicates exact same jobs by title/company/location, even when different
@@ -32,7 +35,9 @@ queue, CSV import, duplicate detection, draft exports, and a small CLI.
 - Exports a local Markdown application draft for a queued job.
 - Exports a dry-run application packet for human review.
 - Flags unsupported job requirements instead of inventing matching experience.
-- Shows the daily strong-match target in the sidebar.
+- Shows the daily strong-match goal in the sidebar.
+- Shows live platform, availability-check, scoring, duplicate, and skip activity
+  while a search is running.
 - Updates local application status after human action.
 - Loads private local preferences from `config/preferences.local.yaml`.
 - Applies hard skips for local-only and mandatory Mandarin requirements.
@@ -113,17 +118,21 @@ and fill the queue.
    - `Primary strengths / description keywords`
    - `Bonus keywords`
    - `Hard skip keywords`
-   - `Strong target`
+   - `Strong-match goal`: the exact number of high-scoring jobs you aim to find;
+     it does not stop or limit a search
    - `Session cap`
 5. Choose `Location`. The dropdown is searchable and uses Malaysia city data
    from a public API with a fallback list.
 6. Choose platforms. With `SERPAPI_API_KEY` configured, the app uses API-backed
    search. Without it, the app falls back to public search pages.
-7. Start with a low session cap such as `10` while testing, especially on the
+7. Choose `Date posted`. `Past month` is the default; use `Any time` only when
+   older listings are still useful.
+8. Start with a low session cap such as `10` while testing, especially on the
    SerpAPI free tier.
-8. Click `Run search and score jobs`.
-9. Open `Job queue` to review scores, decisions, descriptions, remarks, and
-   source links.
+9. Click `Run search and score jobs`. The progress bar and activity log show the
+   provider, current availability check, score result, duplicates, and skips.
+10. Click `Review Job queue` to open the ranked results without returning to the
+    top of the page.
 
 ### Manual Scoring
 
@@ -167,7 +176,11 @@ You can set that in Streamlit Community Cloud secrets. Do not commit a real
 The Streamlit search button reads API-backed search results when SerpAPI is
 configured. Without SerpAPI, it reads public LinkedIn job cards when available,
 then uses public web-result search for the other selected platforms. It scores
-the visible title/company/location/snippet/source URL. It does not log in to
+the visible title/company/location/snippet/source URL. Posting-age filters are
+sent to providers that support them. Before scoring, the app also checks visible
+closed-job wording on the search result and trusted destination page. If a site
+blocks the destination check, the activity log reports that availability could
+not be confirmed and keeps the result for human review. It does not log in to
 LinkedIn, JobStreet, Indeed, Foundit, or company portals. It also does not
 bypass CAPTCHA, submit forms, or use saved browser sessions.
 

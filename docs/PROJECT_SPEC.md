@@ -36,9 +36,15 @@ Included:
 - Optional SerpAPI-backed search through Streamlit secrets or environment.
 - Malaysia city autocomplete with CountriesNow API and local fallback.
 - Search run logs, scoring, dedupe, and queue insertion for up to 50 results.
+- User-controlled posting-age filters with a past-month default.
+- Closed-job checks on search results and trusted destination pages before
+  queue insertion.
+- Live search progress showing provider, availability, scoring, duplicate,
+  skip, and completion activity.
 - Two Streamlit workflows: Automated search and Manual scoring.
 - Editable in-app criteria for target titles, primary strengths/description
-  keywords, bonus keywords, hard skips, strong target, and session cap.
+  keywords, bonus keywords, hard skips, strong-match goal, and session cap.
+- One-click navigation from completed search results to Job queue.
 - One searchable Location dropdown backed by Malaysia city data.
 - Queue actions for draft export, packet export, and status updates.
 - Readable queue table with full descriptions and wide text columns.

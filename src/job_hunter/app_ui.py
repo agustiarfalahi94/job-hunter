@@ -52,9 +52,13 @@ def search_summary_to_rows(summary: SearchRunSummary) -> list[dict[str, object]]
         {"Metric": "Checked", "Value": summary.checked, "Detail": "Search results scored"},
         {"Metric": "Added", "Value": summary.added, "Detail": "New jobs inserted into the queue"},
         {"Metric": "Duplicates", "Value": summary.duplicates, "Detail": "Exact duplicate jobs skipped"},
-        {"Metric": "Skipped", "Value": summary.skipped, "Detail": "Platform queries that could not be read"},
+        {
+            "Metric": "Skipped",
+            "Value": summary.skipped,
+            "Detail": "Closed jobs or unreadable search results skipped",
+        },
     ]
-    rows.extend({"Metric": "Log", "Value": "", "Detail": log} for log in summary.logs)
+    rows.extend({"Metric": "Log", "Value": None, "Detail": log} for log in summary.logs)
     return rows
 
 

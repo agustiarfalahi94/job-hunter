@@ -26,6 +26,7 @@ from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig, load_search_provider_config
 from job_hunter.search import (
     SearchCriteria,
+    SearchProgress,
     build_direct_platform_queries,
     build_search_queries,
     build_serpapi_queries,
@@ -51,6 +52,14 @@ TARGET_TITLES = [
 ]
 PRIMARY_KEYWORDS = ["Power BI", "SSRS", "Google BigQuery"]
 SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit", "Company career pages"]
+AUTOMATED_PAGES = ("Profile & CV", "Search setup", "Job queue")
+MANUAL_PAGES = ("Add job", "Import CSV", "Job queue")
+POSTING_AGE_OPTIONS = {
+    "Past 24 hours": 1,
+    "Past week": 7,
+    "Past month": 30,
+    "Any time": None,
+}
 DEFAULT_STRONG_TARGET = 20
 DEFAULT_SESSION_CAP = 50
 SAMPLE_CSV = """title,company,location,description,source_url
@@ -73,20 +82,22 @@ def main() -> None:
     workflow = _render_sidebar(queue, cv_store, provider_config, preferences)
 
     if workflow == "Automated search":
-        tabs = st.tabs([":material/person: Profile & CV", ":material/tune: Search setup", ":material/table_chart: Job queue"])
-        with tabs[0]:
+        st.session_state.setdefault("automated_page", AUTOMATED_PAGES[0])
+        page = st.segmented_control("Page", AUTOMATED_PAGES, key="automated_page")
+        if page == "Profile & CV":
             _render_profile(cv_store, preferences)
-        with tabs[1]:
+        elif page == "Search setup":
             _render_search_setup(queue, preferences, cv_store, provider_config)
-        with tabs[2]:
+        else:
             _render_queue(queue)
     else:
-        tabs = st.tabs([":material/add_circle: Add job", ":material/upload_file: Import CSV", ":material/table_chart: Job queue"])
-        with tabs[0]:
+        st.session_state.setdefault("manual_page", MANUAL_PAGES[0])
+        page = st.segmented_control("Page", MANUAL_PAGES, key="manual_page")
+        if page == "Add job":
             _render_add_job(queue, _active_preferences(preferences))
-        with tabs[1]:
+        elif page == "Import CSV":
             _render_import(queue, _active_preferences(preferences))
-        with tabs[2]:
+        else:
             _render_queue(queue)
 
 
@@ -136,7 +147,11 @@ def _render_sidebar(
         st.metric("Queued jobs", len(jobs))
         st.metric("New", counts["new"])
         st.metric("Submitted", counts["submitted"])
-        st.metric("Strong target", defaults["strong_target"])
+        st.metric(
+            "Strong-match goal",
+            st.session_state.get("strong_target", defaults["strong_target"]),
+            help="A goal for how many high-scoring jobs you want to find. It does not stop or limit the search.",
+        )
         st.caption("Automated search finds jobs from platforms. Manual scoring is for jobs you already collected.")
         if cv_status.exists:
             st.success(f"CV saved locally ({format_size(cv_status.size_bytes)}).")
@@ -223,6 +238,12 @@ def _render_search_setup(
         location_options = _location_options(cities)
         location = st.selectbox("Location", location_options, index=0, accept_new_options=True)
         platforms = st.multiselect("Platforms to search", SOURCES, default=SOURCES)
+        posting_age = st.selectbox(
+            "Date posted",
+            tuple(POSTING_AGE_OPTIONS),
+            index=2,
+            help="Limits results to newer postings where the selected search provider supports a date filter.",
+        )
         max_jobs = st.slider(
             "Maximum jobs in one session",
             min_value=1,
@@ -238,6 +259,7 @@ def _render_search_setup(
             location=str(location),
             platforms=tuple(str(item) for item in platforms),
             max_results=int(max_jobs),
+            posted_within_days=POSTING_AGE_OPTIONS[str(posting_age)],
         )
         with st.expander("Queries that will run"):
             for query in _planned_queries(criteria, provider_config):
@@ -247,14 +269,50 @@ def _render_search_setup(
         with st.container(horizontal=True, wrap=True):
             if st.button("Run search and score jobs", icon=":material/search:", disabled=disabled):
                 with st.status("Searching public results and scoring jobs", expanded=True) as status:
-                    summary = run_public_search(criteria, active_preferences, queue, provider_config=provider_config)
-                    for log in summary.logs:
-                        st.write(log)
-                    status.update(label="Search run finished", state="complete")
-                st.dataframe(search_summary_to_rows(summary), hide_index=True)
-                st.success("Open Job queue to review the scored results.")
+                    progress_bar = st.progress(0, text=f"0/{max_jobs} jobs checked - preparing search")
+                    activity_box = st.empty()
+                    live_logs: list[str] = []
+
+                    def show_progress(event: SearchProgress) -> None:
+                        live_logs.append(event.message)
+                        short_message = (
+                            event.message
+                            if len(event.message) <= 120
+                            else f"{event.message[:117]}..."
+                        )
+                        percent = (
+                            100
+                            if event.stage == "complete"
+                            else min(99, int(event.checked / max(1, event.total) * 100))
+                        )
+                        progress_bar.progress(
+                            percent,
+                            text=f"{event.checked}/{event.total} jobs checked - {short_message}",
+                        )
+                        activity_box.code("\n".join(live_logs[-12:]), language="text")
+
+                    summary = run_public_search(
+                        criteria,
+                        active_preferences,
+                        queue,
+                        provider_config=provider_config,
+                        progress_callback=show_progress,
+                    )
+                    status.update(label="Search run finished", state="complete", expanded=True)
+                st.session_state["last_search_summary"] = summary
             if st.button("Preview search run", icon=":material/play_arrow:", disabled=disabled):
                 _render_search_preview(max_jobs=max_jobs, location=str(location), platforms=platforms)
+
+        summary = st.session_state.get("last_search_summary")
+        if summary is not None:
+            st.dataframe(search_summary_to_rows(summary), hide_index=True)
+            st.button(
+                "Review Job queue",
+                icon=":material/table_chart:",
+                type="primary",
+                on_click=_open_automated_page,
+                args=("Job queue",),
+            )
 
     with st.container(border=True):
         st.markdown("**Duplicate handling**")
@@ -511,9 +569,32 @@ def _render_editable_criteria(preferences: dict[str, object]) -> dict[str, objec
             key="hard_skip_keywords",
         )
         left, right = st.columns(2)
-        left.number_input("Strong target", min_value=1, max_value=50, value=int(defaults["strong_target"]), key="strong_target")
-        right.number_input("Session cap", min_value=1, max_value=50, value=min(50, int(defaults["session_cap"])), key="session_cap")
+        strong_target = left.number_input(
+            "Strong-match goal",
+            min_value=1,
+            max_value=50,
+            value=int(defaults["strong_target"]),
+            key="strong_target",
+            help="Your goal for the number of jobs that meet the strong-match score. This is not a minimum, maximum, or stopping rule.",
+        )
+        right.number_input(
+            "Session cap",
+            min_value=1,
+            max_value=50,
+            value=min(50, int(defaults["session_cap"])),
+            key="session_cap",
+            help="The maximum number of job results checked during one search run.",
+        )
+        minimum_score = int(preferences.get("minimum_score_to_apply", 90))
+        st.caption(
+            f"Goal: find {strong_target} jobs scoring at least {minimum_score}%. "
+            "The search continues until it reaches the session cap or runs out of results."
+        )
     return _active_preferences(preferences)
+
+
+def _open_automated_page(page: str) -> None:
+    st.session_state["automated_page"] = page
 
 
 def _location_options(cities: tuple[str, ...]) -> tuple[str, ...]:

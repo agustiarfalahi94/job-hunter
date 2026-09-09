@@ -72,6 +72,11 @@ Scores are clamped to 0-100.
 Hard skips return `skip` at score 0 with remarks. Low-suitability and 0% jobs
 must include remarks so it is clear why the job was skipped or deprioritised.
 
+The default strong-match goal is 20 jobs at or above the configured shortlist
+score, currently 90%. This is an exact planning goal, not a minimum requirement,
+maximum result count, or search stopping condition. The session cap controls the
+maximum number of results checked in one run and remains capped at 50.
+
 ## Future Improvements
 
 - Store scored jobs in SQLite.
