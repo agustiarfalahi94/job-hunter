@@ -1,11 +1,88 @@
 import tempfile
 import unittest
+import sqlite3
 from pathlib import Path
 
 from job_hunter.queue import JobInput, JobQueue
 
 
 class JobQueueTest(unittest.TestCase):
+    def test_add_job_stores_posted_date_and_apply_url(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            queue.add_job(
+                JobInput(
+                    title="BI Developer",
+                    company="Example Analytics",
+                    location="Kuala Lumpur",
+                    description="Power BI reporting role",
+                    source_url="https://example.com/jobs/bi",
+                    posted_date="2026-09-09",
+                    apply_url="https://careers.example.com/apply/bi",
+                ),
+                {"target_roles": ["BI Developer"], "primary_keywords": ["Power BI"]},
+            )
+
+            job = queue.list_jobs()[0]
+
+        self.assertEqual(job.posted_date, "2026-09-09")
+        self.assertEqual(job.apply_url, "https://careers.example.com/apply/bi")
+
+    def test_existing_database_is_migrated_without_losing_jobs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "jobs.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE jobs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT NOT NULL,
+                        company TEXT NOT NULL DEFAULT '',
+                        location TEXT NOT NULL DEFAULT '',
+                        description TEXT NOT NULL DEFAULT '',
+                        source_url TEXT NOT NULL DEFAULT '',
+                        dedupe_key TEXT NOT NULL UNIQUE,
+                        score INTEGER NOT NULL,
+                        decision TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'new',
+                        reasons TEXT NOT NULL DEFAULT '',
+                        remarks TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO jobs (
+                        title, company, location, description, source_url,
+                        dedupe_key, score, decision, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "Data Analyst",
+                        "Acme",
+                        "Kuala Lumpur",
+                        "Power BI dashboards",
+                        "https://example.com/jobs/1",
+                        "job:data analyst|acme|kuala lumpur",
+                        95,
+                        "shortlist",
+                        "new",
+                    ),
+                )
+
+            queue = JobQueue(db_path)
+            jobs = queue.list_jobs()
+            with sqlite3.connect(db_path) as conn:
+                columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].title, "Data Analyst")
+        self.assertEqual(jobs[0].posted_date, "")
+        self.assertEqual(jobs[0].apply_url, "")
+        self.assertIn("posted_date", columns)
+        self.assertIn("apply_url", columns)
+
     def test_add_scores_and_lists_job_for_review(self):
         preferences = {
             "target_roles": ["Data Engineer"],

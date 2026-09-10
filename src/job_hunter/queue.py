@@ -28,6 +28,8 @@ class JobRecord:
     status: str
     reasons: str = ""
     remarks: str = ""
+    posted_date: str = ""
+    apply_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -69,9 +71,10 @@ class JobQueue:
                 """
                 INSERT INTO jobs (
                     title, company, location, description, source_url,
-                    dedupe_key, score, decision, status, reasons, remarks
+                    dedupe_key, score, decision, status, reasons, remarks,
+                    posted_date, apply_url
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?)
                 """,
                 (
                     job.title.strip(),
@@ -84,6 +87,8 @@ class JobQueue:
                     scoring.decision,
                     "\n".join(scoring.reasons),
                     "\n".join(scoring.remarks),
+                    job.posted_date.strip(),
+                    job.apply_url.strip(),
                 ),
             )
         return AddResult(int(cursor.lastrowid), created=True, score=scoring.score, decision=scoring.decision)
@@ -112,7 +117,7 @@ class JobQueue:
     def list_jobs(self, status: str | None = None) -> list[JobRecord]:
         query = """
             SELECT id, title, company, location, description, source_url,
-                   score, decision, status, reasons, remarks
+                   score, decision, status, reasons, remarks, posted_date, apply_url
             FROM jobs
         """
         params: tuple[str, ...] = ()
@@ -190,6 +195,8 @@ class JobQueue:
             )
             _ensure_column(conn, "jobs", "reasons", "TEXT NOT NULL DEFAULT ''")
             _ensure_column(conn, "jobs", "remarks", "TEXT NOT NULL DEFAULT ''")
+            _ensure_column(conn, "jobs", "posted_date", "TEXT NOT NULL DEFAULT ''")
+            _ensure_column(conn, "jobs", "apply_url", "TEXT NOT NULL DEFAULT ''")
 
     def _find_duplicate(self, job: JobInput) -> int | None:
         with self._connect() as conn:
@@ -206,7 +213,7 @@ class JobQueue:
             row = conn.execute(
                 """
                 SELECT id, title, company, location, description, source_url,
-                       score, decision, status, reasons, remarks
+                       score, decision, status, reasons, remarks, posted_date, apply_url
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -243,6 +250,8 @@ def _record_from_row(row: sqlite3.Row) -> JobRecord:
         status=str(row["status"]),
         reasons=str(row["reasons"]),
         remarks=str(row["remarks"]),
+        posted_date=str(row["posted_date"]),
+        apply_url=str(row["apply_url"]),
     )
 
 

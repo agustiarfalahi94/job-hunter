@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta
 from typing import Callable
 import json
-from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urlparse
+import re
+from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -86,6 +88,14 @@ class SearchCandidate:
     source_url: str
     platform: str
     closed_reason: str = ""
+    posted_date: str = ""
+    apply_url: str = ""
+
+
+@dataclass(frozen=True)
+class JobPageMetadata:
+    posted_date: str = ""
+    apply_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -182,6 +192,7 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
         title_text = str(item.get("title", "")).strip()
         href = str(item.get("link", "")).strip()
         snippet = str(item.get("snippet", "")).strip()
+        posted_date = normalize_posted_date(str(item.get("date", "")))
         title, company = _split_title_company(title_text)
         if not title or not href:
             continue
@@ -197,6 +208,7 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
                 source_url=href,
                 platform=platform,
                 closed_reason=closed_reason,
+                posted_date=posted_date,
             )
         )
     return candidates
@@ -213,12 +225,18 @@ def parse_linkedin_jobs(html: str, location: str, limit: int) -> list[SearchCand
         title_node = card.select_one(".base-search-card__title")
         company_node = card.select_one(".base-search-card__subtitle")
         location_node = card.select_one(".job-search-card__location")
+        date_node = card.select_one("time.job-search-card__listdate, time")
         if link is None or title_node is None:
             continue
         source_url = str(link.get("href", "")).strip()
         title = title_node.get_text(" ", strip=True)
         company = company_node.get_text(" ", strip=True) if company_node else ""
         card_location = location_node.get_text(" ", strip=True) if location_node else location
+        posted_value = ""
+        if date_node is not None:
+            posted_value = str(date_node.get("datetime", "")).strip() or date_node.get_text(
+                " ", strip=True
+            )
         if not source_url or not title:
             continue
         if not _looks_like_job_result(source_url, title, "LinkedIn"):
@@ -234,6 +252,7 @@ def parse_linkedin_jobs(html: str, location: str, limit: int) -> list[SearchCand
                 source_url=source_url,
                 platform="LinkedIn",
                 closed_reason=_closed_job_reason(card_text),
+                posted_date=normalize_posted_date(posted_value),
             )
         )
     return candidates
@@ -265,6 +284,7 @@ def parse_duckduckgo_results(html: str, platform: str, location: str, limit: int
                 source_url=href,
                 platform=platform,
                 closed_reason=closed_reason,
+                posted_date=_date_from_text(" ".join((title_text, snippet))),
             )
         )
     return candidates
@@ -364,6 +384,21 @@ def run_public_search(
                     ),
                 )
                 continue
+            if _posting_is_too_old(candidate.posted_date, criteria.posted_within_days):
+                skipped += 1
+                _report_progress(
+                    logs,
+                    progress_callback,
+                    stage="skipped",
+                    checked=checked,
+                    total=search_limit,
+                    message=(
+                        f"Skipped {candidate.title} at {candidate.company or 'unknown company'}: "
+                        f"posted {candidate.posted_date}, older than "
+                        f"{criteria.posted_within_days} days"
+                    ),
+                )
+                continue
             _report_progress(
                 logs,
                 progress_callback,
@@ -394,6 +429,12 @@ def run_public_search(
                         message=_availability_unknown_message(candidate),
                     )
                 else:
+                    metadata = extract_job_metadata(job_page, candidate.source_url)
+                    candidate = replace(
+                        candidate,
+                        posted_date=metadata.posted_date or candidate.posted_date,
+                        apply_url=metadata.apply_url or candidate.apply_url,
+                    )
                     job_page_text = BeautifulSoup(job_page, "html.parser").get_text(" ", strip=True)
                     closed_reason = _closed_job_reason(job_page_text)
                     if closed_reason:
@@ -410,6 +451,24 @@ def run_public_search(
                             ),
                         )
                         continue
+                    if _posting_is_too_old(
+                        candidate.posted_date, criteria.posted_within_days
+                    ):
+                        skipped += 1
+                        _report_progress(
+                            logs,
+                            progress_callback,
+                            stage="skipped",
+                            checked=checked,
+                            total=search_limit,
+                            message=(
+                                f"Skipped {candidate.title} at "
+                                f"{candidate.company or 'unknown company'}: "
+                                f"posted {candidate.posted_date}, older than "
+                                f"{criteria.posted_within_days} days"
+                            ),
+                        )
+                        continue
             result = queue.add_job(
                 JobInput(
                     title=candidate.title,
@@ -417,6 +476,8 @@ def run_public_search(
                     location=candidate.location,
                     description=candidate.description,
                     source_url=candidate.source_url,
+                    posted_date=candidate.posted_date,
+                    apply_url=candidate.apply_url,
                 ),
                 preferences,
             )
@@ -525,6 +586,124 @@ def _closed_job_reason(text: str) -> str:
         if marker in normalized:
             return marker.capitalize()
     return ""
+
+
+def normalize_posted_date(value: str, today: date | None = None) -> str:
+    normalized = " ".join(str(value).strip().split())
+    if not normalized:
+        return ""
+    reference_date = today or date.today()
+    iso_candidate = normalized[:10]
+    try:
+        return date.fromisoformat(iso_candidate).isoformat()
+    except ValueError:
+        pass
+
+    for date_format in ("%b %d, %Y", "%B %d, %Y", "%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(normalized, date_format).date().isoformat()
+        except ValueError:
+            continue
+
+    lowered = normalized.casefold()
+    if lowered == "today":
+        return reference_date.isoformat()
+    if lowered == "yesterday":
+        return (reference_date - timedelta(days=1)).isoformat()
+
+    relative = re.fullmatch(
+        r"(?:about\s+)?(\d+)\+?\s+(hour|day|week|month)s?\s+ago", lowered
+    )
+    if relative is None:
+        return ""
+    amount = int(relative.group(1))
+    unit = relative.group(2)
+    days = {"hour": 0, "day": amount, "week": amount * 7, "month": amount * 30}[unit]
+    return (reference_date - timedelta(days=days)).isoformat()
+
+
+def extract_job_metadata(html: str, source_url: str) -> JobPageMetadata:
+    soup = BeautifulSoup(html, "html.parser")
+    posted_date = ""
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            payload = json.loads(script.string or script.get_text() or "{}")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        date_posted = _find_date_posted(payload)
+        if date_posted:
+            posted_date = normalize_posted_date(date_posted)
+            if posted_date:
+                break
+
+    if not posted_date:
+        date_node = soup.select_one("time[datetime], time.job-search-card__listdate")
+        if date_node is not None:
+            value = str(date_node.get("datetime", "")).strip() or date_node.get_text(
+                " ", strip=True
+            )
+            posted_date = normalize_posted_date(value)
+
+    apply_url = ""
+    for link in soup.find_all("a", href=True):
+        label = " ".join(
+            (
+                link.get_text(" ", strip=True),
+                str(link.get("aria-label", "")),
+                str(link.get("title", "")),
+            )
+        ).casefold()
+        if "apply" not in label:
+            continue
+        candidate_url = urljoin(source_url, str(link.get("href", "")).strip())
+        if _safe_https_url(candidate_url):
+            apply_url = candidate_url
+            break
+    return JobPageMetadata(posted_date=posted_date, apply_url=apply_url)
+
+
+def _find_date_posted(value: object) -> str:
+    if isinstance(value, dict):
+        raw_date = value.get("datePosted")
+        if isinstance(raw_date, str) and raw_date.strip():
+            return raw_date.strip()
+        for child in value.values():
+            found = _find_date_posted(child)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_date_posted(child)
+            if found:
+                return found
+    return ""
+
+
+def _date_from_text(text: str) -> str:
+    relative = re.search(
+        r"\b(?:today|yesterday|(?:about\s+)?\d+\+?\s+(?:hour|day|week|month)s?\s+ago)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if relative:
+        return normalize_posted_date(relative.group(0))
+    iso_date = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
+    return normalize_posted_date(iso_date.group(0)) if iso_date else ""
+
+
+def _posting_is_too_old(posted_date: str, days: int | None) -> bool:
+    if not posted_date or days is None:
+        return False
+    try:
+        parsed_date = date.fromisoformat(posted_date)
+    except ValueError:
+        return False
+    return parsed_date < date.today() - timedelta(days=max(1, days))
+
+
+def _safe_https_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and bool(parsed.hostname)
 
 
 def _availability_unknown_message(candidate: SearchCandidate) -> str:

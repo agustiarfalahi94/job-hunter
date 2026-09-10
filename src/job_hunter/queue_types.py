@@ -12,3 +12,5 @@ class JobInput:
     location: str = ""
     description: str = ""
     source_url: str = ""
+    posted_date: str = ""
+    apply_url: str = ""
