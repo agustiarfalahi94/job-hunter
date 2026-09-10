@@ -1,6 +1,6 @@
 # Application Pipeline
 
-## v1.11 Flow
+## v1.12 Flow
 
 ```text
 Optional private CV
@@ -32,7 +32,8 @@ User login / CAPTCHA / required answers / review / submit
 
 ## Search Rules
 
-- CV upload is optional. Search and scoring use the editable criteria shown in the app.
+- CV upload is optional. A saved CV shows a direct Continue to Search jobs action.
+- Search and scoring use the same unified criteria values shown in the app.
 - A run checks at most 50 results.
 - The strong-match goal is a planning goal, not a stop condition.
 - Search defaults to the past month; users may choose 24 hours, one week, or any time.
@@ -56,7 +57,8 @@ User login / CAPTCHA / required answers / review / submit
 ## Production Test
 
 1. Open **Search jobs** without uploading a CV.
-2. Confirm the title, keyword, location, source, date, goal, and cap controls are editable.
+2. Confirm one Search criteria panel contains the title, keyword, location,
+   source, date, goal, and maximum-results controls.
 3. Run a small search and watch the progress bar and activity log.
 4. Open **Job queue** with the button shown after the run.
 5. Confirm the queue shows `Posted` and does not show application status.

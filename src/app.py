@@ -167,6 +167,15 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
                 st.warning(f"CV was saved, but text extraction failed: {exc}")
             st.rerun()
 
+    if status.exists:
+        st.button(
+            "Continue to Search jobs",
+            icon=":material/arrow_forward:",
+            type="primary",
+            on_click=_open_page,
+            args=("Search jobs",),
+        )
+
     with st.container(border=True):
         st.markdown("**What the app currently knows from your CV-backed profile**")
         cv_text = cv_store.load_text()
@@ -199,21 +208,39 @@ def _render_search_jobs(
     else:
         st.info("No CV is saved, and that is fine. Search and scoring use the editable criteria below.")
 
-    active_preferences = _render_editable_criteria(preferences)
-    criteria_defaults = _criteria_defaults(active_preferences)
+    criteria_defaults = _criteria_defaults(preferences)
     cities = _cached_malaysia_cities()
     with st.container(border=True):
+        st.markdown("**Search criteria**")
         title_contains = st.multiselect(
-            "Job title contains",
+            "Target job titles",
             criteria_defaults["target_roles"],
-            default=criteria_defaults["target_roles"][:4],
+            default=criteria_defaults["target_roles"],
             accept_new_options=True,
+            key="target_roles",
         )
         description_contains = st.multiselect(
-            "Job description contains at least one primary strength",
+            "Required description keywords",
             criteria_defaults["primary_keywords"],
             default=criteria_defaults["primary_keywords"],
             accept_new_options=True,
+            key="primary_keywords",
+            help="A job must contain at least one of these strengths to qualify as a strong match.",
+        )
+        st.multiselect(
+            "Bonus keywords",
+            criteria_defaults["bonus_keywords"],
+            default=criteria_defaults["bonus_keywords"],
+            accept_new_options=True,
+            key="bonus_keywords",
+        )
+        st.multiselect(
+            "Hard skip keywords",
+            criteria_defaults["hard_skip_keywords"],
+            default=criteria_defaults["hard_skip_keywords"],
+            accept_new_options=True,
+            key="hard_skip_keywords",
+            help="Jobs containing these phrases are skipped entirely.",
         )
         location_options = _location_options(cities)
         location = st.selectbox("Location", location_options, index=0, accept_new_options=True)
@@ -224,14 +251,31 @@ def _render_search_jobs(
             index=2,
             help="Limits results to newer postings where the selected search provider supports a date filter.",
         )
-        max_jobs = st.slider(
+        left, right = st.columns(2)
+        strong_target = left.number_input(
+            "Strong-match goal",
+            min_value=1,
+            max_value=50,
+            value=int(criteria_defaults["strong_target"]),
+            key="strong_target",
+            help="A planning goal, not a search limit or stopping rule.",
+        )
+        max_jobs = right.slider(
             "Maximum jobs in one session",
             min_value=1,
             max_value=50,
             value=min(50, int(criteria_defaults["session_cap"])),
+            key="session_cap",
+            help="The maximum number of job results checked during this search run.",
+        )
+        minimum_score = int(preferences.get("minimum_score_to_apply", 90))
+        st.caption(
+            f"Goal: find {strong_target} jobs scoring at least {minimum_score}%. "
+            "The search stops at the maximum above or when results run out."
         )
         st.caption(provider_status_label(provider_config.has_api_search))
 
+        active_preferences = _active_preferences(preferences)
         disabled = not title_contains or not description_contains or not platforms
         criteria = SearchCriteria(
             title_terms=tuple(str(item) for item in title_contains),
@@ -429,50 +473,6 @@ def _active_preferences(preferences: dict[str, object]) -> dict[str, object]:
         "suitable_matches": st.session_state.get("session_cap", defaults["session_cap"]),
     }
     return active
-
-
-def _render_editable_criteria(preferences: dict[str, object]) -> dict[str, object]:
-    defaults = _criteria_defaults(preferences)
-    with st.expander("Edit search and scoring criteria", expanded=True):
-        st.multiselect("Target titles", defaults["target_roles"], default=defaults["target_roles"], accept_new_options=True, key="target_roles")
-        st.multiselect(
-            "Primary strengths / description keywords",
-            defaults["primary_keywords"],
-            default=defaults["primary_keywords"],
-            accept_new_options=True,
-            key="primary_keywords",
-        )
-        st.multiselect("Bonus keywords", defaults["bonus_keywords"], default=defaults["bonus_keywords"], accept_new_options=True, key="bonus_keywords")
-        st.multiselect(
-            "Hard skip keywords",
-            defaults["hard_skip_keywords"],
-            default=defaults["hard_skip_keywords"],
-            accept_new_options=True,
-            key="hard_skip_keywords",
-        )
-        left, right = st.columns(2)
-        strong_target = left.number_input(
-            "Strong-match goal",
-            min_value=1,
-            max_value=50,
-            value=int(defaults["strong_target"]),
-            key="strong_target",
-            help="Your goal for the number of jobs that meet the strong-match score. This is not a minimum, maximum, or stopping rule.",
-        )
-        right.number_input(
-            "Session cap",
-            min_value=1,
-            max_value=50,
-            value=min(50, int(defaults["session_cap"])),
-            key="session_cap",
-            help="The maximum number of job results checked during one search run.",
-        )
-        minimum_score = int(preferences.get("minimum_score_to_apply", 90))
-        st.caption(
-            f"Goal: find {strong_target} jobs scoring at least {minimum_score}%. "
-            "The search continues until it reaches the session cap or runs out of results."
-        )
-    return _active_preferences(preferences)
 
 
 def _open_page(page: str) -> None:

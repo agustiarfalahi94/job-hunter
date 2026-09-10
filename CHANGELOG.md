@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.12.0 - 2026-09-11
+
+- Replaced the two overlapping Search jobs forms with one unified Search
+  criteria panel.
+- Made target titles and required description keywords the single source for
+  both public queries and suitability scoring.
+- Consolidated Session cap and Maximum jobs into one Maximum jobs per session
+  control.
+- Added a Continue to Search jobs button whenever a saved CV is available.
+- Added Streamlit regression tests for the unified criteria and CV navigation
+  flows.
+
 ## 1.11.1 - 2026-09-10
 
 - Fixed a Streamlit Community Cloud hot-reload failure caused by importing new

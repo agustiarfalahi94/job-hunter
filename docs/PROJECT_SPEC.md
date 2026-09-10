@@ -18,7 +18,8 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 - Contact-free public candidate profile supported by the supplied CV.
 - Private PDF, DOCX, and best-effort legacy DOC storage and text extraction.
 - Optional CV signal display; CV upload is not required for search.
-- Editable target titles, primary keywords, bonus keywords, hard skips, strong-match goal, and session cap.
+- Editable target titles, primary keywords, bonus keywords, hard skips,
+  strong-match goal, and maximum jobs per session.
 - One searchable Malaysia city selector backed by a public API and local fallback.
 - LinkedIn, JobStreet, Indeed, Foundit, and selected company-career search targets.
 - Optional SerpAPI search configured through Streamlit secrets or environment.
@@ -32,6 +33,9 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 - Exact cross-platform duplicate detection by title, company, and location.
 - Official HTTPS Apply URL discovery with original-posting fallback.
 - One Streamlit workflow: **Profile & CV**, **Search jobs**, and **Job queue**.
+- One Search criteria panel whose titles and keywords drive both discovery and
+  scoring, without duplicated controls.
+- Direct navigation from a saved CV to Search jobs.
 - Readable queue table with wrapping, wide text columns, and no application-status column.
 - Automated tests, local check script, versioned changelog, design, and implementation plans.
 
@@ -48,6 +52,8 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 ## Success Criteria
 
 - Search can run when no CV is stored.
+- A saved CV offers direct navigation to Search jobs.
+- Search titles and required keywords appear once and drive both discovery and scoring.
 - The queue never presents application status as posting freshness.
 - Every row shows an ISO posting date or `Unknown`.
 - Known stale or closed jobs are skipped with an explanatory activity message.

@@ -42,6 +42,32 @@ class AppNavigationTest(unittest.TestCase):
         )
         self.assertFalse(search_button.disabled)
 
+    def test_profile_has_a_button_that_opens_search_jobs(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        source = app_path.read_text(encoding="utf-8")
+
+        self.assertIn('"Continue to Search jobs"', source)
+        self.assertIn('args=("Search jobs",)', source)
+
+    def test_search_jobs_uses_one_unified_criteria_panel(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path)).run(timeout=10)
+
+        app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+
+        labels = [widget.label for widget in app_test.multiselect]
+        self.assertEqual(labels.count("Target job titles"), 1)
+        self.assertEqual(labels.count("Required description keywords"), 1)
+        self.assertEqual(labels.count("Bonus keywords"), 1)
+        self.assertEqual(labels.count("Hard skip keywords"), 1)
+        self.assertNotIn("Job title contains", labels)
+        self.assertNotIn("Primary strengths / description keywords", labels)
+        self.assertEqual(
+            sum(widget.label == "Maximum jobs in one session" for widget in app_test.slider),
+            1,
+        )
+        self.assertFalse(any(widget.label == "Session cap" for widget in app_test.number_input))
+
     def test_removed_workflow_actions_are_not_in_streamlit_entrypoint(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
         source = app_path.read_text(encoding="utf-8")
