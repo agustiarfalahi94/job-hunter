@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urljoin, urlp
 
 from bs4 import BeautifulSoup
 
+from job_hunter.application_links import is_safe_application_url
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
@@ -59,19 +60,6 @@ CLOSED_JOB_MARKERS = (
     "this job has expired",
     "job has expired",
 )
-KNOWN_ATS_DOMAINS = (
-    "ashbyhq.com",
-    "greenhouse.io",
-    "icims.com",
-    "lever.co",
-    "myworkdayjobs.com",
-    "smartrecruiters.com",
-    "successfactors.com",
-    "taleo.net",
-    "workable.com",
-)
-
-
 @dataclass(frozen=True)
 class SearchCriteria:
     title_terms: tuple[str, ...]
@@ -710,26 +698,6 @@ def _posting_is_too_old(posted_date: str, days: int | None) -> bool:
     except ValueError:
         return False
     return parsed_date < date.today() - timedelta(days=max(1, days))
-
-
-def is_safe_application_url(url: str, source_url: str) -> bool:
-    parsed = urlparse(url)
-    source = urlparse(source_url)
-    hostname = (parsed.hostname or "").casefold()
-    source_hostname = (source.hostname or "").casefold()
-    if parsed.scheme != "https" or source.scheme != "https":
-        return False
-    if not hostname or not source_hostname:
-        return False
-    same_site = (
-        hostname == source_hostname
-        or hostname.endswith(f".{source_hostname}")
-        or source_hostname.endswith(f".{hostname}")
-    )
-    known_ats = any(
-        hostname == domain or hostname.endswith(f".{domain}") for domain in KNOWN_ATS_DOMAINS
-    )
-    return same_site or known_ats
 
 
 def _availability_unknown_message(candidate: SearchCandidate) -> str:

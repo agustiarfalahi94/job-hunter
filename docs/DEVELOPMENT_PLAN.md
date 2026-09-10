@@ -137,3 +137,10 @@
   fallback that opens in a new browser tab.
 - Kept login, CAPTCHA, required questions, review, and final submission in the
   user's browser; prohibited LinkedIn automation remains out of scope.
+
+## v1.11.1 - Streamlit Cloud Rebuild Hotfix
+
+- Restored the stable-import boundary required by Streamlit hot reloads.
+- Isolated application-link validation in its own module.
+- Pinned the tested Streamlit version so Community Cloud performs a clean,
+  reproducible dependency rebuild.
