@@ -8,12 +8,14 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent))
 
 from job_hunter.app_ui import (
-    application_destination,
-    application_destination_host,
     filter_jobs,
     jobs_to_rows,
     provider_status_label,
     search_summary_to_rows,
+)
+from job_hunter.application_links import (
+    application_destination_hostname,
+    application_destination_url,
 )
 from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
 from job_hunter.cv_store import CVStore, format_size
@@ -342,8 +344,8 @@ def _render_queue_actions(jobs) -> None:
     options = {f"#{job.id} - {job.title} - {job.company}": job for job in jobs}
     selected = st.selectbox("Job", list(options))
     job = options[selected]
-    destination = application_destination(job)
-    destination_host = application_destination_host(job)
+    destination = application_destination_url(job.apply_url, job.source_url)
+    destination_host = application_destination_hostname(job.apply_url, job.source_url)
     if job.apply_url and destination == job.apply_url:
         st.caption("Job Hunter found an official application destination for this role.")
     else:

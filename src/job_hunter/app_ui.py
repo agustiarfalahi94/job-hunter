@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Iterable
-from urllib.parse import urlparse
 
+from job_hunter.application_links import (
+    application_destination_hostname,
+    application_destination_url,
+)
 from job_hunter.queue import JobRecord
-from job_hunter.search import SearchRunSummary, is_safe_application_url
+from job_hunter.search import SearchRunSummary
 
 
 STATUSES = ("new", "reviewing", "drafted", "submitted", "rejected")
@@ -46,16 +49,11 @@ def filter_jobs(
 
 
 def application_destination(job: JobRecord) -> str:
-    if is_safe_application_url(job.apply_url, job.source_url):
-        return job.apply_url
-    parsed = urlparse(job.source_url)
-    if parsed.scheme == "https" and parsed.hostname:
-        return job.source_url
-    return ""
+    return application_destination_url(job.apply_url, job.source_url)
 
 
 def application_destination_host(job: JobRecord) -> str:
-    return (urlparse(application_destination(job)).hostname or "").casefold()
+    return application_destination_hostname(job.apply_url, job.source_url)
 
 
 def status_counts(jobs: Iterable[JobRecord]) -> dict[str, int]:

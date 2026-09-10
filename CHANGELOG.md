@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.1 - 2026-09-10
+
+- Fixed a Streamlit Community Cloud hot-reload failure caused by importing new
+  helper names from an already-cached module.
+- Moved application-link validation behind a cache-safe module boundary and
+  tightened the entrypoint import regression test.
+- Pinned Streamlit 1.63.0 so dependency resolution is reproducible and this
+  deployment receives a clean environment rebuild.
+
 ## 1.11.0 - 2026-09-10
 
 - Unified the Streamlit app into Profile & CV, Search jobs, and Job queue.

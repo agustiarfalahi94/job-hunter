@@ -11,8 +11,14 @@ class AppImportContractTest(unittest.TestCase):
             if isinstance(node, ast.ImportFrom) and node.module == "job_hunter.app_ui":
                 imported_names.update(alias.name for alias in node.names)
 
-        self.assertNotIn("editable_criteria_defaults", imported_names)
-        self.assertNotIn("queue_column_widths", imported_names)
+        stable_names = {
+            "filter_jobs",
+            "jobs_to_rows",
+            "provider_status_label",
+            "search_summary_to_rows",
+            "status_counts",
+        }
+        self.assertLessEqual(imported_names, stable_names)
 
 
 if __name__ == "__main__":
