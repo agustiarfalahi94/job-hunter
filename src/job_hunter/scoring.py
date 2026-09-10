@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from job_hunter.eligibility import hard_skip_matches
+
 
 DEFAULT_WEIGHTS: dict[str, int] = {
     "role": 30,
@@ -34,9 +36,9 @@ def score_job(job: dict[str, Any], preferences: dict[str, Any]) -> ScoreResult:
     reasons: list[str] = []
     remarks: list[str] = []
 
-    hard_skip_matches = _all_contains(text, preferences.get("hard_skip_keywords", ()))
-    if hard_skip_matches:
-        remarks.extend(f"Hard skip keyword found: {match}" for match in hard_skip_matches)
+    skip_matches = hard_skip_matches(text, preferences.get("hard_skip_keywords", ()))
+    if skip_matches:
+        remarks.extend(f"Hard skip keyword found: {match}" for match in skip_matches)
         return ScoreResult(score=0, decision="skip", reasons=tuple(remarks), remarks=tuple(remarks), weights=weights)
 
     matched_role = _first_contains(title, preferences.get("target_roles", ()))

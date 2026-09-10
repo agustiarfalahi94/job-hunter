@@ -9,6 +9,7 @@ from job_hunter.application_links import (
     application_destination_hostname,
     application_destination_url,
 )
+from job_hunter.eligibility import hard_skip_matches
 from job_hunter.queue import JobRecord
 from job_hunter.search import SearchRunSummary
 
@@ -38,14 +39,28 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
 
 
 def filter_jobs(
-    jobs: Iterable[JobRecord], decision: str, status: str = "all"
+    jobs: Iterable[JobRecord],
+    decision: str,
+    status: str = "all",
+    hard_skip_keywords: object = (),
 ) -> list[JobRecord]:
-    filtered = list(jobs)
+    filtered = exclude_hard_skipped_jobs(jobs, hard_skip_keywords)
     if decision != "all":
         filtered = [job for job in filtered if job.decision == decision]
     if status != "all":
         filtered = [job for job in filtered if job.status == status]
     return filtered
+
+
+def exclude_hard_skipped_jobs(
+    jobs: Iterable[JobRecord], configured_keywords: object
+) -> list[JobRecord]:
+    visible: list[JobRecord] = []
+    for job in jobs:
+        text = " ".join((job.title, job.description, job.location))
+        if not hard_skip_matches(text, configured_keywords):
+            visible.append(job)
+    return visible
 
 
 def application_destination(job: JobRecord) -> str:

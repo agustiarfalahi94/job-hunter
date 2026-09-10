@@ -7,6 +7,7 @@ from job_hunter.app_ui import (
     application_destination,
     application_destination_host,
     editable_criteria_defaults,
+    exclude_hard_skipped_jobs,
     filter_jobs,
     jobs_to_rows,
     provider_status_label,
@@ -62,6 +63,26 @@ class AppUiTest(unittest.TestCase):
         filtered = filter_jobs(jobs, decision="shortlist")
 
         self.assertEqual([job.id for job in filtered], [1])
+
+    def test_excludes_historical_jobs_that_match_current_hard_skip_rules(self):
+        jobs = [
+            JobRecord(
+                1,
+                "BI Specialist (Local Applicant Only)",
+                "A",
+                "Kuala Lumpur",
+                "Power BI",
+                "",
+                90,
+                "shortlist",
+                "new",
+            ),
+            JobRecord(2, "BI Analyst", "B", "Kuala Lumpur", "Power BI", "", 90, "shortlist", "new"),
+        ]
+
+        visible = exclude_hard_skipped_jobs(jobs, ["locals/malaysian only"])
+
+        self.assertEqual([job.id for job in visible], [2])
 
     def test_application_destination_prefers_safe_apply_url_then_source(self):
         direct = JobRecord(

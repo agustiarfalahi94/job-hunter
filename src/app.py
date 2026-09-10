@@ -81,7 +81,7 @@ def main() -> None:
     elif page == "Search jobs":
         _render_search_jobs(queue, preferences, cv_store, provider_config)
     else:
-        _render_queue(queue)
+        _render_queue(queue, preferences)
 
 
 def _render_header() -> None:
@@ -120,9 +120,14 @@ def _render_sidebar(
     provider_config: SearchProviderConfig,
     preferences: dict[str, object],
 ) -> None:
-    jobs = queue.list_jobs()
-    cv_status = cv_store.status()
     defaults = _criteria_defaults(preferences)
+    hard_skip_keywords = st.session_state.get(
+        "hard_skip_keywords", defaults["hard_skip_keywords"]
+    )
+    jobs = filter_jobs(
+        queue.list_jobs(), decision="all", hard_skip_keywords=hard_skip_keywords
+    )
+    cv_status = cv_store.status()
     with st.sidebar:
         st.header("Today")
         st.metric("Queued jobs", len(jobs))
@@ -344,10 +349,15 @@ def _render_search_jobs(
             "If LinkedIn and Foundit show the same exact role at the same company and location, Job Hunter keeps one queue item and treats the other as a duplicate. Later we can store the extra platform links as alternate sources."
         )
 
-def _render_queue(queue: JobQueue) -> None:
+def _render_queue(queue: JobQueue, preferences: dict[str, object]) -> None:
     st.subheader("Job queue")
     st.write("Review the strongest matches first, then open the official application destination.")
-    jobs = queue.list_jobs()
+    active_preferences = _active_preferences(preferences)
+    jobs = filter_jobs(
+        queue.list_jobs(),
+        decision="all",
+        hard_skip_keywords=active_preferences.get("hard_skip_keywords", ()),
+    )
     if not jobs:
         st.info("No jobs are queued yet. Open Search jobs and run your first search.")
         return

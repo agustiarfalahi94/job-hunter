@@ -127,6 +127,36 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual(mandarin.decision, "skip")
         self.assertIn("Hard skip keyword found: mandarin speaker is mandatory", mandarin.remarks)
 
+    def test_hard_skips_local_applicant_only_title_variant(self):
+        result = score_job(
+            {
+                "title": "Senior BI Specialist (Local Applicant Only)",
+                "description": "Power BI and SSRS reporting role.",
+                "location": "Kuala Lumpur",
+            },
+            {"hard_skip_keywords": ["locals/malaysian only"]},
+        )
+
+        self.assertEqual(result.score, 0)
+        self.assertEqual(result.decision, "skip")
+        self.assertIn("Hard skip keyword found: locals/malaysian only", result.remarks)
+
+    def test_local_team_wording_does_not_trigger_local_only_rule(self):
+        result = score_job(
+            {
+                "title": "BI Analyst",
+                "description": "Build Power BI dashboards with the local reporting team.",
+                "location": "Kuala Lumpur",
+            },
+            {
+                "target_roles": ["BI Analyst"],
+                "primary_keywords": ["Power BI"],
+                "hard_skip_keywords": ["locals/malaysian only"],
+            },
+        )
+
+        self.assertNotEqual(result.decision, "skip")
+
     def test_managerial_title_is_allowed_when_description_matches(self):
         job = {
             "title": "BI Manager",

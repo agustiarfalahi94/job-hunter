@@ -469,6 +469,77 @@ class SearchTest(unittest.TestCase):
         self.assertTrue(any("Checking availability" in line for line in summary.logs))
         self.assertTrue(any("No longer accepting applications" in line for line in summary.logs))
 
+    def test_run_public_search_excludes_local_only_title_before_queue_insertion(self):
+        criteria = SearchCriteria(
+            title_terms=("BI Developer",),
+            description_terms=("Power BI",),
+            location="Kuala Lumpur",
+            platforms=("LinkedIn",),
+            max_results=1,
+            posted_within_days=None,
+        )
+        search_html = """
+        <div class="base-search-card">
+          <a class="base-card__full-link" href="https://my.linkedin.com/jobs/view/local-only">BI Developer (Local Applicant Only)</a>
+          <h3 class="base-search-card__title">BI Developer (Local Applicant Only)</h3>
+          <h4 class="base-search-card__subtitle">Restricted Company</h4>
+          <span class="job-search-card__location">Kuala Lumpur</span>
+        </div>
+        """
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            summary = run_public_search(
+                criteria,
+                {"hard_skip_keywords": ["locals/malaysian only"]},
+                queue,
+                fetcher=lambda url: search_html,
+            )
+            jobs = queue.list_jobs()
+
+        self.assertEqual(summary.added, 0)
+        self.assertEqual(summary.skipped, 1)
+        self.assertEqual(jobs, [])
+        self.assertTrue(any("Hard skip keyword found" in line for line in summary.logs))
+
+    def test_run_public_search_excludes_restriction_found_on_job_page(self):
+        criteria = SearchCriteria(
+            title_terms=("BI Developer",),
+            description_terms=("Power BI",),
+            location="Kuala Lumpur",
+            platforms=("LinkedIn",),
+            max_results=1,
+            posted_within_days=None,
+        )
+        search_html = """
+        <div class="base-search-card">
+          <a class="base-card__full-link" href="https://my.linkedin.com/jobs/view/restricted-detail">BI Developer</a>
+          <h3 class="base-search-card__title">BI Developer</h3>
+          <h4 class="base-search-card__subtitle">Restricted Company</h4>
+          <span class="job-search-card__location">Kuala Lumpur</span>
+        </div>
+        """
+
+        def fetcher(url: str) -> str:
+            if "jobs/search" in url:
+                return search_html
+            return "<main>Power BI reporting role. Local applicants only.</main>"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            summary = run_public_search(
+                criteria,
+                {"hard_skip_keywords": ["locals/malaysian only"]},
+                queue,
+                fetcher=fetcher,
+            )
+            jobs = queue.list_jobs()
+
+        self.assertEqual(summary.added, 0)
+        self.assertEqual(summary.skipped, 1)
+        self.assertEqual(jobs, [])
+        self.assertTrue(any("Hard skip keyword found" in line for line in summary.logs))
+
     def test_run_public_search_reports_blocked_availability_check_for_manual_review(self):
         criteria = SearchCriteria(
             title_terms=("BI Developer",),

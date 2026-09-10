@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urljoin, urlp
 from bs4 import BeautifulSoup
 
 from job_hunter.application_links import is_safe_application_url
+from job_hunter.eligibility import hard_skip_matches
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
@@ -383,6 +384,23 @@ def run_public_search(
                     ),
                 )
                 continue
+            eligibility_reason = _eligibility_skip_reason(
+                candidate, preferences.get("hard_skip_keywords", ())
+            )
+            if eligibility_reason:
+                skipped += 1
+                _report_progress(
+                    logs,
+                    progress_callback,
+                    stage="skipped",
+                    checked=checked,
+                    total=search_limit,
+                    message=(
+                        f"Skipped {candidate.title} at {candidate.company or 'unknown company'}: "
+                        f"{eligibility_reason}"
+                    ),
+                )
+                continue
             if _posting_is_too_old(candidate.posted_date, criteria.posted_within_days):
                 skipped += 1
                 _report_progress(
@@ -435,6 +453,26 @@ def run_public_search(
                         apply_url=metadata.apply_url or candidate.apply_url,
                     )
                     job_page_text = BeautifulSoup(job_page, "html.parser").get_text(" ", strip=True)
+                    eligibility_reason = _eligibility_skip_reason(
+                        candidate,
+                        preferences.get("hard_skip_keywords", ()),
+                        page_text=job_page_text,
+                    )
+                    if eligibility_reason:
+                        skipped += 1
+                        _report_progress(
+                            logs,
+                            progress_callback,
+                            stage="skipped",
+                            checked=checked,
+                            total=search_limit,
+                            message=(
+                                f"Skipped {candidate.title} at "
+                                f"{candidate.company or 'unknown company'}: "
+                                f"{eligibility_reason}"
+                            ),
+                        )
+                        continue
                     closed_reason = _closed_job_reason(job_page_text)
                     if closed_reason:
                         skipped += 1
@@ -705,6 +743,18 @@ def _availability_unknown_message(candidate: SearchCandidate) -> str:
         f"Availability could not be confirmed: {candidate.title} at "
         f"{candidate.company or 'unknown company'}"
     )
+
+
+def _eligibility_skip_reason(
+    candidate: SearchCandidate, keywords: object, page_text: str = ""
+) -> str:
+    text = " ".join(
+        (candidate.title, candidate.description, candidate.location, page_text)
+    )
+    matches = hard_skip_matches(text, keywords)
+    if not matches:
+        return ""
+    return f"Hard skip keyword found: {', '.join(matches)}"
 
 
 def _clean_duckduckgo_url(url: str) -> str:

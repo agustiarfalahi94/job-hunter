@@ -44,7 +44,11 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
         "CAB deployment",
     ],
     "avoid_keywords": [],
-    "hard_skip_keywords": ["locals/malaysian only", "mandarin speaker is mandatory"],
+    "hard_skip_keywords": [
+        "locals/malaysian only",
+        "local applicant only",
+        "mandarin speaker is mandatory",
+    ],
     "allow_managerial_if_description_matches": True,
     "minimum_score_to_apply": 90,
     "daily_targets": {"strong_matches": 20, "suitable_matches": 50},

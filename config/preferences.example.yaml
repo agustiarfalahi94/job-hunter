@@ -48,6 +48,7 @@ avoid_keywords: []
 
 hard_skip_keywords:
   - locals/malaysian only
+  - local applicant only
   - mandarin speaker is mandatory
 
 allow_managerial_if_description_matches: true
