@@ -1,265 +1,150 @@
 # Job Hunter
 
-Local-first job matching and application planning assistant. Current version:
-v1.10.0.
+Job Hunter is a Streamlit app that searches, scores, and ranks Kuala Lumpur data jobs using criteria the user controls. Current version: v1.11.0.
 
-The goal is to help review many job openings quickly without pretending the
-system can safely apply everywhere on its own. The current version includes
-the project brain, a factual candidate profile, preferences template, scoring
-rules, Streamlit dashboard, PDF/Word CV upload and text extraction, public
-and optional API-backed search, editable search criteria, city lookup, SQLite
-queue, CSV import, duplicate detection, draft exports, and a small CLI.
+Live app: [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/)
 
 ## What It Does
 
-- Scores a job against target roles, locations, preferred keywords, and avoid
-  keywords.
-- Extracts readable text from locally uploaded PDF, DOCX, and best-effort DOC
-  CV files.
-- Detects primary and bonus CV signals from the extracted text.
-- Searches public LinkedIn job cards and public web-result pages for selected
-  job platforms.
-- Supports optional SerpAPI search through Streamlit secrets.
-- Lets the user limit results to the past 24 hours, week, month, or any time.
-- Checks search cards and trusted destination pages for closed-job labels before
-  adding a result to the queue.
-- Loads Malaysia city options from a public city API with local fallback.
-- Lets the user edit target titles, primary keywords, bonus keywords, hard
-  skips, strong-match goal, and session cap inside the app.
-- Adds and scores discovered search results into the local queue.
-- Stores scored jobs in a local SQLite queue.
-- Deduplicates exact same jobs by title/company/location, even when different
-  platforms have different URLs.
-- Imports a simple CSV with `title`, `company`, `location`, `description`, and
-  `source_url` columns.
-- Exports a local Markdown application draft for a queued job.
-- Exports a dry-run application packet for human review.
-- Flags unsupported job requirements instead of inventing matching experience.
-- Shows the daily strong-match goal in the sidebar.
-- Shows live platform, availability-check, scoring, duplicate, and skip activity
-  while a search is running.
-- Updates local application status after human action.
-- Loads private local preferences from `config/preferences.local.yaml`.
-- Applies hard skips for local-only and mandatory Mandarin requirements.
-- Runs as a Streamlit web app for daily use.
-- Saves/replaces/removes a local CV file under a git-ignored private folder.
-- Saves extracted CV text under the same git-ignored private folder.
-- Separates automated platform search from fully manual scoring.
-- Separates public project templates from private candidate inputs.
-- Documents the first application workflow before browser automation exists.
-- Keeps the real CV, contact details, secrets, and local preferences out of Git.
+- Searches selected public job sources for up to 50 results per session.
+- Supports LinkedIn, JobStreet, Indeed, Foundit, and selected company career pages.
+- Uses SerpAPI when `SERPAPI_API_KEY` is configured and a limited public-search fallback otherwise.
+- Accepts an optional PDF, DOCX, or best-effort legacy DOC CV.
+- Lets users search and score jobs without uploading a CV.
+- Makes target titles, primary strengths, bonus skills, hard skips, location, posting age, strong-match goal, and session cap editable.
+- Scores each result with visible reasons and mandatory remarks for weak or skipped matches.
+- Shows real search progress, including the provider, current result, duplicate checks, stale or closed jobs, and scoring activity.
+- Stores the real posting date when one can be verified and displays `Unknown` otherwise.
+- Skips a result when its known posting date is older than the selected limit.
+- Skips visible closed, filled, unavailable, or expired postings.
+- Deduplicates the same title, company, and location across platforms.
+- Finds an official HTTPS application destination when the readable posting provides one.
+- Opens Apply in a new browser tab, falling back to the original posting when no separate application URL is available.
+- Keeps CV files, extracted CV text, local queue data, preferences, and secrets out of Git.
 
-## Public/Private Boundary
+## How To Use The Web App
 
-This repository is intended to be public. Do not commit:
+### 1. Profile & CV
 
-- The actual CV file.
-- Phone number, email address, passport, visa, or address details.
-- Job-board session cookies, exported browser profiles, or application drafts
-  containing private information.
-- API keys or model provider credentials.
-- `.streamlit/secrets.toml`.
+Uploading a CV is optional.
 
-Use `config/preferences.example.yaml` as the public template. Keep the real
-working copy at `config/preferences.local.yaml`.
+- Upload PDF, DOCX, or DOC to keep a private profile reference.
+- Replace or remove the saved CV at any time.
+- The app shows primary and bonus skill signals found in readable CV text.
+- Skip this page if you want to search using only the editable criteria.
 
-## Project Layout
+On Streamlit Community Cloud, uploaded data belongs to that app session/storage environment. A public deployment should not be treated as a private multi-user account system until authentication and per-user storage are added.
 
-| Path | Purpose |
-|---|---|
-| `src/job_hunter/profile.py` | Public, CV-supported profile summary with contact details excluded |
-| `src/job_hunter/scoring.py` | Deterministic v0.1 scoring engine |
-| `src/job_hunter/queue.py` | SQLite queue, scoring-at-import, and duplicate detection |
-| `src/job_hunter/cv_store.py` | Local private CV save, replace, remove, and status helpers |
-| `src/job_hunter/cv_parser.py` | Extracts CV text and detects CV keyword signals |
-| `src/job_hunter/search.py` | Builds public search queries, parses result pages, and ingests results |
-| `src/job_hunter/locations.py` | Loads/filter Malaysia city choices for autocomplete |
-| `src/job_hunter/runtime_config.py` | Reads optional API search config from secrets/env |
-| `src/job_hunter/cli.py` | Local commands for adding, importing, and listing jobs |
-| `src/job_hunter/drafts.py` | Truthful draft generation and unsupported-claim warnings |
-| `src/job_hunter/application_packet.py` | Dry-run application packets with submit safety notes |
-| `src/job_hunter/workflow.py` | Daily progress summary and next-action guidance |
-| `src/job_hunter/preferences.py` | Simple local preference loading |
-| `src/app.py` | Streamlit web dashboard |
-| `config/preferences.example.yaml` | Safe preferences template |
-| `docs/` | Product spec, profile, scoring, pipeline, architecture, and development plan |
-| `tests/` | Unit tests for scoring and the public profile boundary |
-| `tool/check.sh` | Local test gate |
+### 2. Search Jobs
 
-## Run It
+1. Edit target titles, primary description keywords, bonus skills, and hard-skip phrases.
+2. Set the **Strong-match goal**. This is the exact number of strong results you hope to find; it is not a minimum, maximum, or stopping rule.
+3. Set the **Session cap**. This is the maximum number of results checked in one run, capped at 50.
+4. Choose one searchable Malaysia **Location**.
+5. Select the job platforms.
+6. Choose **Date posted**: past 24 hours, past week, past month, or any time.
+7. Click **Run search and score jobs**.
+8. Watch the progress bar and activity log.
+9. Click **Review Job queue** when the run finishes.
 
-```sh
-python -m venv .venv
-source .venv/bin/activate
-./tool/check.sh
-```
+`Past month` is the default. Start with a smaller session cap while testing, especially with SerpAPI's free allowance.
 
-## Web App
+### 3. Job Queue
 
-Run locally:
+The queue is ordered by score and shows:
 
-```sh
-streamlit run src/app.py
-```
+- score and decision;
+- actual posting date, or `Unknown` when the source does not expose one;
+- title, company, and location;
+- match reasons and low-suitability remarks;
+- description and source link.
 
-The web app has two modes in the sidebar.
+Filter by decision, choose a job, and click **Apply**. Job Hunter prefers a discovered official application URL and otherwise opens the original posting in a new browser tab.
 
-### Automated Search
+## Apply Boundary
 
-Use this when you want Job Hunter to search selected platforms, score results,
-and fill the queue.
+The hosted Streamlit server cannot take over the visitor's existing logged-in browser session, bypass CAPTCHA, or safely complete arbitrary third-party forms. LinkedIn also prohibits third-party software and browser extensions that automate activity on LinkedIn.
 
-1. Open `Profile & CV`.
-2. Upload or replace your CV. PDF and DOCX are preferred; legacy DOC is
-   best-effort.
-3. Open `Search setup`.
-4. Edit the search and scoring criteria:
-   - `Target titles`
-   - `Primary strengths / description keywords`
-   - `Bonus keywords`
-   - `Hard skip keywords`
-   - `Strong-match goal`: the exact number of high-scoring jobs you aim to find;
-     it does not stop or limit a search
-   - `Session cap`
-5. Choose `Location`. The dropdown is searchable and uses Malaysia city data
-   from a public API with a fallback list.
-6. Choose platforms. With `SERPAPI_API_KEY` configured, the app uses API-backed
-   search. Without it, the app falls back to public search pages.
-7. Choose `Date posted`. `Past month` is the default; use `Any time` only when
-   older listings are still useful.
-8. Start with a low session cap such as `10` while testing, especially on the
-   SerpAPI free tier.
-9. Click `Run search and score jobs`. The progress bar and activity log show the
-   provider, current availability check, score result, duplicates, and skips.
-10. Click `Review Job queue` to open the ranked results without returning to the
-    top of the page.
+For that reason, Job Hunter performs the supported part of the application flow:
 
-### Manual Scoring
+1. locate a safe official HTTPS application destination where possible;
+2. fall back to the original job posting when discovery is blocked or unsupported;
+3. open that destination in a new tab;
+4. leave login, CAPTCHA, required questions, final review, and submission in the user's browser.
 
-Use this when you already found jobs yourself and only want Job Hunter to score
-them.
+Opening a page is never recorded or described as a submitted application.
 
-1. Select `Manual scoring` in the sidebar.
-2. Use `Add job` for one pasted job description.
-3. Use `Import CSV` for many rows from a spreadsheet or saved research list.
-4. Open `Job queue` to review the results.
+## Search Boundary
 
-### Job Queue
+With SerpAPI configured, the app reads Google organic results for the selected platforms. Without it, the app tries public LinkedIn job cards and public web-result pages. Public pages can be incomplete or blocked.
 
-The queue is shared by both modes. It shows score, decision, status, title,
-company, location, full description, reasons, remarks, and source link. Use the
-actions below the table to export a draft, export an application packet, or
-update the status after you apply manually.
+Posting-age filters are sent to providers that support them. Job Hunter also checks dates it can parse from search metadata or structured `JobPosting` data. Unknown dates remain visible for review rather than being mislabeled as new.
 
-For free hosting, deploy this repository on Streamlit Community Cloud and set
-the app entry point to:
+Destination availability checks are limited to trusted source domains. If a site blocks the check, the activity log says availability could not be confirmed and keeps the result for review.
 
-```text
-src/app.py
-```
+## SerpAPI Setup
 
-The hosted app will use its own Streamlit Cloud storage. Treat a public
-deployment as a personal demo until authentication and per-user storage exist.
-Do not publish private CV files or secrets in the repository.
-
-Optional API search uses this secret:
+Add this to Streamlit Community Cloud secrets:
 
 ```toml
 SERPAPI_API_KEY = "your-key-here"
 ```
 
-You can set that in Streamlit Community Cloud secrets. Do not commit a real
-`.streamlit/secrets.toml` file.
+Do not commit the real key or `.streamlit/secrets.toml`.
 
-### Production Search Boundary
-
-The Streamlit search button reads API-backed search results when SerpAPI is
-configured. Without SerpAPI, it reads public LinkedIn job cards when available,
-then uses public web-result search for the other selected platforms. It scores
-the visible title/company/location/snippet/source URL. Posting-age filters are
-sent to providers that support them. Before scoring, the app also checks visible
-closed-job wording on the search result and trusted destination page. If a site
-blocks the destination check, the activity log reports that availability could
-not be confirmed and keeps the result for human review. It does not log in to
-LinkedIn, JobStreet, Indeed, Foundit, or company portals. It also does not
-bypass CAPTCHA, submit forms, or use saved browser sessions.
-
-For stronger production search, configure SerpAPI first. Future providers can
-be added behind `search.py`, such as Google Custom Search, Adzuna, a paid
-job-search API, or official company ATS feeds. Put provider keys in Streamlit
-secrets, never in Git.
-
-## CLI
-
-Add one pasted job:
+## Run Locally
 
 ```sh
-PYTHONPATH=src python3 -m job_hunter.cli add \
-  --title "Data Engineer" \
-  --company "Example Analytics" \
-  --location "Kuala Lumpur" \
-  --description "SQL Python Airflow BigQuery migration pipelines" \
-  --source-url "https://example.com/jobs/1"
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run src/app.py
 ```
 
-Import CSV:
+Run the complete automated check:
 
 ```sh
-PYTHONPATH=src python3 -m job_hunter.cli import-csv data/raw/jobs.csv
+./tool/check.sh
 ```
 
-List queue:
+## Deploy On Streamlit Community Cloud
 
-```sh
-PYTHONPATH=src python3 -m job_hunter.cli list
+Use this repository and set the app entry point to:
+
+```text
+src/app.py
 ```
 
-Export a draft for queued job `1`:
+Add `SERPAPI_API_KEY` in the deployment's Secrets settings. The live app automatically redeploys from the configured GitHub branch after a push.
 
-```sh
-PYTHONPATH=src python3 -m job_hunter.cli draft 1
-```
+## Public And Private Data
 
-Export a dry-run application packet for queued job `1`:
+This repository is public. Never commit:
 
-```sh
-PYTHONPATH=src python3 -m job_hunter.cli packet 1
-```
+- the actual CV or extracted CV text;
+- email, phone number, home address, passport, or visa details;
+- platform passwords, cookies, exported browser profiles, or CAPTCHA data;
+- API keys;
+- local queue databases or application records;
+- `config/preferences.local.yaml` or `.streamlit/secrets.toml`.
 
-Mark a job as submitted after you submit it yourself:
+Use `config/preferences.example.yaml` as the safe public template.
 
-```sh
-PYTHONPATH=src python3 -m job_hunter.cli status 1 submitted
-```
+## Project Layout
 
-Check today's progress toward 20 strong matches:
+| Path | Purpose |
+|---|---|
+| `src/app.py` | Streamlit interface for Profile, Search, Queue, and Apply links |
+| `src/job_hunter/search.py` | Query building, result parsing, freshness checks, metadata discovery, and live progress |
+| `src/job_hunter/scoring.py` | Deterministic explainable job scoring |
+| `src/job_hunter/queue.py` | Additive SQLite storage and duplicate detection |
+| `src/job_hunter/cv_store.py` | Private CV save, replace, and removal |
+| `src/job_hunter/cv_parser.py` | PDF and Word text extraction plus skill-signal detection |
+| `src/job_hunter/locations.py` | Malaysia city lookup with local fallback |
+| `src/job_hunter/runtime_config.py` | Streamlit secrets and environment configuration |
+| `config/preferences.example.yaml` | Public criteria template |
+| `docs/` | Product, scoring, architecture, pipeline, and release plans |
+| `tests/` | Queue, search, scoring, privacy, and Streamlit regression tests |
+| `tool/check.sh` | Complete local test gate |
 
-```sh
-PYTHONPATH=src python3 -m job_hunter.cli today --target 20
-```
-
-The current local target is 20 strong matches, with up to 50 suitable matches
-for review.
-
-## Design Notes
-
-The style follows the user's existing projects:
-
-- Plain README first, with concrete behavior before architecture.
-- Local config templates are committed; real secrets and personal data are not.
-- The important rules live in `AGENTS.md` so future AI coding sessions do not
-  have to guess the safety boundary.
-- Tests cover the small runtime surface from day one.
-
-## Status
-
-This is a local daily workflow assistant with public/API search support, not a
-live job-board login or auto-apply bot yet. The first usable loop is:
-
-1. Upload a CV locally.
-2. Search platform results, paste a job description, or import a CSV.
-3. Score jobs against the candidate profile and preferences.
-4. Put promising jobs into a human-reviewed application queue.
-5. Generate tailored drafts only from supported experience.
-6. Submit manually until browser automation is designed and tested.
-7. Mark submitted jobs locally in the queue.
+The older command-line helpers remain for backward compatibility, but the supported user journey is the Streamlit app described above.
