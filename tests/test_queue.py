@@ -1,6 +1,7 @@
+from contextlib import closing
+import sqlite3
 import tempfile
 import unittest
-import sqlite3
 from pathlib import Path
 
 from job_hunter.queue import JobInput, JobQueue
@@ -31,7 +32,7 @@ class JobQueueTest(unittest.TestCase):
     def test_existing_database_is_migrated_without_losing_jobs(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "jobs.db"
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn:
                 conn.execute(
                     """
                     CREATE TABLE jobs (
@@ -70,10 +71,11 @@ class JobQueueTest(unittest.TestCase):
                         "new",
                     ),
                 )
+                conn.commit()
 
             queue = JobQueue(db_path)
             jobs = queue.list_jobs()
-            with sqlite3.connect(db_path) as conn:
+            with closing(sqlite3.connect(db_path)) as conn:
                 columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
 
         self.assertEqual(len(jobs), 1)

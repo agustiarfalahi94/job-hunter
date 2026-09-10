@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Iterable
+from urllib.parse import urlparse
 
 from job_hunter.queue import JobRecord
 from job_hunter.search import SearchRunSummary
@@ -20,7 +21,7 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
             "ID": job.id,
             "Score": job.score,
             "Decision": job.decision,
-            "Status": job.status,
+            "Posted": job.posted_date or "Unknown",
             "Title": job.title,
             "Company": job.company,
             "Location": job.location,
@@ -33,13 +34,23 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
     ]
 
 
-def filter_jobs(jobs: Iterable[JobRecord], decision: str, status: str) -> list[JobRecord]:
+def filter_jobs(
+    jobs: Iterable[JobRecord], decision: str, status: str = "all"
+) -> list[JobRecord]:
     filtered = list(jobs)
     if decision != "all":
         filtered = [job for job in filtered if job.decision == decision]
     if status != "all":
         filtered = [job for job in filtered if job.status == status]
     return filtered
+
+
+def application_destination(job: JobRecord) -> str:
+    for url in (job.apply_url, job.source_url):
+        parsed = urlparse(url)
+        if parsed.scheme == "https" and parsed.hostname:
+            return url
+    return ""
 
 
 def status_counts(jobs: Iterable[JobRecord]) -> dict[str, int]:
@@ -85,6 +96,7 @@ def queue_column_widths() -> dict[str, str]:
         "Title": "large",
         "Company": "medium",
         "Location": "medium",
+        "Posted": "medium",
         "Reasons": "large",
         "Remarks": "large",
         "Description": "large",
