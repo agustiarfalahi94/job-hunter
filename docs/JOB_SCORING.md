@@ -14,6 +14,10 @@ application should be submitted automatically.
 - Remote policy or employment notes.
 - Local preferences from `config/preferences.local.yaml`.
 
+CV upload is optional. The active score uses the editable criteria shown in the
+Streamlit Search jobs page; saved CV text is used for private profile signal
+display and must not silently add unsupported experience.
+
 ## Current Criteria
 
 Target titles:
@@ -72,10 +76,13 @@ Scores are clamped to 0-100.
 Hard skips return `skip` at score 0 with remarks. Low-suitability and 0% jobs
 must include remarks so it is clear why the job was skipped or deprioritised.
 
+The default strong-match goal is 20 jobs at or above the configured shortlist
+score, currently 90%. This is an exact planning goal, not a minimum requirement,
+maximum result count, or search stopping condition. The session cap controls the
+maximum number of results checked in one run and remains capped at 50.
+
 ## Future Improvements
 
-- Store scored jobs in SQLite.
-- Add duplicate detection by company/title/location/job URL.
 - Add explainable LLM review after deterministic scoring.
-- Add a "claim support" check that maps generated draft sentences back to
-  candidate-profile evidence.
+- Learn from explicit user feedback without silently changing hard skips or
+  primary-strength requirements.

@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.11.0 - 2026-09-10
+
+- Unified the Streamlit app into Profile & CV, Search jobs, and Job queue.
+- Made CV upload optional so users can search and score with editable criteria
+  alone.
+- Removed manual job entry, CSV import, draft/packet export, and application
+  status controls from the web interface.
+- Replaced the misleading `Status = new` queue column with an actual posting
+  date or `Unknown`.
+- Added date extraction from structured job metadata, LinkedIn cards, SerpAPI
+  metadata, and recognizable relative dates.
+- Added a second freshness check that skips known stale results beyond the
+  selected posting-age limit.
+- Added an additive SQLite migration for `posted_date` and `apply_url`.
+- Backfills missing date and Apply metadata when an older queue row is found
+  again as a duplicate.
+- Added official HTTPS Apply destination discovery with a safe original-posting
+  fallback.
+- Restricted discovered Apply links to same-site or recognized ATS hosts and
+  displayed the selected destination hostname before navigation.
+- Enabled a real Apply link that opens in a new browser tab while leaving login,
+  CAPTCHA, required questions, review, and submission in the user's browser.
+- Added queue, search, URL-safety, migration, and Streamlit regression tests.
+
+## 1.10.0 - 2026-09-09
+
+- Added user-controlled posting-age filters for the past 24 hours, past week,
+  past month, or any time; the past month is the default.
+- Added search-card and destination-page checks that skip jobs marked as no
+  longer accepting applications, closed, filled, unavailable, or expired.
+- Added live search progress with provider, availability-check, scoring,
+  duplicate, skip, and completion messages.
+- Replaced the post-search instruction with a button that opens Job queue.
+- Renamed Strong target to Strong-match goal and documented that it is a goal,
+  while Session cap is the actual per-run maximum.
+- Restricted destination-page checks to the selected platform's trusted job
+  domains.
+
 ## 1.9.1 - 2026-09-09
 
 - Fixed Streamlit Cloud import-time compatibility after the v1.9.0 UI cleanup.

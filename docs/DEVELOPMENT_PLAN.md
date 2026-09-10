@@ -107,3 +107,33 @@
 - Moved draft, packet, and status actions into the Job queue page.
 - Added full descriptions and wider readable text columns to the queue table.
 - Added a README tutorial for real Streamlit usage.
+
+## v1.10 - Search Freshness and Live Progress
+
+- Added user-controlled posting-age filters with a past-month default.
+- Added search-result and trusted destination-page checks for closed jobs.
+- Added real-time search progress and activity messages.
+- Added one-click navigation from a completed search to Job queue.
+- Clarified Strong-match goal as a planning goal and Session cap as the actual
+  per-run maximum.
+- Added trusted-domain validation before destination-page availability checks.
+
+## v1.11 - Streamlined Search, Dates, and Apply Links
+
+- Replaced the separate automated/manual Streamlit modes with one three-page
+  journey: Profile & CV, Search jobs, and Job queue.
+- Made CV upload explicitly optional; keyword-only search and scoring work
+  without a saved CV.
+- Removed manual job entry, CSV import, draft export, packet export, and
+  application-status controls from the Streamlit interface.
+- Replaced the misleading application status column with a real posting date
+  or `Unknown`.
+- Added posting-date normalization from structured job data, LinkedIn cards,
+  SerpAPI metadata, and recognizable relative dates.
+- Added a second freshness check so known stale results are skipped even when a
+  provider returns them after a date-filtered query.
+- Added additive SQLite fields for posting date and discovered Apply URL.
+- Added official HTTPS Apply destination discovery with an original-posting
+  fallback that opens in a new browser tab.
+- Kept login, CAPTCHA, required questions, review, and final submission in the
+  user's browser; prohibited LinkedIn automation remains out of scope.

@@ -1,73 +1,67 @@
 # Application Pipeline
 
-## v0.1 Flow
+## v1.11 Flow
 
 ```text
-Pasted job or CSV row
-      |
-      v
-Deterministic scoring
-      |
-      v
-Local SQLite queue
-      |
-      v
-shortlist / review / reject
-      |
-      v
-Draft export with warnings
-      |
-      v
-Dry-run application packet
-      |
-      v
-Human review
-      |
-      v
-Manual submit
-      |
-      v
-Status update + daily progress
-      |
-      v
-Application notes and draft
+Optional private CV
+        |
+        v
+Editable titles + keywords + location + sources + date limit
+        |
+        v
+Public or SerpAPI-backed search with live progress
+        |
+        v
+Closed-job and known-date freshness checks
+        |
+        v
+Deterministic scoring + cross-platform deduplication
+        |
+        v
+SQLite queue with real posting date or Unknown
+        |
+        v
+Official HTTPS Apply destination discovery
+        |
+        v
+Open destination in a new browser tab
+        |
+        v
+User login / CAPTCHA / required answers / review / submit
 ```
 
-## Rules
+## Search Rules
 
-- The system may recommend applying.
-- The system may prepare a draft.
-- The user decides whether to submit.
-- The system must not invent experience to fit a job.
-- The system must stop when a job asks for unsupported must-have experience.
-- Duplicate jobs are detected before they can inflate the queue.
-- Drafts are written locally under `exports/`, which is git-ignored.
-- Application packets default to `Submit allowed: no`.
-- The daily target is measured from local statuses, not assumed from generated
-  drafts.
+- CV upload is optional. Search and scoring use the editable criteria shown in the app.
+- A run checks at most 50 results.
+- The strong-match goal is a planning goal, not a stop condition.
+- Search defaults to the past month; users may choose 24 hours, one week, or any time.
+- A provider date filter is a first pass, not proof that every returned result is fresh.
+- A known posting date older than the selected limit is skipped and explained in the activity log.
+- A missing or unparseable posting date becomes `Unknown`, never `New`.
+- Visible closed, filled, expired, or unavailable postings are skipped.
+- If a trusted page blocks the availability check, the job remains available for human review and the log states that availability could not be confirmed.
+- Duplicate title/company/location combinations produce one queue row across sources.
 
-## Later Browser Layer
+## Apply Rules
 
-Browser automation should be designed as a separate phase. It must handle:
+- The app may discover and open a same-site or recognized ATS HTTPS application destination.
+- Unknown cross-site Apply links are ignored in favor of the original posting.
+- When a separate Apply URL cannot be discovered, the original safe posting is used.
+- Opening the link does not change an application status and is not described as submission.
+- The user reviews and submits on the destination site.
+- The app does not store credentials, cookies, CAPTCHA answers, or identity documents.
+- The app does not automate LinkedIn activity because LinkedIn prohibits that use.
 
-- Logged-in job-board sessions without storing credentials in Git.
-- Rate limits and anti-abuse policies.
-- Captchas and identity checks by handing control back to the user.
-- Audit logs of what was filled and what was submitted.
-- A dry-run mode before any real submission.
+## Production Test
 
-The first safe target is assisted form filling, not fully autonomous
-submission.
+1. Open **Search jobs** without uploading a CV.
+2. Confirm the title, keyword, location, source, date, goal, and cap controls are editable.
+3. Run a small search and watch the progress bar and activity log.
+4. Open **Job queue** with the button shown after the run.
+5. Confirm the queue shows `Posted` and does not show application status.
+6. Choose a job and click **Apply**.
+7. Confirm the safest available HTTPS destination opens in a new tab.
+8. Complete any login, CAPTCHA, required questions, review, and submission manually on that site.
 
-## Production Testing Notes
-
-In Streamlit Community Cloud, the current safe production path is:
-
-1. Upload a PDF, DOCX, or legacy DOC CV file.
-2. Confirm readable CV text signals appear.
-3. Choose a Malaysia city and selected platforms.
-4. Run search and review the queue.
-5. Open application links manually and update status after human submission.
-
-Optional API search requires `SERPAPI_API_KEY` in Streamlit secrets. Without it,
-the app uses free public search fallbacks that can be blocked or incomplete.
+Optional API search requires `SERPAPI_API_KEY` in Streamlit secrets. Public fallback search can be incomplete or blocked.

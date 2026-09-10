@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Iterable
+from urllib.parse import urlparse
 
 from job_hunter.queue import JobRecord
-from job_hunter.search import SearchRunSummary
+from job_hunter.search import SearchRunSummary, is_safe_application_url
 
 
 STATUSES = ("new", "reviewing", "drafted", "submitted", "rejected")
@@ -20,7 +21,7 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
             "ID": job.id,
             "Score": job.score,
             "Decision": job.decision,
-            "Status": job.status,
+            "Posted": job.posted_date or "Unknown",
             "Title": job.title,
             "Company": job.company,
             "Location": job.location,
@@ -33,13 +34,28 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
     ]
 
 
-def filter_jobs(jobs: Iterable[JobRecord], decision: str, status: str) -> list[JobRecord]:
+def filter_jobs(
+    jobs: Iterable[JobRecord], decision: str, status: str = "all"
+) -> list[JobRecord]:
     filtered = list(jobs)
     if decision != "all":
         filtered = [job for job in filtered if job.decision == decision]
     if status != "all":
         filtered = [job for job in filtered if job.status == status]
     return filtered
+
+
+def application_destination(job: JobRecord) -> str:
+    if is_safe_application_url(job.apply_url, job.source_url):
+        return job.apply_url
+    parsed = urlparse(job.source_url)
+    if parsed.scheme == "https" and parsed.hostname:
+        return job.source_url
+    return ""
+
+
+def application_destination_host(job: JobRecord) -> str:
+    return (urlparse(application_destination(job)).hostname or "").casefold()
 
 
 def status_counts(jobs: Iterable[JobRecord]) -> dict[str, int]:
@@ -52,9 +68,13 @@ def search_summary_to_rows(summary: SearchRunSummary) -> list[dict[str, object]]
         {"Metric": "Checked", "Value": summary.checked, "Detail": "Search results scored"},
         {"Metric": "Added", "Value": summary.added, "Detail": "New jobs inserted into the queue"},
         {"Metric": "Duplicates", "Value": summary.duplicates, "Detail": "Exact duplicate jobs skipped"},
-        {"Metric": "Skipped", "Value": summary.skipped, "Detail": "Platform queries that could not be read"},
+        {
+            "Metric": "Skipped",
+            "Value": summary.skipped,
+            "Detail": "Closed jobs or unreadable search results skipped",
+        },
     ]
-    rows.extend({"Metric": "Log", "Value": "", "Detail": log} for log in summary.logs)
+    rows.extend({"Metric": "Log", "Value": None, "Detail": log} for log in summary.logs)
     return rows
 
 
@@ -81,6 +101,7 @@ def queue_column_widths() -> dict[str, str]:
         "Title": "large",
         "Company": "medium",
         "Location": "medium",
+        "Posted": "medium",
         "Reasons": "large",
         "Remarks": "large",
         "Description": "large",

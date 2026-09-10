@@ -1,6 +1,11 @@
 import unittest
 
+import pandas as pd
+import pyarrow as pa
+
 from job_hunter.app_ui import (
+    application_destination,
+    application_destination_host,
     editable_criteria_defaults,
     filter_jobs,
     jobs_to_rows,
@@ -28,6 +33,8 @@ class AppUiTest(unittest.TestCase):
                     decision="shortlist",
                     status="new",
                     remarks="Strong match",
+                    posted_date="2026-09-09",
+                    apply_url="https://careers.example.com/apply/1",
                 )
             ]
         )
@@ -36,6 +43,15 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(rows[0]["Decision"], "shortlist")
         self.assertEqual(rows[0]["Remarks"], "Strong match")
         self.assertEqual(rows[0]["Description"], "Power BI role")
+        self.assertEqual(rows[0]["Posted"], "2026-09-09")
+        self.assertNotIn("Status", rows[0])
+
+    def test_jobs_to_rows_labels_missing_posted_date_as_unknown(self):
+        job = JobRecord(1, "BI Developer", "A", "Kuala Lumpur", "", "", 96, "shortlist", "new")
+
+        row = jobs_to_rows([job])[0]
+
+        self.assertEqual(row["Posted"], "Unknown")
 
     def test_filter_jobs_can_show_only_shortlisted_jobs(self):
         jobs = [
@@ -43,9 +59,65 @@ class AppUiTest(unittest.TestCase):
             JobRecord(2, "Support", "B", "Kuala Lumpur", "", "", 0, "skip", "new"),
         ]
 
-        filtered = filter_jobs(jobs, decision="shortlist", status="all")
+        filtered = filter_jobs(jobs, decision="shortlist")
 
         self.assertEqual([job.id for job in filtered], [1])
+
+    def test_application_destination_prefers_safe_apply_url_then_source(self):
+        direct = JobRecord(
+            1,
+            "BI Developer",
+            "A",
+            "Kuala Lumpur",
+            "",
+            "https://example.com/jobs/1",
+            96,
+            "shortlist",
+            "new",
+            apply_url="https://careers.example.com/apply/1",
+        )
+        fallback = JobRecord(
+            2,
+            "Data Analyst",
+            "B",
+            "Kuala Lumpur",
+            "",
+            "https://example.com/jobs/2",
+            92,
+            "shortlist",
+            "new",
+            apply_url="http://unsafe.example/apply/2",
+        )
+        unsafe = JobRecord(
+            3,
+            "BI Analyst",
+            "C",
+            "Kuala Lumpur",
+            "",
+            "javascript:alert(1)",
+            90,
+            "shortlist",
+            "new",
+        )
+        untrusted_apply = JobRecord(
+            4,
+            "Reporting Analyst",
+            "D",
+            "Kuala Lumpur",
+            "",
+            "https://example.com/jobs/4",
+            90,
+            "shortlist",
+            "new",
+            apply_url="https://unrelated.example/apply/4",
+        )
+
+        self.assertEqual(application_destination(direct), "https://careers.example.com/apply/1")
+        self.assertEqual(application_destination(fallback), "https://example.com/jobs/2")
+        self.assertEqual(application_destination(unsafe), "")
+        self.assertEqual(application_destination(untrusted_apply), "https://example.com/jobs/4")
+        self.assertEqual(application_destination_host(direct), "careers.example.com")
+        self.assertEqual(application_destination_host(unsafe), "")
 
     def test_status_counts_includes_empty_defaults(self):
         jobs = [
@@ -73,6 +145,21 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(rows[0]["Metric"], "Checked")
         self.assertEqual(rows[0]["Value"], 2)
         self.assertIn("Duplicate skipped", rows[-1]["Detail"])
+
+    def test_search_summary_rows_convert_to_arrow_without_mixed_value_types(self):
+        summary = SearchRunSummary(
+            checked=2,
+            added=1,
+            duplicates=0,
+            skipped=1,
+            logs=("Search complete",),
+        )
+
+        frame = pd.DataFrame(search_summary_to_rows(summary))
+        self.assertFalse(any(isinstance(value, str) for value in frame["Value"]))
+        table = pa.Table.from_pandas(frame, preserve_index=False)
+
+        self.assertEqual(table.column("Value").to_pylist(), [2.0, 1.0, 0.0, 1.0, None])
 
     def test_provider_status_label_explains_api_and_fallback_modes(self):
         self.assertEqual(provider_status_label(True), "API search enabled")
@@ -102,6 +189,7 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(widths["Title"], "large")
         self.assertEqual(widths["Description"], "large")
         self.assertEqual(widths["Remarks"], "large")
+        self.assertEqual(widths["Posted"], "medium")
         self.assertEqual(widths["Source URL"], "medium")
 
 
