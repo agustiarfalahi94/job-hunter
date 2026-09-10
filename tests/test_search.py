@@ -108,6 +108,8 @@ class SearchTest(unittest.TestCase):
         self.assertEqual(normalize_posted_date("2026-09-09", today=today), "2026-09-09")
         self.assertEqual(normalize_posted_date("2 days ago", today=today), "2026-09-08")
         self.assertEqual(normalize_posted_date("1 week ago", today=today), "2026-09-03")
+        self.assertEqual(normalize_posted_date("2 months ago", today=today), "2026-07-12")
+        self.assertEqual(normalize_posted_date("1 year ago", today=today), "2025-09-10")
         self.assertEqual(normalize_posted_date("Yesterday", today=today), "2026-09-09")
         self.assertEqual(normalize_posted_date("not provided", today=today), "")
 
@@ -123,6 +125,53 @@ class SearchTest(unittest.TestCase):
 
         self.assertEqual(metadata.posted_date, "2026-09-08")
         self.assertEqual(metadata.apply_url, "https://careers.example.com/jobs/123/apply")
+
+    def test_extract_job_metadata_reads_date_posted_meta(self):
+        html = '<meta itemprop="datePosted" content="2026-09-08">'
+
+        metadata = extract_job_metadata(html, "https://careers.example.com/jobs/123")
+
+        self.assertEqual(metadata.posted_date, "2026-09-08")
+
+    def test_extract_job_metadata_reads_relative_posted_element(self):
+        html = '<div class="posted-time-ago__text">2 months ago</div>'
+
+        metadata = extract_job_metadata(
+            html,
+            "https://my.linkedin.com/jobs/view/123",
+            today=date(2026, 9, 10),
+        )
+
+        self.assertEqual(metadata.posted_date, "2026-07-12")
+
+    def test_extract_job_metadata_reads_labeled_visible_posting_age(self):
+        html = "<main>Date posted: 1 year ago</main>"
+
+        metadata = extract_job_metadata(
+            html,
+            "https://my.linkedin.com/jobs/view/123",
+            today=date(2026, 9, 10),
+        )
+
+        self.assertEqual(metadata.posted_date, "2025-09-10")
+
+    def test_extract_job_metadata_reads_embedded_job_date(self):
+        html = '<script>window.__JOB__ = {"postedAt":"2026-09-07"};</script>'
+
+        metadata = extract_job_metadata(html, "https://careers.example.com/jobs/123")
+
+        self.assertEqual(metadata.posted_date, "2026-09-07")
+
+    def test_extract_job_metadata_ignores_unrelated_relative_age(self):
+        html = "<main>Our company was founded 1 year ago.</main>"
+
+        metadata = extract_job_metadata(
+            html,
+            "https://careers.example.com/jobs/123",
+            today=date(2026, 9, 10),
+        )
+
+        self.assertEqual(metadata.posted_date, "")
 
     def test_extract_job_metadata_rejects_non_https_apply_link(self):
         html = '<a href="http://careers.example.com/jobs/123/apply">Apply now</a>'
@@ -220,6 +269,37 @@ class SearchTest(unittest.TestCase):
         self.assertIn("BigQuery", candidates[0].description)
         self.assertEqual(candidates[0].posted_date, "2026-09-08")
 
+    def test_parse_serpapi_results_reads_known_nested_posting_date_fields(self):
+        payload = """
+        {
+          "organic_results": [
+            {
+              "title": "BI Developer - Example One",
+              "link": "https://my.linkedin.com/jobs/view/posted-one",
+              "snippet": "Power BI role.",
+              "rich_snippet": {
+                "top": {"detected_extensions": {"posted_at": "Sep 8, 2026"}}
+              }
+            },
+            {
+              "title": "Data Analyst - Example Two",
+              "link": "https://my.linkedin.com/jobs/view/posted-two",
+              "snippet": "SSRS role.",
+              "date_posted": "2026-09-07"
+            }
+          ]
+        }
+        """
+
+        candidates = parse_serpapi_results(
+            payload, platform="LinkedIn", location="Kuala Lumpur", limit=5
+        )
+
+        self.assertEqual(
+            [candidate.posted_date for candidate in candidates],
+            ["2026-09-08", "2026-09-07"],
+        )
+
     def test_parse_linkedin_jobs_extracts_public_job_cards(self):
         candidates = parse_linkedin_jobs(LINKEDIN_HTML, location="Kuala Lumpur", limit=5)
 
@@ -296,6 +376,71 @@ class SearchTest(unittest.TestCase):
 
         self.assertEqual(job.posted_date, "2026-09-10")
         self.assertEqual(job.apply_url, "https://jobs.lever.co/current/123")
+
+    def test_run_public_search_skips_stale_relative_date_from_job_page(self):
+        criteria = SearchCriteria(
+            title_terms=("BI Developer",),
+            description_terms=("Power BI",),
+            location="Kuala Lumpur",
+            platforms=("LinkedIn",),
+            max_results=1,
+            posted_within_days=30,
+        )
+        search_html = """
+        <div class="base-search-card">
+          <a class="base-card__full-link" href="https://my.linkedin.com/jobs/view/stale-detail">BI Developer</a>
+          <h3 class="base-search-card__title">BI Developer</h3>
+          <h4 class="base-search-card__subtitle">Old Company</h4>
+          <span class="job-search-card__location">Kuala Lumpur</span>
+        </div>
+        """
+
+        def fetcher(url: str) -> str:
+            if "jobs/search" in url:
+                return search_html
+            return "<main>Date posted: 1 year ago</main>"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            summary = run_public_search(criteria, {}, queue, fetcher=fetcher)
+            jobs = queue.list_jobs()
+
+        self.assertEqual(summary.added, 0)
+        self.assertEqual(summary.skipped, 1)
+        self.assertEqual(jobs, [])
+        self.assertTrue(any("older than 30 days" in line for line in summary.logs))
+
+    def test_run_public_search_logs_when_posting_date_is_unavailable(self):
+        criteria = SearchCriteria(
+            title_terms=("BI Developer",),
+            description_terms=("Power BI",),
+            location="Kuala Lumpur",
+            platforms=("LinkedIn",),
+            max_results=1,
+            posted_within_days=30,
+        )
+        search_html = """
+        <div class="base-search-card">
+          <a class="base-card__full-link" href="https://my.linkedin.com/jobs/view/no-date">BI Developer</a>
+          <h3 class="base-search-card__title">BI Developer</h3>
+          <h4 class="base-search-card__subtitle">Current Company</h4>
+          <span class="job-search-card__location">Kuala Lumpur</span>
+        </div>
+        """
+
+        def fetcher(url: str) -> str:
+            if "jobs/search" in url:
+                return search_html
+            return "<main>Power BI reporting role. Applications are open.</main>"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            summary = run_public_search(criteria, {}, queue, fetcher=fetcher)
+
+        self.assertEqual(summary.added, 1)
+        self.assertTrue(
+            any("Posting date unavailable" in line for line in summary.logs)
+        )
 
     def test_parse_duckduckgo_results_extracts_candidates(self):
         candidates = parse_duckduckgo_results(

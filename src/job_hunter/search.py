@@ -192,7 +192,7 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
         title_text = str(item.get("title", "")).strip()
         href = str(item.get("link", "")).strip()
         snippet = str(item.get("snippet", "")).strip()
-        posted_date = normalize_posted_date(str(item.get("date", "")))
+        posted_date = normalize_posted_date(_find_provider_posted_value(item))
         title, company = _split_title_company(title_text)
         if not title or not href:
             continue
@@ -488,6 +488,19 @@ def run_public_search(
                             ),
                         )
                         continue
+                    if not candidate.posted_date:
+                        _report_progress(
+                            logs,
+                            progress_callback,
+                            stage="date_unknown",
+                            checked=checked,
+                            total=search_limit,
+                            message=(
+                                f"Posting date unavailable: {candidate.title} at "
+                                f"{candidate.company or 'unknown company'} did not expose "
+                                "a readable date."
+                            ),
+                        )
                     if _posting_is_too_old(
                         candidate.posted_date, criteria.posted_within_days
                     ):
@@ -649,17 +662,25 @@ def normalize_posted_date(value: str, today: date | None = None) -> str:
         return (reference_date - timedelta(days=1)).isoformat()
 
     relative = re.fullmatch(
-        r"(?:about\s+)?(\d+)\+?\s+(hour|day|week|month)s?\s+ago", lowered
+        r"(?:about\s+)?(\d+)\+?\s+(hour|day|week|month|year)s?\s+ago", lowered
     )
     if relative is None:
         return ""
     amount = int(relative.group(1))
     unit = relative.group(2)
-    days = {"hour": 0, "day": amount, "week": amount * 7, "month": amount * 30}[unit]
+    days = {
+        "hour": 0,
+        "day": amount,
+        "week": amount * 7,
+        "month": amount * 30,
+        "year": amount * 365,
+    }[unit]
     return (reference_date - timedelta(days=days)).isoformat()
 
 
-def extract_job_metadata(html: str, source_url: str) -> JobPageMetadata:
+def extract_job_metadata(
+    html: str, source_url: str, today: date | None = None
+) -> JobPageMetadata:
     soup = BeautifulSoup(html, "html.parser")
     posted_date = ""
     for script in soup.select('script[type="application/ld+json"]'):
@@ -669,17 +690,25 @@ def extract_job_metadata(html: str, source_url: str) -> JobPageMetadata:
             continue
         date_posted = _find_date_posted(payload)
         if date_posted:
-            posted_date = normalize_posted_date(date_posted)
+            posted_date = normalize_posted_date(date_posted, today=today)
             if posted_date:
                 break
 
     if not posted_date:
-        date_node = soup.select_one("time[datetime], time.job-search-card__listdate")
-        if date_node is not None:
-            value = str(date_node.get("datetime", "")).strip() or date_node.get_text(
-                " ", strip=True
-            )
-            posted_date = normalize_posted_date(value)
+        posted_date = _date_from_meta(soup, today=today)
+
+    if not posted_date:
+        posted_date = _date_from_job_page_nodes(soup, today=today)
+
+    if not posted_date:
+        posted_date = normalize_posted_date(
+            _find_embedded_posted_value(soup), today=today
+        )
+
+    if not posted_date:
+        posted_date = _labeled_date_from_text(
+            soup.get_text(" ", strip=True), today=today
+        )
 
     apply_url = ""
     for link in soup.find_all("a", href=True):
@@ -716,16 +745,117 @@ def _find_date_posted(value: object) -> str:
     return ""
 
 
-def _date_from_text(text: str) -> str:
+def _find_provider_posted_value(value: object, allow_generic_date: bool = True) -> str:
+    known_keys = ("datePosted", "date_posted", "posted_at")
+    if isinstance(value, dict):
+        keys = ("date",) + known_keys if allow_generic_date else known_keys
+        for key in keys:
+            raw_value = value.get(key)
+            if isinstance(raw_value, str) and raw_value.strip():
+                return raw_value.strip()
+        for child in value.values():
+            found = _find_provider_posted_value(child, allow_generic_date=False)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_provider_posted_value(child, allow_generic_date=False)
+            if found:
+                return found
+    return ""
+
+
+def _date_from_meta(soup: BeautifulSoup, today: date | None = None) -> str:
+    date_labels = {
+        "dateposted",
+        "datepublished",
+        "articlepublishedtime",
+        "ogpublishedtime",
+        "publicationdate",
+        "publishdate",
+    }
+    for node in soup.find_all("meta"):
+        labels = " ".join(
+            str(node.get(attribute, ""))
+            for attribute in ("itemprop", "property", "name")
+        )
+        normalized_labels = re.sub(r"[^a-z0-9]+", "", labels.casefold())
+        if not any(label in normalized_labels for label in date_labels):
+            continue
+        value = str(node.get("content", "")).strip()
+        posted_date = normalize_posted_date(value, today=today)
+        if posted_date:
+            return posted_date
+    return ""
+
+
+def _date_from_job_page_nodes(soup: BeautifulSoup, today: date | None = None) -> str:
+    for node in soup.find_all(True):
+        attributes = " ".join(
+            (
+                " ".join(str(item) for item in node.get("class", ())),
+                str(node.get("id", "")),
+                str(node.get("data-test", "")),
+                str(node.get("data-testid", "")),
+                str(node.get("itemprop", "")),
+            )
+        ).casefold()
+        if node.name != "time" and not any(
+            marker in attributes
+            for marker in (
+                "posted-time",
+                "posted-date",
+                "posting-date",
+                "date-posted",
+                "dateposted",
+            )
+        ):
+            continue
+        value = (
+            str(node.get("datetime", "")).strip()
+            or str(node.get("content", "")).strip()
+            or node.get_text(" ", strip=True)
+        )
+        posted_date = _date_from_text(value, today=today)
+        if posted_date:
+            return posted_date
+    return ""
+
+
+def _find_embedded_posted_value(soup: BeautifulSoup) -> str:
+    pattern = re.compile(
+        r'["\'](?:datePosted|date_posted|postedAt|posted_at)["\']\s*:\s*["\']([^"\']+)["\']',
+        flags=re.IGNORECASE,
+    )
+    for script in soup.find_all("script"):
+        match = pattern.search(script.string or script.get_text() or "")
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def _labeled_date_from_text(text: str, today: date | None = None) -> str:
+    label = re.compile(
+        r"\b(?:date\s+posted|posted|listed|published)\s*(?:on\s+|:\s*|-\s*)?",
+        flags=re.IGNORECASE,
+    )
+    for match in label.finditer(text):
+        posted_date = _date_from_text(text[match.end() : match.end() + 80], today=today)
+        if posted_date:
+            return posted_date
+    return ""
+
+
+def _date_from_text(text: str, today: date | None = None) -> str:
     relative = re.search(
-        r"\b(?:today|yesterday|(?:about\s+)?\d+\+?\s+(?:hour|day|week|month)s?\s+ago)\b",
+        r"\b(?:today|yesterday|(?:about\s+)?\d+\+?\s+(?:hour|day|week|month|year)s?\s+ago)\b",
         text,
         flags=re.IGNORECASE,
     )
     if relative:
-        return normalize_posted_date(relative.group(0))
+        return normalize_posted_date(relative.group(0), today=today)
     iso_date = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
-    return normalize_posted_date(iso_date.group(0)) if iso_date else ""
+    return normalize_posted_date(iso_date.group(0), today=today) if iso_date else ""
 
 
 def _posting_is_too_old(posted_date: str, days: int | None) -> bool:
