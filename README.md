@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter is a Streamlit app that searches, scores, and ranks Kuala Lumpur data jobs using criteria the user controls. Current version: v1.11.0.
+Job Hunter is a Streamlit app that searches, scores, and ranks Kuala Lumpur data jobs using criteria the user controls. Current version: v1.13.0.
 
 Live app: [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/)
 
@@ -13,13 +13,16 @@ Live app: [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/)
 - Lets users search and score jobs without uploading a CV.
 - Makes target titles, primary strengths, bonus skills, hard skips, location, posting age, strong-match goal, and session cap editable.
 - Scores each result with visible reasons and mandatory remarks for weak or skipped matches.
+- Excludes local-only and Malaysian-only roles using punctuation-tolerant phrase matching.
 - Shows real search progress, including the provider, current result, duplicate checks, stale or closed jobs, and scoring activity.
-- Stores the real posting date when one can be verified and displays `Unknown` otherwise.
+- Reads posting dates from provider fields, structured page data, posting-time elements, embedded job data, and labeled visible text.
+- Stores the real posting date when one can be verified and displays `Unknown` with an activity message otherwise.
 - Skips a result when its known posting date is older than the selected limit.
 - Skips visible closed, filled, unavailable, or expired postings.
 - Deduplicates the same title, company, and location across platforms.
 - Finds an official HTTPS application destination when the readable posting provides one.
 - Opens Apply in a new browser tab, falling back to the original posting when no separate application URL is available.
+- Lets users mark retained jobs as `Applied` or `Not applied`; applied jobs stay visible.
 - Keeps CV files, extracted CV text, local queue data, preferences, and secrets out of Git.
 
 ## How To Use The Web App
@@ -59,11 +62,12 @@ The queue is ordered by score and shows:
 
 - score and decision;
 - actual posting date, or `Unknown` when the source does not expose one;
+- application status, shown as `Applied` or `Not applied`;
 - title, company, and location;
 - match reasons and low-suitability remarks;
 - description and source link.
 
-Filter by decision, choose a job, and click **Apply**. Job Hunter prefers a discovered official application URL and otherwise opens the original posting in a new browser tab.
+Filter by decision, choose a job, and click **Apply**. Job Hunter prefers a discovered official application URL and otherwise opens the original posting in a new browser tab. After completing the external application, select **I have applied to this job**. You can clear the checkbox if it was marked by mistake.
 
 ## Apply Boundary
 
@@ -76,15 +80,18 @@ For that reason, Job Hunter performs the supported part of the application flow:
 3. show its hostname and open that destination in a new tab;
 4. leave login, CAPTCHA, required questions, final review, and submission in the user's browser.
 
-Opening a page is never recorded or described as a submitted application.
+Opening a page is never recorded or described as a submitted application. Application status changes only when the user selects or clears the queue checkbox.
 
 ## Search Boundary
 
 With SerpAPI configured, the app reads Google organic results for the selected platforms. Without it, the app tries public LinkedIn job cards and public web-result pages. Public pages can be incomplete or blocked.
 
-Posting-age filters are sent to providers that support them. Job Hunter also checks dates it can parse from search metadata or structured `JobPosting` data. Unknown dates remain visible for review rather than being mislabeled as new.
+Posting-age filters are sent to providers that support them. Job Hunter also checks known provider fields, structured `JobPosting` data, job-page metadata, posting-time elements, embedded job fields, and labeled text such as `Date posted: 2 months ago`. Unknown dates remain visible for review rather than being mislabeled as new.
+
+Hard-skip rules normalize punctuation and recognize common local-only wording. Restricted new results never enter the active queue; matching historical rows are hidden without being deleted from local storage.
 
 Destination availability checks are limited to trusted source domains. If a site blocks the check, the activity log says availability could not be confirmed and keeps the result for review.
+Safe HTTPS redirects within supported job platforms and recognized applicant-tracking systems are followed during enrichment; untrusted redirects are rejected.
 
 ## SerpAPI Setup
 
@@ -140,8 +147,9 @@ Use `config/preferences.example.yaml` as the safe public template.
 |---|---|
 | `src/app.py` | Streamlit interface for Profile, Search, Queue, and Apply links |
 | `src/job_hunter/search.py` | Query building, result parsing, freshness checks, metadata discovery, and live progress |
+| `src/job_hunter/eligibility.py` | Shared punctuation-tolerant hard-skip matching |
 | `src/job_hunter/scoring.py` | Deterministic explainable job scoring |
-| `src/job_hunter/queue.py` | Additive SQLite storage and duplicate detection |
+| `src/job_hunter/queue.py` | Additive SQLite storage, application status, and duplicate detection |
 | `src/job_hunter/cv_store.py` | Private CV save, replace, and removal |
 | `src/job_hunter/cv_parser.py` | PDF and Word text extraction plus skill-signal detection |
 | `src/job_hunter/locations.py` | Malaysia city lookup with local fallback |

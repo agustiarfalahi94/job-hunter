@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from job_hunter.queue import JobQueue
 from job_hunter.runtime_config import SearchProviderConfig
@@ -12,6 +13,7 @@ from job_hunter.search import (
     build_direct_platform_queries,
     build_search_queries,
     extract_job_metadata,
+    fetch_job_html,
     normalize_posted_date,
     parse_serpapi_results,
     parse_linkedin_jobs,
@@ -102,6 +104,30 @@ CLOSED_LINKEDIN_HTML = """
 
 
 class SearchTest(unittest.TestCase):
+    def test_fetch_job_html_follows_safe_platform_redirect(self):
+        redirect = MagicMock(
+            is_redirect=True,
+            headers={"Location": "https://my.linkedin.com/jobs/view/123"},
+        )
+        final = MagicMock(is_redirect=False, text="<main>Date posted: 2 days ago</main>")
+
+        with patch("requests.get", side_effect=[redirect, final]) as request:
+            html = fetch_job_html("https://www.linkedin.com/jobs/view/123")
+
+        self.assertEqual(html, "<main>Date posted: 2 days ago</main>")
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args_list[1].args[0], "https://my.linkedin.com/jobs/view/123")
+
+    def test_fetch_job_html_rejects_untrusted_redirect(self):
+        redirect = MagicMock(
+            is_redirect=True,
+            headers={"Location": "https://untrusted.example/jobs/view/123"},
+        )
+
+        with patch("requests.get", return_value=redirect):
+            with self.assertRaisesRegex(RuntimeError, "untrusted destination"):
+                fetch_job_html("https://www.linkedin.com/jobs/view/123")
+
     def test_normalize_posted_date_accepts_iso_and_relative_values(self):
         today = date(2026, 9, 10)
 

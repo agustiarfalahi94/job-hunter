@@ -47,7 +47,13 @@ Git/GitHub/GitLab, CI/CD pipeline variables, Agile/Scrum, and CAB deployment.
 Hard skip keywords:
 
 - `locals/malaysian only`
+- `local applicant only`
 - `mandarin speaker is mandatory`
+
+Hard-skip matching ignores case and punctuation. The local-only rule also
+recognizes `local applicants only`, `local candidate(s) only`, `locals only`,
+and `Malaysian(s) only`. New matches are excluded before queue insertion;
+matching historical rows are hidden from the active queue without deletion.
 
 Managerial titles are allowed when the description still fits the candidate's
 hands-on BI/reporting/data engineering experience.
@@ -70,7 +76,7 @@ Scores are clamped to 0-100.
 | Score | Decision |
 |---:|---|
 | 90-100 | `shortlist` |
-| 50-69 | `review` |
+| 50 to one point below the configured shortlist threshold | `review` |
 | 0-49 | `reject` |
 
 Hard skips return `skip` at score 0 with remarks. Low-suitability and 0% jobs

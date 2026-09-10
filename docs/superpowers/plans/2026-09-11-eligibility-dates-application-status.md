@@ -15,6 +15,7 @@
 - Release version is `1.13.0`.
 - Branch is `codex/eligibility-dates-applied-v1-13`.
 - No new production dependency or headless browser is introduced.
+- Page enrichment follows no more than three HTTPS redirects and only across supported job or applicant-tracking domains.
 - The actual CV, extracted text, API keys, cookies, private queue database, and application records remain outside Git.
 - Restricted historical rows are hidden from the active queue but are not deleted.
 - Opening an Apply link never marks an application as submitted.
@@ -42,7 +43,7 @@
 - Produces: `exclude_hard_skipped_jobs(jobs: Iterable[JobRecord], configured_keywords: object) -> list[JobRecord]`
 - Consumes: the existing `preferences["hard_skip_keywords"]` list and combined job title, description, location, and fetched page text
 
-- [ ] **Step 1: Write failing matcher and scoring tests**
+- [x] **Step 1: Write failing matcher and scoring tests**
 
 Add tests proving that punctuation and case are normalized, that the configured legacy rule `locals/malaysian only` activates local-only aliases, and that unrelated uses of the word `local` do not match:
 
@@ -63,13 +64,13 @@ def test_scoring_skips_local_applicant_only_title(self):
     assert result.score == 0
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm failure**
+- [x] **Step 2: Run the focused tests and confirm failure**
 
-Run: `pytest tests/test_eligibility.py tests/test_scoring.py -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_eligibility tests.test_scoring -v`
 
 Expected: FAIL because `job_hunter.eligibility` does not exist and the current literal matcher misses the title variant.
 
-- [ ] **Step 3: Implement the shared eligibility matcher**
+- [x] **Step 3: Implement the shared eligibility matcher**
 
 Create `src/job_hunter/eligibility.py` with punctuation normalization and a local-only alias group:
 
@@ -105,21 +106,21 @@ def _normalize(value: str) -> str:
 
 Keep aliases phrase-specific so ordinary wording such as `work with local teams` does not trigger exclusion.
 
-- [ ] **Step 4: Route scoring through the shared matcher**
+- [x] **Step 4: Route scoring through the shared matcher**
 
 Replace the hard-skip `_all_contains` call in `score_job()` with `hard_skip_matches(text, preferences.get("hard_skip_keywords", ()))`. Keep the existing zero score, `skip` decision, reasons, and remarks contract.
 
-- [ ] **Step 5: Write failing search-ingestion tests**
+- [x] **Step 5: Write failing search-ingestion tests**
 
 Add one test where the search-card title contains `(Local Applicant Only)` and another where the restriction appears only in the fetched job page. Assert `summary.skipped == 1`, `summary.added == 0`, an explanatory log is present, and `queue.list_jobs() == []`.
 
-- [ ] **Step 6: Run the search tests and confirm failure**
+- [x] **Step 6: Run the search tests and confirm failure**
 
-Run: `pytest tests/test_search.py -k "local_only" -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_search.SearchTest.test_run_public_search_excludes_local_only_title_before_queue_insertion tests.test_search.SearchTest.test_run_public_search_excludes_restriction_found_on_job_page -v`
 
 Expected: FAIL because restricted results are currently passed to `queue.add_job()`.
 
-- [ ] **Step 7: Exclude restricted candidates before insertion**
+- [x] **Step 7: Exclude restricted candidates before insertion**
 
 In `run_public_search()`, check the candidate title, snippet, and location before fetching the detail page. After a readable detail fetch, check the same fields plus `job_page_text`. On a match, increment `skipped`, emit a `skipped` progress event naming the configured rule, and continue without calling `queue.add_job()`.
 
@@ -132,23 +133,23 @@ def _eligibility_skip_reason(candidate: SearchCandidate, keywords: object, page_
     return f"Hard skip keyword found: {', '.join(matches)}" if matches else ""
 ```
 
-- [ ] **Step 8: Write and implement historical-row visibility tests**
+- [x] **Step 8: Write and implement historical-row visibility tests**
 
 Add `exclude_hard_skipped_jobs()` in `app_ui.py`. It combines each record's title, description, and location and keeps only records with no match. Test that a historical local-only record is removed while an applied or ordinary record remains.
 
 In `src/app.py`, pass preferences into `_render_queue(queue, preferences)` and obtain the active hard-skip list from `_active_preferences(preferences)`. Apply the same helper in `_render_sidebar()` before calculating the queue metric, and in `_render_queue()` before decision filters, the table, and the Apply selector are built. Do not delete the SQLite row.
 
-- [ ] **Step 9: Seed explicit public configuration examples**
+- [x] **Step 9: Seed explicit public configuration examples**
 
 Add `local applicant only` to the default and example hard-skip lists while retaining `locals/malaysian only` for compatibility. Confirm the UI remains editable.
 
-- [ ] **Step 10: Run focused eligibility tests**
+- [x] **Step 10: Run focused eligibility tests**
 
-Run: `pytest tests/test_eligibility.py tests/test_scoring.py tests/test_search.py tests/test_app_ui.py -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_eligibility tests.test_scoring tests.test_search tests.test_app_ui -v`
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit eligibility filtering**
+- [x] **Step 11: Commit eligibility filtering**
 
 ```bash
 git add src/job_hunter/eligibility.py src/job_hunter/scoring.py src/job_hunter/search.py src/job_hunter/app_ui.py src/app.py src/job_hunter/preferences.py config/preferences.example.yaml tests/test_eligibility.py tests/test_scoring.py tests/test_search.py tests/test_app_ui.py
@@ -168,7 +169,7 @@ git commit -m "Exclude restricted local-only jobs"
 - Extends: `extract_job_metadata(html: str, source_url: str, today: date | None = None) -> JobPageMetadata`
 - Produces: private provider, metadata, embedded-data, and labeled-text extraction helpers returning raw strings or normalized ISO dates
 
-- [ ] **Step 1: Write failing relative-date tests**
+- [x] **Step 1: Write failing relative-date tests**
 
 Extend the normalization test with deterministic month and year expectations:
 
@@ -177,25 +178,25 @@ assert normalize_posted_date("2 months ago", today=date(2026, 9, 10)) == "2026-0
 assert normalize_posted_date("1 year ago", today=date(2026, 9, 10)) == "2025-09-10"
 ```
 
-- [ ] **Step 2: Run the normalization test and confirm failure**
+- [x] **Step 2: Run the normalization test and confirm failure**
 
-Run: `pytest tests/test_search.py::SearchTest::test_normalize_posted_date_accepts_iso_and_relative_values -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_search.SearchTest.test_normalize_posted_date_accepts_iso_and_relative_values -v`
 
 Expected: FAIL for the year value.
 
-- [ ] **Step 3: Add year support**
+- [x] **Step 3: Add year support**
 
 Extend both relative-date regular expressions to include `year`, and map it to `amount * 365` days. Keep hour/day/week/month behavior unchanged.
 
-- [ ] **Step 4: Write failing provider-date tests**
+- [x] **Step 4: Write failing provider-date tests**
 
 Add SerpAPI fixtures for direct `date`, nested `rich_snippet.top.detected_extensions.posted_at`, and relative `1 year ago` values. Assert that the parser preserves the normalized date on each `SearchCandidate`.
 
-- [ ] **Step 5: Implement known provider-field extraction**
+- [x] **Step 5: Implement known provider-field extraction**
 
 Add a helper that checks only recognized date keys (`date`, `datePosted`, `date_posted`, `posted_at`) and recognized nested containers. Do not recursively accept arbitrary date-looking values. Pass the selected raw value through `normalize_posted_date()`.
 
-- [ ] **Step 6: Write failing page-metadata tests**
+- [x] **Step 6: Write failing page-metadata tests**
 
 Cover all fallback layers with isolated HTML fixtures:
 
@@ -208,13 +209,13 @@ Cover all fallback layers with isolated HTML fixtures:
 
 Call `extract_job_metadata(..., today=date(2026, 9, 10))` for relative fixtures. Add a negative fixture containing unrelated text such as `Our company was founded 1 year ago` and assert the date stays empty.
 
-- [ ] **Step 7: Run page-metadata tests and confirm failure**
+- [x] **Step 7: Run page-metadata tests and confirm failure**
 
-Run: `pytest tests/test_search.py -k "metadata and (meta or visible or embedded or unrelated)" -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_search -v`
 
 Expected: FAIL because only JSON-LD and generic `<time>` are currently inspected.
 
-- [ ] **Step 8: Implement ordered page-date extraction**
+- [x] **Step 8: Implement ordered page-date extraction**
 
 Keep JSON-LD first, then inspect:
 
@@ -225,21 +226,23 @@ Keep JSON-LD first, then inspect:
 
 Normalize each candidate with the optional `today` argument and stop at the first valid value. Keep Apply-link discovery unchanged.
 
-- [ ] **Step 9: Add date-source activity logging**
+- [x] **Step 9: Add date-source activity logging**
 
 When a readable detail page still yields no posting date and the provider candidate also has none, emit a `date_unknown` progress event explaining that the source exposed no readable posting date. Do not increment `skipped`. Existing blocked-page handling stays `availability_unknown`.
 
-- [ ] **Step 10: Verify stale enriched dates are excluded**
+Add controlled request tests proving `fetch_job_html()` follows a safe platform redirect such as `www.linkedin.com` to `my.linkedin.com` and rejects an untrusted redirect. Implement a maximum of three manual redirects with HTTPS and trusted-domain validation at every hop.
+
+- [x] **Step 10: Verify stale enriched dates are excluded**
 
 Add a search test where the search card has no date but the detail page says `Date posted: 1 year ago`; assert the result is skipped after enrichment and never enters the queue.
 
-- [ ] **Step 11: Run focused search tests**
+- [x] **Step 11: Run focused search tests**
 
-Run: `pytest tests/test_search.py -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_search -v`
 
 Expected: PASS.
 
-- [ ] **Step 12: Commit posting-date enrichment**
+- [x] **Step 12: Commit posting-date enrichment**
 
 ```bash
 git add src/job_hunter/search.py tests/test_search.py
@@ -264,7 +267,7 @@ git commit -m "Improve job posting date detection"
 - Consumes: only `not_applied` and `applied` storage values
 - Displays: `Not applied` and `Applied` labels
 
-- [ ] **Step 1: Write failing storage and migration tests**
+- [x] **Step 1: Write failing storage and migration tests**
 
 Extend the old-database migration test to assert the `application_status` column is added and its existing row reads `not_applied`. Add a fresh-record test and an update test:
 
@@ -278,13 +281,13 @@ with self.assertRaises(ValueError):
 
 Also assert a missing job ID raises `ValueError`.
 
-- [ ] **Step 2: Run storage tests and confirm failure**
+- [x] **Step 2: Run storage tests and confirm failure**
 
-Run: `pytest tests/test_queue.py -k "application_status or existing_database" -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_queue -v`
 
 Expected: FAIL because the field, column, and update method do not exist.
 
-- [ ] **Step 3: Implement additive storage support**
+- [x] **Step 3: Implement additive storage support**
 
 Add the field to `JobRecord`, include it in every job `SELECT`, and map it in `_record_from_row()`. In `_init_db()` add:
 
@@ -299,23 +302,23 @@ _ensure_column(
 
 Implement `update_application_status()` with `{"not_applied", "applied"}` validation and the same missing-row behavior as the legacy updater. Do not repurpose or delete the legacy `status` field.
 
-- [ ] **Step 4: Run storage tests**
+- [x] **Step 4: Run storage tests**
 
-Run: `pytest tests/test_queue.py -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_queue -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing queue-interface tests**
+- [x] **Step 5: Write failing queue-interface tests**
 
 Update row-output expectations so `jobs_to_rows()` emits `Application status: Applied` or `Not applied`. Add `Application status` to width expectations. Extend the Streamlit source/AppTest checks to require an `I have applied to this job` checkbox and continue to reject the old generic `Set status` interface.
 
-- [ ] **Step 6: Run UI tests and confirm failure**
+- [x] **Step 6: Run UI tests and confirm failure**
 
-Run: `pytest tests/test_app_ui.py tests/test_app_navigation.py -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_app_ui tests.test_app_navigation -v`
 
 Expected: FAIL because the column and checkbox are absent.
 
-- [ ] **Step 7: Implement the queue column and checkbox**
+- [x] **Step 7: Implement the queue column and checkbox**
 
 Add the application-status label to `jobs_to_rows()`. Add a medium-width column configuration. Change `_render_queue_actions(jobs)` to `_render_queue_actions(queue, jobs)`, then render:
 
@@ -334,13 +337,13 @@ if desired_status != job.application_status:
 
 Place the checkbox beside the selected-job controls, not in the search form. Do not update status from the Apply link.
 
-- [ ] **Step 8: Run application-status tests**
+- [x] **Step 8: Run application-status tests**
 
-Run: `pytest tests/test_queue.py tests/test_app_ui.py tests/test_app_navigation.py -q`
+Run: `PYTHONPATH=src python -m unittest tests.test_queue tests.test_app_ui tests.test_app_navigation -v`
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit application tracking**
+- [x] **Step 9: Commit application tracking**
 
 ```bash
 git add src/job_hunter/queue.py src/job_hunter/app_ui.py src/app.py tests/test_queue.py tests/test_app_ui.py tests/test_app_navigation.py
@@ -366,17 +369,17 @@ git commit -m "Track applied jobs in the queue"
 - Produces: package version `1.13.0`
 - Documents: local-only exclusion, layered date limits, manual applied-state semantics, migration, and production test steps
 
-- [ ] **Step 1: Update release metadata and user documentation**
+- [x] **Step 1: Update release metadata and user documentation**
 
 Set `pyproject.toml` to `1.13.0`, correct the README's displayed version to `v1.13.0`, and add the `1.13.0` changelog entry dated `2026-09-11`. Update each listed document so it matches the implemented behavior and does not promise automatic application-history detection.
 
-- [ ] **Step 2: Run the complete automated gate**
+- [x] **Step 2: Run the complete automated gate**
 
 Run: `./tool/check.sh`
 
 Expected: all tests pass, compilation succeeds, and dependency checks report no broken requirements.
 
-- [ ] **Step 3: Review the complete branch diff**
+- [x] **Step 3: Review the complete branch diff**
 
 Run: `git diff --check main...HEAD`
 
@@ -386,7 +389,7 @@ Run: `git diff main...HEAD -- src tests config pyproject.toml README.md CHANGELO
 
 Review for accidental private data, secrets, incorrect migration ordering, overly broad date extraction, hidden applied jobs, and any path that inserts a restricted candidate.
 
-- [ ] **Step 4: Perform local Streamlit smoke tests**
+- [x] **Step 4: Perform local Streamlit smoke tests**
 
 Start the app on an available local port and verify desktop and mobile layouts. Confirm:
 
@@ -397,7 +400,7 @@ Start the app on an available local port and verify desktop and mobile layouts. 
 5. Marking and unmarking applied persists across reruns.
 6. Applied jobs remain visible.
 
-- [ ] **Step 5: Mark the plan complete and commit release files**
+- [x] **Step 5: Mark the plan complete and commit release files**
 
 Change each completed checkbox in this file to `[x]`, then commit:
 

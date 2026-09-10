@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.13.0 - 2026-09-11
+
+- Added punctuation-tolerant local-only eligibility matching, including `Local
+  Applicant Only`, local-candidate variants, and Malaysian-only variants.
+- Excluded restricted new results before queue insertion and hid matching
+  historical rows without deleting stored data.
+- Expanded posting-date discovery across known SerpAPI fields, page metadata,
+  posting-time elements, embedded job data, and labeled visible text.
+- Followed bounded HTTPS redirects on trusted job and applicant-tracking
+  domains while rejecting untrusted redirect destinations.
+- Added deterministic support for relative years and explicit activity messages
+  when a posting date remains unavailable.
+- Added an additive `application_status` SQLite migration and an Applied / Not
+  applied queue column.
+- Added a reversible selected-job checkbox while keeping applied jobs visible
+  and never treating an opened Apply link as a completed submission.
+- Added eligibility, date-enrichment, migration, and Streamlit regression tests.
+
 ## 1.12.0 - 2026-09-11
 
 - Replaced the two overlapping Search jobs forms with one unified Search

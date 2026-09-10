@@ -87,7 +87,7 @@ def search_summary_to_rows(summary: SearchRunSummary) -> list[dict[str, object]]
         {
             "Metric": "Skipped",
             "Value": summary.skipped,
-            "Detail": "Closed jobs or unreadable search results skipped",
+            "Detail": "Restricted, stale, closed, or unreadable results skipped",
         },
     ]
     rows.extend({"Metric": "Log", "Value": None, "Detail": log} for log in summary.logs)

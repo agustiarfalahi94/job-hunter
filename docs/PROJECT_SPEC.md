@@ -9,7 +9,7 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 1. Optionally save a PDF, DOCX, or best-effort DOC CV for private profile reference.
 2. Search without requiring a CV by editing title, description, location, platform, freshness, and scoring criteria.
 3. Watch live provider, availability, duplicate, freshness, and scoring progress.
-4. Review ranked results with a verified posting date or `Unknown`.
+4. Review ranked results with a verified posting date or `Unknown` and an explicit application status.
 5. Open the safest official application destination in a new tab.
 6. Complete login, CAPTCHA, required questions, final review, and submission on the destination site.
 
@@ -26,7 +26,11 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 - Public-result fallback when no API key is configured.
 - Provider posting-age filters with a past-month default.
 - Posting-date extraction from structured job metadata, platform cards, and recognizable search-result dates.
+- Posting-date enrichment from known provider fields, job-page metadata,
+  posting-time elements, embedded job data, and labeled visible text.
+- Bounded HTTPS redirect handling for supported job and applicant-tracking domains.
 - A second recency check that rejects known dates older than the user-selected limit.
+- Punctuation-tolerant local-only and Malaysian-only exclusion before active-queue insertion.
 - Closed-job checks on result cards and trusted destination pages.
 - Deterministic explainable scoring with mandatory remarks for weak and skipped jobs.
 - SQLite queue migration that preserves existing local rows.
@@ -36,7 +40,8 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 - One Search criteria panel whose titles and keywords drive both discovery and
   scoring, without duplicated controls.
 - Direct navigation from a saved CV to Search jobs.
-- Readable queue table with wrapping, wide text columns, and no application-status column.
+- Readable queue table with wrapping, wide text columns, posting date, and application status.
+- Reversible Applied / Not applied tracking that keeps applied jobs visible.
 - Automated tests, local check script, versioned changelog, design, and implementation plans.
 
 ## Not Included
@@ -45,6 +50,7 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 - LinkedIn form automation or any activity prohibited by a platform's terms.
 - Generic remote control of a visitor's logged-in browser from Streamlit Cloud.
 - Automatic submission of arbitrary third-party forms.
+- Automatic lookup of application history from third-party platform accounts.
 - Storage of platform passwords, cookies, identity documents, or private form answers.
 - Public-deployment authentication or per-user private storage.
 - Guaranteed extraction from every legacy binary DOC file.
@@ -57,8 +63,11 @@ Job Hunter turns editable search preferences into a short, explainable list of K
 - The queue never presents application status as posting freshness.
 - Every row shows an ISO posting date or `Unknown`.
 - Known stale or closed jobs are skipped with an explanatory activity message.
+- Local-only jobs are excluded even when punctuation or title wording differs from the configured legacy phrase.
+- Relative month and year posting ages are normalized when the source exposes them in a supported field or label.
 - Apply prefers a discovered safe HTTPS destination and otherwise opens the original safe posting.
 - The app never claims that an application was submitted.
+- Application status changes only through the user's explicit queue action, and applied jobs remain visible.
 - Existing SQLite rows survive migration.
 - A fresh clone passes the complete test gate and starts the Streamlit app without import errors.
 - No CV, contact details, secrets, or local application data enter Git.

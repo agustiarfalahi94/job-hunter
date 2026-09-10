@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urljoin, urlp
 
 from bs4 import BeautifulSoup
 
-from job_hunter.application_links import is_safe_application_url
+from job_hunter.application_links import KNOWN_ATS_DOMAINS, is_safe_application_url
 from job_hunter.eligibility import hard_skip_matches
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
@@ -583,7 +583,7 @@ def fetch_public_html(url: str) -> str:
 
     response = requests.get(
         url,
-        headers={"User-Agent": "JobHunter/1.11 (+https://github.com/agustiarfalahi94/job-hunter)"},
+        headers={"User-Agent": "JobHunter/1.13 (+https://github.com/agustiarfalahi94/job-hunter)"},
         timeout=(5, 20),
     )
     response.raise_for_status()
@@ -593,16 +593,26 @@ def fetch_public_html(url: str) -> str:
 def fetch_job_html(url: str) -> str:
     import requests
 
-    response = requests.get(
-        url,
-        headers={"User-Agent": "JobHunter/1.11 (+https://github.com/agustiarfalahi94/job-hunter)"},
-        timeout=(3, 8),
-        allow_redirects=False,
-    )
-    if response.is_redirect:
-        raise RuntimeError("Job page redirected")
-    response.raise_for_status()
-    return response.text
+    if not _is_trusted_job_url(url):
+        raise RuntimeError("Job page URL is not trusted")
+    current_url = url
+    for redirect_count in range(4):
+        response = requests.get(
+            current_url,
+            headers={"User-Agent": "JobHunter/1.13 (+https://github.com/agustiarfalahi94/job-hunter)"},
+            timeout=(3, 8),
+            allow_redirects=False,
+        )
+        if not response.is_redirect:
+            response.raise_for_status()
+            return response.text
+        if redirect_count == 3:
+            raise RuntimeError("Job page redirected too many times")
+        next_url = urljoin(current_url, response.headers.get("Location", ""))
+        if not _is_trusted_job_url(next_url):
+            raise RuntimeError("Job page redirected to an untrusted destination")
+        current_url = next_url
+    raise RuntimeError("Job page could not be loaded")
 
 
 def _quoted_or(values: tuple[str, ...]) -> str:
@@ -930,3 +940,18 @@ def _looks_like_job_result(url: str, title: str, platform: str) -> bool:
     if not hints:
         return True
     return any(hint in normalized_url for hint in hints)
+
+
+def _is_trusted_job_url(url: str) -> bool:
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").casefold()
+    trusted_domains = {
+        domain
+        for domains in PLATFORM_DOMAINS.values()
+        for domain in domains
+    }
+    trusted_domains.update(KNOWN_ATS_DOMAINS)
+    return parsed.scheme == "https" and any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in trusted_domains
+    )

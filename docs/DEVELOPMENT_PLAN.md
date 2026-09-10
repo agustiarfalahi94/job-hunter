@@ -154,3 +154,17 @@
   suitability scoring.
 - Added a direct Continue to Search jobs action after a CV is saved.
 - Added Streamlit regression coverage for both user-flow fixes.
+
+## v1.13 - Eligibility, Dates, and Application Status
+
+- Added shared punctuation-tolerant matching for local-only and Malaysian-only
+  restrictions in search results, detail pages, scoring, and queue visibility.
+- Prevented restricted new jobs from entering the active queue while retaining
+  historical data outside the active view.
+- Expanded posting-date enrichment to known provider fields, page metadata,
+  posting-time elements, embedded job data, and labeled visible text.
+- Added relative-year parsing and activity messages for unavailable dates.
+- Added additive Applied / Not applied persistence and a reversible queue
+  checkbox while keeping applied jobs visible.
+- Added focused regression tests, documentation, review, CI, and production
+  verification for the release.

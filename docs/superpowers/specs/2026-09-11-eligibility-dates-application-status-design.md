@@ -36,6 +36,8 @@ Relative values such as `2 months ago` and `1 year ago` will be normalized to IS
 
 If a page reveals its date only after client-side execution, login, or a CAPTCHA, the hosted app may still report **Unknown**. The activity log will distinguish this source limitation from a parsing failure. Known dates older than the user's posting-age limit remain excluded.
 
+Page enrichment may follow at most three HTTPS redirects when every destination remains on a supported job platform or recognized applicant-tracking domain. Arbitrary redirect destinations are rejected.
+
 ## Application Status
 
 The queue will gain a dedicated `application_status` field with two values:

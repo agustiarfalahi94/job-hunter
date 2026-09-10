@@ -16,7 +16,7 @@ optional private CV       editable search/scoring criteria
                        +----------------+----------------+
                        |                |                |
                        v                v                v
-                 closed check      date parsing     Apply URL discovery
+          eligibility/closed check date parsing     Apply URL discovery
                        |                |                |
                        +----------------+----------------+
                                         |
@@ -27,7 +27,7 @@ optional private CV       editable search/scoring criteria
                          additive SQLite job queue
                                         |
                                         v
-                       Streamlit review + HTTPS Apply link
+              Streamlit review + status + HTTPS Apply link
                                         |
                                         v
                          user's browser and final submit
@@ -44,6 +44,7 @@ optional private CV       editable search/scoring criteria
 | `preferences.py` | Public template plus ignored local preference override |
 | `locations.py` | Malaysia city lookup and local fallback |
 | `runtime_config.py` | SerpAPI key loading from Streamlit secrets or environment |
+| `eligibility.py` | Shared normalized hard-skip and local-only phrase matching |
 | `search.py` | Provider queries, trusted-source parsing, freshness, availability, metadata, and progress |
 | `scoring.py` | Explainable deterministic fit score and remarks |
 | `queue_types.py` | Shared queue input contract |
@@ -71,19 +72,19 @@ Private:
 
 ## Search Boundary
 
-SerpAPI is preferred when configured. Otherwise, the app attempts public LinkedIn cards and public web-result pages. Provider filters narrow posting age, while parsed dates supply a second verification layer. Search cards and trusted destination pages are checked for closed-job markers.
+SerpAPI is preferred when configured. Otherwise, the app attempts public LinkedIn cards and public web-result pages. Provider filters narrow posting age, while parsed dates supply a second verification layer. Date enrichment checks known provider fields, JSON-LD, page metadata, posting-time elements, embedded job fields, and labeled visible text. Search cards and trusted destination pages are checked for local-only restrictions and closed-job markers.
 
-Availability fetches use short timeouts and trusted source domains. A blocked page yields an unknown-availability message rather than a false open/closed conclusion.
+Availability fetches use short timeouts and trusted source domains. Up to three HTTPS redirects may be followed when every destination remains on a supported job platform or recognized applicant-tracking domain. Untrusted redirects are rejected. A blocked page yields an unknown-availability message rather than a false open/closed conclusion.
 
 ## Apply Boundary
 
 Readable destination HTML is inspected for a link clearly labelled as an application action. Relative links are resolved against the source URL. Only same-site or recognized ATS HTTPS destinations are stored; unknown cross-site links fall back to the original posting. The selected hostname is shown before navigation.
 
-The Streamlit server does not control the visitor's browser session. The Apply control opens the discovered destination, or the original posting as a fallback, in a new tab. Login, CAPTCHA, required questions, review, and submission remain in the user's browser. This boundary also avoids implementing LinkedIn automation that the platform prohibits.
+The Streamlit server does not control the visitor's browser session. The Apply control opens the discovered destination, or the original posting as a fallback, in a new tab. Login, CAPTCHA, required questions, review, and submission remain in the user's browser. The user records `Applied` explicitly after submission; opening the link alone does not change status. This boundary also avoids implementing LinkedIn automation that the platform prohibits.
 
 ## SQLite Migration
 
-`posted_date` and `apply_url` are added with `ALTER TABLE` only when missing. Existing rows are retained and receive empty values, which the interface renders as `Unknown` or falls back from safely.
+`posted_date`, `apply_url`, and `application_status` are added with `ALTER TABLE` only when missing. Existing rows are retained. Missing dates render as `Unknown`, missing application links fall back safely, and migrated application status defaults to `not_applied`.
 
 When a later search finds the same job again, missing date and Apply metadata
 are backfilled without replacing non-empty values already stored on the row.
