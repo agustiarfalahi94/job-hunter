@@ -31,15 +31,19 @@ Uploading a CV is optional.
 - Upload PDF, DOCX, or DOC to keep a private profile reference.
 - Replace or remove the saved CV at any time.
 - The app shows primary and bonus skill signals found in readable CV text.
+- After saving, click **Continue to Search jobs** to move directly to the next
+  step.
 - Skip this page if you want to search using only the editable criteria.
 
 On Streamlit Community Cloud, uploaded data belongs to that app session/storage environment. A public deployment should not be treated as a private multi-user account system until authentication and per-user storage are added.
 
 ### 2. Search Jobs
 
-1. Edit target titles, primary description keywords, bonus skills, and hard-skip phrases.
+1. Use the single **Search criteria** panel to edit target job titles, required
+   description keywords, bonus skills, and hard-skip phrases. These values
+   control both searching and scoring.
 2. Set the **Strong-match goal**. This is the exact number of strong results you hope to find; it is not a minimum, maximum, or stopping rule.
-3. Set the **Session cap**. This is the maximum number of results checked in one run, capped at 50.
+3. Set **Maximum jobs in one session**. This is the search limit, capped at 50.
 4. Choose one searchable Malaysia **Location**.
 5. Select the job platforms.
 6. Choose **Date posted**: past 24 hours, past week, past month, or any time.
@@ -47,7 +51,7 @@ On Streamlit Community Cloud, uploaded data belongs to that app session/storage 
 8. Watch the progress bar and activity log.
 9. Click **Review Job queue** when the run finishes.
 
-`Past month` is the default. Start with a smaller session cap while testing, especially with SerpAPI's free allowance.
+`Past month` is the default. Start with a smaller maximum while testing, especially with SerpAPI's free allowance.
 
 ### 3. Job Queue
 

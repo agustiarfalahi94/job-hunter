@@ -144,3 +144,13 @@
 - Isolated application-link validation in its own module.
 - Pinned the tested Streamlit version so Community Cloud performs a clean,
   reproducible dependency rebuild.
+
+## v1.12 - Unified Search Criteria and CV Navigation
+
+- Consolidated titles, required description keywords, bonus keywords, hard
+  skips, location, platforms, freshness, goal, and maximum results into one
+  Search criteria panel.
+- Reused the same title and required-keyword values for query construction and
+  suitability scoring.
+- Added a direct Continue to Search jobs action after a CV is saved.
+- Added Streamlit regression coverage for both user-flow fixes.
