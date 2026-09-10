@@ -50,6 +50,7 @@ class AppNavigationTest(unittest.TestCase):
         self.assertNotIn('"Export draft"', source)
         self.assertNotIn('"Export packet"', source)
         self.assertNotIn('"Set status"', source)
+        self.assertNotIn("use_container_width", source)
 
 
 if __name__ == "__main__":

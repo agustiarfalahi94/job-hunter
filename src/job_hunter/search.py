@@ -59,6 +59,17 @@ CLOSED_JOB_MARKERS = (
     "this job has expired",
     "job has expired",
 )
+KNOWN_ATS_DOMAINS = (
+    "ashbyhq.com",
+    "greenhouse.io",
+    "icims.com",
+    "lever.co",
+    "myworkdayjobs.com",
+    "smartrecruiters.com",
+    "successfactors.com",
+    "taleo.net",
+    "workable.com",
+)
 
 
 @dataclass(frozen=True)
@@ -656,7 +667,7 @@ def extract_job_metadata(html: str, source_url: str) -> JobPageMetadata:
         if "apply" not in label:
             continue
         candidate_url = urljoin(source_url, str(link.get("href", "")).strip())
-        if _safe_https_url(candidate_url):
+        if is_safe_application_url(candidate_url, source_url):
             apply_url = candidate_url
             break
     return JobPageMetadata(posted_date=posted_date, apply_url=apply_url)
@@ -701,9 +712,24 @@ def _posting_is_too_old(posted_date: str, days: int | None) -> bool:
     return parsed_date < date.today() - timedelta(days=max(1, days))
 
 
-def _safe_https_url(url: str) -> bool:
+def is_safe_application_url(url: str, source_url: str) -> bool:
     parsed = urlparse(url)
-    return parsed.scheme == "https" and bool(parsed.hostname)
+    source = urlparse(source_url)
+    hostname = (parsed.hostname or "").casefold()
+    source_hostname = (source.hostname or "").casefold()
+    if parsed.scheme != "https" or source.scheme != "https":
+        return False
+    if not hostname or not source_hostname:
+        return False
+    same_site = (
+        hostname == source_hostname
+        or hostname.endswith(f".{source_hostname}")
+        or source_hostname.endswith(f".{hostname}")
+    )
+    known_ats = any(
+        hostname == domain or hostname.endswith(f".{domain}") for domain in KNOWN_ATS_DOMAINS
+    )
+    return same_site or known_ats
 
 
 def _availability_unknown_message(candidate: SearchCandidate) -> str:

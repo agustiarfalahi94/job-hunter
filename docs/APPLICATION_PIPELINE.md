@@ -45,7 +45,8 @@ User login / CAPTCHA / required answers / review / submit
 
 ## Apply Rules
 
-- The app may discover and open a safe official HTTPS application destination.
+- The app may discover and open a same-site or recognized ATS HTTPS application destination.
+- Unknown cross-site Apply links are ignored in favor of the original posting.
 - When a separate Apply URL cannot be discovered, the original safe posting is used.
 - Opening the link does not change an application status and is not described as submission.
 - The user reviews and submits on the destination site.

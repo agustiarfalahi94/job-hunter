@@ -67,9 +67,9 @@ The hosted Streamlit server cannot take over the visitor's existing logged-in br
 
 For that reason, Job Hunter performs the supported part of the application flow:
 
-1. locate a safe official HTTPS application destination where possible;
+1. locate a same-site or recognized ATS HTTPS application destination where possible;
 2. fall back to the original job posting when discovery is blocked or unsupported;
-3. open that destination in a new tab;
+3. show its hostname and open that destination in a new tab;
 4. leave login, CAPTCHA, required questions, final review, and submission in the user's browser.
 
 Opening a page is never recorded or described as a submitted application.

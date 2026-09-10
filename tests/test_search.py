@@ -131,6 +131,20 @@ class SearchTest(unittest.TestCase):
 
         self.assertEqual(metadata.apply_url, "")
 
+    def test_extract_job_metadata_rejects_unknown_cross_site_apply_link(self):
+        html = '<a href="https://unrelated.example/apply/123">Apply now</a>'
+
+        metadata = extract_job_metadata(html, "https://careers.example.com/jobs/123")
+
+        self.assertEqual(metadata.apply_url, "")
+
+    def test_extract_job_metadata_accepts_known_ats_apply_link(self):
+        html = '<a href="https://jobs.lever.co/example/123">Apply now</a>'
+
+        metadata = extract_job_metadata(html, "https://careers.example.com/jobs/123")
+
+        self.assertEqual(metadata.apply_url, "https://jobs.lever.co/example/123")
+
     def test_build_search_queries_targets_selected_platforms(self):
         criteria = SearchCriteria(
             title_terms=("Data Analyst", "BI Developer"),
@@ -269,7 +283,7 @@ class SearchTest(unittest.TestCase):
         <script type="application/ld+json">
           {"@type": "JobPosting", "datePosted": "2026-09-10"}
         </script>
-        <a href="https://careers.current.example/apply/123">Apply for this job</a>
+        <a href="https://jobs.lever.co/current/123">Apply for this job</a>
         """
 
         def fetcher(url: str) -> str:
@@ -281,7 +295,7 @@ class SearchTest(unittest.TestCase):
             job = queue.list_jobs()[0]
 
         self.assertEqual(job.posted_date, "2026-09-10")
-        self.assertEqual(job.apply_url, "https://careers.current.example/apply/123")
+        self.assertEqual(job.apply_url, "https://jobs.lever.co/current/123")
 
     def test_parse_duckduckgo_results_extracts_candidates(self):
         candidates = parse_duckduckgo_results(

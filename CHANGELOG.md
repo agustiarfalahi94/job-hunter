@@ -18,6 +18,8 @@
   again as a duplicate.
 - Added official HTTPS Apply destination discovery with a safe original-posting
   fallback.
+- Restricted discovered Apply links to same-site or recognized ATS hosts and
+  displayed the selected destination hostname before navigation.
 - Enabled a real Apply link that opens in a new browser tab while leaving login,
   CAPTCHA, required questions, review, and submission in the user's browser.
 - Added queue, search, URL-safety, migration, and Streamlit regression tests.

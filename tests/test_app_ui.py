@@ -5,6 +5,7 @@ import pyarrow as pa
 
 from job_hunter.app_ui import (
     application_destination,
+    application_destination_host,
     editable_criteria_defaults,
     filter_jobs,
     jobs_to_rows,
@@ -98,10 +99,25 @@ class AppUiTest(unittest.TestCase):
             "shortlist",
             "new",
         )
+        untrusted_apply = JobRecord(
+            4,
+            "Reporting Analyst",
+            "D",
+            "Kuala Lumpur",
+            "",
+            "https://example.com/jobs/4",
+            90,
+            "shortlist",
+            "new",
+            apply_url="https://unrelated.example/apply/4",
+        )
 
         self.assertEqual(application_destination(direct), "https://careers.example.com/apply/1")
         self.assertEqual(application_destination(fallback), "https://example.com/jobs/2")
         self.assertEqual(application_destination(unsafe), "")
+        self.assertEqual(application_destination(untrusted_apply), "https://example.com/jobs/4")
+        self.assertEqual(application_destination_host(direct), "careers.example.com")
+        self.assertEqual(application_destination_host(unsafe), "")
 
     def test_status_counts_includes_empty_defaults(self):
         jobs = [

@@ -7,7 +7,7 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 from job_hunter.queue import JobRecord
-from job_hunter.search import SearchRunSummary
+from job_hunter.search import SearchRunSummary, is_safe_application_url
 
 
 STATUSES = ("new", "reviewing", "drafted", "submitted", "rejected")
@@ -46,11 +46,16 @@ def filter_jobs(
 
 
 def application_destination(job: JobRecord) -> str:
-    for url in (job.apply_url, job.source_url):
-        parsed = urlparse(url)
-        if parsed.scheme == "https" and parsed.hostname:
-            return url
+    if is_safe_application_url(job.apply_url, job.source_url):
+        return job.apply_url
+    parsed = urlparse(job.source_url)
+    if parsed.scheme == "https" and parsed.hostname:
+        return job.source_url
     return ""
+
+
+def application_destination_host(job: JobRecord) -> str:
+    return (urlparse(application_destination(job)).hostname or "").casefold()
 
 
 def status_counts(jobs: Iterable[JobRecord]) -> dict[str, int]:

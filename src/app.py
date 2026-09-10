@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from job_hunter.app_ui import (
     application_destination,
+    application_destination_host,
     filter_jobs,
     jobs_to_rows,
     provider_status_label,
@@ -326,7 +327,7 @@ def _render_queue(queue: JobQueue) -> None:
             },
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=520,
     )
     _render_queue_actions(filtered)
@@ -342,10 +343,13 @@ def _render_queue_actions(jobs) -> None:
     selected = st.selectbox("Job", list(options))
     job = options[selected]
     destination = application_destination(job)
+    destination_host = application_destination_host(job)
     if job.apply_url and destination == job.apply_url:
         st.caption("Job Hunter found an official application destination for this role.")
     else:
         st.caption("No separate application destination was found, so Apply opens the original posting.")
+    if destination_host:
+        st.caption(f"Destination: `{destination_host}`")
     st.link_button(
         "Apply",
         destination or "https://jobs-hunter.streamlit.app/",

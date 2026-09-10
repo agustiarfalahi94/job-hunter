@@ -77,7 +77,7 @@ Availability fetches use short timeouts and trusted source domains. A blocked pa
 
 ## Apply Boundary
 
-Readable destination HTML is inspected for a link clearly labelled as an application action. Relative links are resolved against the source URL. Only HTTPS destinations with a hostname are stored or shown.
+Readable destination HTML is inspected for a link clearly labelled as an application action. Relative links are resolved against the source URL. Only same-site or recognized ATS HTTPS destinations are stored; unknown cross-site links fall back to the original posting. The selected hostname is shown before navigation.
 
 The Streamlit server does not control the visitor's browser session. The Apply control opens the discovered destination, or the original posting as a fallback, in a new tab. Login, CAPTCHA, required questions, review, and submission remain in the user's browser. This boundary also avoids implementing LinkedIn automation that the platform prohibits.
 
