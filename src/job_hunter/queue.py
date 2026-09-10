@@ -55,6 +55,7 @@ class JobQueue:
     def add_job(self, job: JobInput, preferences: dict[str, Any]) -> AddResult:
         existing_id = self._find_duplicate(job)
         if existing_id is not None:
+            self._backfill_metadata(existing_id, job)
             existing = self._get_job(existing_id)
             return AddResult(existing_id, created=False, score=existing.score, decision=existing.decision)
 
@@ -207,6 +208,22 @@ class JobQueue:
         if row is None:
             return None
         return int(row["id"])
+
+    def _backfill_metadata(self, job_id: int, job: JobInput) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE jobs
+                SET posted_date = CASE
+                        WHEN posted_date = '' THEN ? ELSE posted_date
+                    END,
+                    apply_url = CASE
+                        WHEN apply_url = '' THEN ? ELSE apply_url
+                    END
+                WHERE id = ?
+                """,
+                (job.posted_date.strip(), job.apply_url.strip(), job_id),
+            )
 
     def _get_job(self, job_id: int) -> JobRecord:
         with self._connect() as conn:

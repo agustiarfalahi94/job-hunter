@@ -148,6 +148,39 @@ class JobQueueTest(unittest.TestCase):
         self.assertEqual(first.job_id, second.job_id)
         self.assertEqual(len(jobs), 1)
 
+    def test_duplicate_search_backfills_missing_posted_date_and_apply_url(self):
+        preferences = {"target_roles": ["BI Developer"]}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            queue.add_job(
+                JobInput(
+                    title="BI Developer",
+                    company="Acme",
+                    location="Kuala Lumpur",
+                    description="Power BI reports",
+                    source_url="https://example.com/jobs/bi",
+                ),
+                preferences,
+            )
+
+            duplicate = queue.add_job(
+                JobInput(
+                    title="BI Developer",
+                    company="Acme",
+                    location="Kuala Lumpur",
+                    description="Power BI reports",
+                    source_url="https://example.com/jobs/bi",
+                    posted_date="2026-09-10",
+                    apply_url="https://careers.example.com/apply/bi",
+                ),
+                preferences,
+            )
+            job = queue.list_jobs()[0]
+
+        self.assertFalse(duplicate.created)
+        self.assertEqual(job.posted_date, "2026-09-10")
+        self.assertEqual(job.apply_url, "https://careers.example.com/apply/bi")
+
     def test_add_job_deduplicates_cross_platform_exact_same_role(self):
         preferences = {"target_roles": ["Data Analyst"], "primary_keywords": ["Power BI"]}
         with tempfile.TemporaryDirectory() as tmpdir:

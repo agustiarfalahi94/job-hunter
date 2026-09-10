@@ -533,7 +533,7 @@ def fetch_public_html(url: str) -> str:
 
     response = requests.get(
         url,
-        headers={"User-Agent": "JobHunter/1.10 (+https://github.com/agustiarfalahi94/job-hunter)"},
+        headers={"User-Agent": "JobHunter/1.11 (+https://github.com/agustiarfalahi94/job-hunter)"},
         timeout=(5, 20),
     )
     response.raise_for_status()
@@ -545,7 +545,7 @@ def fetch_job_html(url: str) -> str:
 
     response = requests.get(
         url,
-        headers={"User-Agent": "JobHunter/1.10 (+https://github.com/agustiarfalahi94/job-hunter)"},
+        headers={"User-Agent": "JobHunter/1.11 (+https://github.com/agustiarfalahi94/job-hunter)"},
         timeout=(3, 8),
         allow_redirects=False,
     )
