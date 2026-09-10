@@ -386,10 +386,10 @@ def _render_queue(queue: JobQueue, preferences: dict[str, object]) -> None:
         width="stretch",
         height=520,
     )
-    _render_queue_actions(filtered)
+    _render_queue_actions(queue, filtered)
 
 
-def _render_queue_actions(jobs) -> None:
+def _render_queue_actions(queue: JobQueue, jobs) -> None:
     st.subheader("Apply")
     jobs = list(jobs)
     if not jobs:
@@ -398,6 +398,16 @@ def _render_queue_actions(jobs) -> None:
     options = {f"#{job.id} - {job.title} - {job.company}": job for job in jobs}
     selected = st.selectbox("Job", list(options))
     job = options[selected]
+    applied = st.checkbox(
+        "I have applied to this job",
+        value=job.application_status == "applied",
+        key=f"application_status_{job.id}",
+    )
+    desired_status = "applied" if applied else "not_applied"
+    if desired_status != job.application_status:
+        queue.update_application_status(job.id, desired_status)
+        st.toast("Application status updated.")
+        st.rerun()
     destination = application_destination_url(job.apply_url, job.source_url)
     destination_host = application_destination_hostname(job.apply_url, job.source_url)
     if job.apply_url and destination == job.apply_url:
@@ -458,6 +468,7 @@ def _queue_column_widths() -> dict[str, str]:
         "Company": "medium",
         "Location": "medium",
         "Posted": "medium",
+        "Application status": "medium",
         "Reasons": "large",
         "Remarks": "large",
         "Description": "large",

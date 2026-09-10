@@ -1,8 +1,9 @@
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import app
+from job_hunter.queue import JobRecord
 from streamlit.testing.v1 import AppTest
 
 
@@ -77,6 +78,36 @@ class AppNavigationTest(unittest.TestCase):
         self.assertNotIn('"Export packet"', source)
         self.assertNotIn('"Set status"', source)
         self.assertNotIn("use_container_width", source)
+
+    def test_queue_apply_panel_persists_applied_checkbox(self):
+        job = JobRecord(
+            id=7,
+            title="BI Developer",
+            company="Acme",
+            location="Kuala Lumpur",
+            description="Power BI role",
+            source_url="https://example.com/jobs/7",
+            score=95,
+            decision="shortlist",
+            status="new",
+        )
+        queue = MagicMock()
+        selected_label = "#7 - BI Developer - Acme"
+
+        with (
+            patch.object(app.st, "subheader"),
+            patch.object(app.st, "selectbox", return_value=selected_label),
+            patch.object(app.st, "checkbox", return_value=True),
+            patch.object(app.st, "caption"),
+            patch.object(app.st, "link_button"),
+            patch.object(app.st, "info"),
+            patch.object(app.st, "toast"),
+            patch.object(app.st, "rerun") as rerun,
+        ):
+            app._render_queue_actions(queue, [job])
+
+        queue.update_application_status.assert_called_once_with(7, "applied")
+        rerun.assert_called_once_with()
 
 
 if __name__ == "__main__":

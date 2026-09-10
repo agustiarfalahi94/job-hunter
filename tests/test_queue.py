@@ -28,6 +28,7 @@ class JobQueueTest(unittest.TestCase):
 
         self.assertEqual(job.posted_date, "2026-09-09")
         self.assertEqual(job.apply_url, "https://careers.example.com/apply/bi")
+        self.assertEqual(job.application_status, "not_applied")
 
     def test_existing_database_is_migrated_without_losing_jobs(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -82,8 +83,48 @@ class JobQueueTest(unittest.TestCase):
         self.assertEqual(jobs[0].title, "Data Analyst")
         self.assertEqual(jobs[0].posted_date, "")
         self.assertEqual(jobs[0].apply_url, "")
+        self.assertEqual(jobs[0].application_status, "not_applied")
         self.assertIn("posted_date", columns)
         self.assertIn("apply_url", columns)
+        self.assertIn("application_status", columns)
+
+    def test_updates_application_status_without_hiding_job(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            created = queue.add_job(
+                JobInput(
+                    title="BI Developer",
+                    company="Example Analytics",
+                    location="Kuala Lumpur",
+                    description="Power BI reporting role",
+                    source_url="https://example.com/jobs/bi",
+                ),
+                {"target_roles": ["BI Developer"]},
+            )
+
+            queue.update_application_status(created.job_id, "applied")
+            jobs = queue.list_jobs()
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].application_status, "applied")
+
+    def test_rejects_invalid_application_status(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            created = queue.add_job(
+                JobInput(title="BI Analyst", company="Acme", location="Kuala Lumpur"),
+                {},
+            )
+
+            with self.assertRaisesRegex(ValueError, "Unsupported application status"):
+                queue.update_application_status(created.job_id, "submitted")
+
+    def test_application_status_update_rejects_missing_job(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+
+            with self.assertRaisesRegex(ValueError, "Job not found: 999"):
+                queue.update_application_status(999, "applied")
 
     def test_add_scores_and_lists_job_for_review(self):
         preferences = {

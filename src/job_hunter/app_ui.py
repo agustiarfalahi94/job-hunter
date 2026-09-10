@@ -26,6 +26,9 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
             "Score": job.score,
             "Decision": job.decision,
             "Posted": job.posted_date or "Unknown",
+            "Application status": (
+                "Applied" if job.application_status == "applied" else "Not applied"
+            ),
             "Title": job.title,
             "Company": job.company,
             "Location": job.location,
@@ -115,6 +118,7 @@ def queue_column_widths() -> dict[str, str]:
         "Company": "medium",
         "Location": "medium",
         "Posted": "medium",
+        "Application status": "medium",
         "Reasons": "large",
         "Remarks": "large",
         "Description": "large",

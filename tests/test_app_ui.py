@@ -36,6 +36,7 @@ class AppUiTest(unittest.TestCase):
                     remarks="Strong match",
                     posted_date="2026-09-09",
                     apply_url="https://careers.example.com/apply/1",
+                    application_status="applied",
                 )
             ]
         )
@@ -45,6 +46,7 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(rows[0]["Remarks"], "Strong match")
         self.assertEqual(rows[0]["Description"], "Power BI role")
         self.assertEqual(rows[0]["Posted"], "2026-09-09")
+        self.assertEqual(rows[0]["Application status"], "Applied")
         self.assertNotIn("Status", rows[0])
 
     def test_jobs_to_rows_labels_missing_posted_date_as_unknown(self):
@@ -53,6 +55,7 @@ class AppUiTest(unittest.TestCase):
         row = jobs_to_rows([job])[0]
 
         self.assertEqual(row["Posted"], "Unknown")
+        self.assertEqual(row["Application status"], "Not applied")
 
     def test_filter_jobs_can_show_only_shortlisted_jobs(self):
         jobs = [
@@ -211,6 +214,7 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(widths["Description"], "large")
         self.assertEqual(widths["Remarks"], "large")
         self.assertEqual(widths["Posted"], "medium")
+        self.assertEqual(widths["Application status"], "medium")
         self.assertEqual(widths["Source URL"], "medium")
 
 

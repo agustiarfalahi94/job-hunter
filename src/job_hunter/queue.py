@@ -30,6 +30,7 @@ class JobRecord:
     remarks: str = ""
     posted_date: str = ""
     apply_url: str = ""
+    application_status: str = "not_applied"
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,8 @@ class JobQueue:
     def list_jobs(self, status: str | None = None) -> list[JobRecord]:
         query = """
             SELECT id, title, company, location, description, source_url,
-                   score, decision, status, reasons, remarks, posted_date, apply_url
+                   score, decision, status, reasons, remarks, posted_date, apply_url,
+                   application_status
             FROM jobs
         """
         params: tuple[str, ...] = ()
@@ -173,6 +175,18 @@ class JobQueue:
             if cursor.rowcount != 1:
                 raise ValueError(f"Job not found: {job_id}")
 
+    def update_application_status(self, job_id: int, application_status: str) -> None:
+        allowed = {"not_applied", "applied"}
+        if application_status not in allowed:
+            raise ValueError(f"Unsupported application status: {application_status}")
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE jobs SET application_status = ? WHERE id = ?",
+                (application_status, job_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"Job not found: {job_id}")
+
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -190,6 +204,7 @@ class JobQueue:
                     status TEXT NOT NULL DEFAULT 'new',
                     reasons TEXT NOT NULL DEFAULT '',
                     remarks TEXT NOT NULL DEFAULT '',
+                    application_status TEXT NOT NULL DEFAULT 'not_applied',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -198,6 +213,12 @@ class JobQueue:
             _ensure_column(conn, "jobs", "remarks", "TEXT NOT NULL DEFAULT ''")
             _ensure_column(conn, "jobs", "posted_date", "TEXT NOT NULL DEFAULT ''")
             _ensure_column(conn, "jobs", "apply_url", "TEXT NOT NULL DEFAULT ''")
+            _ensure_column(
+                conn,
+                "jobs",
+                "application_status",
+                "TEXT NOT NULL DEFAULT 'not_applied'",
+            )
 
     def _find_duplicate(self, job: JobInput) -> int | None:
         with self._connect() as conn:
@@ -230,7 +251,8 @@ class JobQueue:
             row = conn.execute(
                 """
                 SELECT id, title, company, location, description, source_url,
-                       score, decision, status, reasons, remarks, posted_date, apply_url
+                       score, decision, status, reasons, remarks, posted_date, apply_url,
+                       application_status
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -269,6 +291,7 @@ def _record_from_row(row: sqlite3.Row) -> JobRecord:
         remarks=str(row["remarks"]),
         posted_date=str(row["posted_date"]),
         apply_url=str(row["apply_url"]),
+        application_status=str(row["application_status"]),
     )
 
 
