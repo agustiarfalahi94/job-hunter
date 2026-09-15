@@ -396,7 +396,7 @@ git commit -m "Broaden discovery with validated custom sources"
 - Extends: `JobRecord.application_recorded_at: str` and `application_evidence: str`.
 - Produces: `filter_jobs(..., application_view: str = "actionable")` where values are `actionable`, `all`, and `applied`.
 
-- [ ] **Step 1: Write URL and stable-ID tests**
+- [x] **Step 1: Write URL and stable-ID tests**
 
 ```python
 def test_tracking_variants_have_one_canonical_url():
@@ -427,7 +427,7 @@ def test_generic_apply_url_is_not_a_vacancy_identity():
     assert workspace.add_scored_job(second, result).created
 ```
 
-- [ ] **Step 2: Write cross-source and application-record tests**
+- [x] **Step 2: Write cross-source and application-record tests**
 
 Add a same-vacancy Foundit/LinkedIn pair with matching specific title, employer,
 and location. Assert one record contains both source links. Add a Foundit record
@@ -435,32 +435,32 @@ whose Apply URL points to LinkedIn but whose vacancy fields differ; assert two
 records. Mark the consolidated record applied, add another confident source,
 and assert status and evidence remain attached.
 
-- [ ] **Step 3: Write queue presentation tests**
+- [x] **Step 3: Write queue presentation tests**
 
 Assert the default `actionable` view excludes applied jobs, `applied` shows
 them, row decision is `Already applied`, and remarks include
 `Marked manually by the user; not verified with the job platform`. Assert Apply
 link selection never calls the status updater.
 
-- [ ] **Step 4: Run focused tests and verify failure**
+- [x] **Step 4: Run focused tests and verify failure**
 
 Expected: FAIL on missing identity module, sources, and application views.
 
-- [ ] **Step 5: Implement identity resolution and source consolidation**
+- [x] **Step 5: Implement identity resolution and source consolidation**
 
 Strip only known tracking query keys. Parse LinkedIn numeric view/currentJobId,
 Indeed `jk`, JobStreet path IDs, and Foundit path IDs. Use stable source identity,
 then canonical URL, then a nonempty normalized title/company/location
 fingerprint. Never use `apply_url` for identity. Preserve all safe source links.
 
-- [ ] **Step 6: Implement applied-record semantics**
+- [x] **Step 6: Implement applied-record semantics**
 
 Record UTC timestamp and fixed manual evidence only on the explicit status
 control. Present computed decision `Already applied` without overwriting the
 original match decision. Keep additive local SQLite columns for CLI
 compatibility, but do not route hosted state through SQLite.
 
-- [ ] **Step 7: Run complete tests and commit**
+- [x] **Step 7: Run complete tests and commit**
 
 ```bash
 git add src/job_hunter/job_identity.py src/job_hunter/queue_types.py src/job_hunter/session_workspace.py src/job_hunter/queue.py src/job_hunter/app_ui.py tests/test_job_identity.py tests/test_session_workspace.py tests/test_queue.py tests/test_app_ui.py
@@ -488,7 +488,7 @@ git commit -m "Consolidate job sources and applied records"
 - Produces: `SearchRunController.snapshot() -> RunSnapshot`.
 - Produces: `SessionWorkspace.accept_completed(match: CompletedMatch) -> bool` returning false for stale run IDs.
 
-- [ ] **Step 1: Write slow-mock cancellation tests**
+- [x] **Step 1: Write slow-mock cancellation tests**
 
 ```python
 def test_cancel_stops_new_work_and_preserves_completed_results():
@@ -527,38 +527,38 @@ Define `BlockingFetcher` with a thread-safe `calls` counter and ten discovered
 fixed `MatchResult` immediately. These exact fakes make scheduling counts and
 cancellation timing deterministic.
 
-- [ ] **Step 2: Write stale-run and retry cancellation tests**
+- [x] **Step 2: Write stale-run and retry cancellation tests**
 
 Start run A, cancel it, start run B, then release A's blocked result. Assert
 `accept_completed` rejects A and accepts B. Mock a retryable Gemini error, cancel
 before the retry delay, and assert only one Gemini call. Assert no new page fetch
 begins after cancellation.
 
-- [ ] **Step 3: Write ceiling tests**
+- [x] **Step 3: Write ceiling tests**
 
 Provide unlimited duplicate and failure generators. Assert at most 12 discovery
 requests, 50 page fetches, 50 Gemini attempts, 50 accepted unique results, two
 concurrent tasks, and no scheduling after the deadline clock reaches 300 seconds.
 
-- [ ] **Step 4: Run focused tests and verify failure**
+- [x] **Step 4: Run focused tests and verify failure**
 
 Expected: FAIL because `search_runner.py` does not exist.
 
-- [ ] **Step 5: Extract pure candidate processing from synchronous search**
+- [x] **Step 5: Extract pure candidate processing from synchronous search**
 
 Separate query discovery, cheap identity check, page enrichment, deterministic
 exclusions, Gemini scoring, and completion publication. Insert cancellation
 checks before and after each stage. Keep `run_public_search` as a compatibility
 wrapper used by CLI/tests until callers are migrated.
 
-- [ ] **Step 6: Implement the controller**
+- [x] **Step 6: Implement the controller**
 
 Use one coordinator thread and `ThreadPoolExecutor(max_workers=2)`. Use
 `threading.Event`, `queue.Queue`, UUID run IDs, injected monotonic clock, and
 bounded request/scoring counters. Workers publish immutable data only. Controller
 shutdown must be nonblocking for the Streamlit rerun path and bounded in tests.
 
-- [ ] **Step 7: Run focused and complete tests, then commit**
+- [x] **Step 7: Run focused and complete tests, then commit**
 
 ```bash
 git add src/job_hunter/search_runner.py src/job_hunter/search.py src/job_hunter/session_workspace.py tests/test_search_runner.py tests/test_search.py

@@ -7,6 +7,18 @@ from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
 
 
 class SessionWorkspaceTest(unittest.TestCase):
+    def test_accept_completed_rejects_stale_run_and_accepts_active_run(self):
+        from job_hunter.search_runner import CompletedMatch
+
+        workspace = SessionWorkspace()
+        score = MatchResult(90, "shortlist", ("Power BI",), (), "Gemini", "test", False)
+        job = JobInput(title="BI Analyst", company="Acme", location="Kuala Lumpur")
+        workspace.activate_run("run-b")
+
+        self.assertFalse(workspace.accept_completed(CompletedMatch("run-a", job, score)))
+        self.assertTrue(workspace.accept_completed(CompletedMatch("run-b", job, score)))
+        self.assertEqual(len(workspace.list_jobs()), 1)
+
     def test_workspaces_do_not_share_private_state(self):
         first = SessionWorkspace()
         second = SessionWorkspace()

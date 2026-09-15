@@ -35,6 +35,7 @@ class SessionWorkspace:
         self.score_cache: dict[str, object] = {}
         self._jobs: list[JobRecord] = []
         self._next_job_id = 1
+        self._active_run_id = ""
 
     @property
     def cv_text(self) -> str:
@@ -141,6 +142,19 @@ class SessionWorkspace:
                 )
                 return
         raise ValueError(f"Job not found: {job_id}")
+
+    def activate_run(self, run_id: str) -> None:
+        self._active_run_id = run_id
+
+    def accept_completed(self, match: object) -> bool:
+        if getattr(match, "run_id", "") != self._active_run_id:
+            return False
+        job = getattr(match, "job", None)
+        result = getattr(match, "result", None)
+        if not isinstance(job, JobInput) or not isinstance(result, MatchResult):
+            return False
+        self.add_scored_job(job, result)
+        return True
 
     def _find_duplicate(self, job: JobInput) -> JobRecord | None:
         candidate_source = job_source(job.platform, job.source_url)
