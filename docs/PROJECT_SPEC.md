@@ -2,81 +2,57 @@
 
 ## Purpose
 
-Job Hunter turns editable search preferences into a short, explainable list of Kuala Lumpur data jobs. It should reduce repetitive research without inventing candidate experience, mislabeling job freshness, or pretending that opening a job page means an application was submitted.
+Job Hunter turns editable preferences and, optionally, a session CV into a ranked list of real public job postings. It reduces repetitive research without inventing experience, mislabelling freshness, sharing one visitor's data with another, or pretending an opened page was submitted.
 
-## Supported Web Workflow
+## Supported Workflow
 
-1. Optionally save a PDF, DOCX, or best-effort DOC CV for private profile reference.
-2. Search without requiring a CV by editing title, description, location, platform, freshness, and scoring criteria.
-3. Watch live provider, availability, duplicate, freshness, and scoring progress.
-4. Review ranked results with a verified posting date or `Unknown` and an explicit application status.
-5. Open the safest official application destination in a new tab.
-6. Complete login, CAPTCHA, required questions, final review, and submission on the destination site.
+1. Choose Criteria-based or CV-based search.
+2. Optionally save a PDF, DOCX, or best-effort DOC CV in the current session.
+3. Edit title, description, bonus, hard-skip, location, source, and freshness criteria.
+4. Search title and description signals independently across selected sources.
+5. Enrich up to 50 unique jobs with descriptions, dates, and safe Apply destinations.
+6. Exclude restricted, known-stale, and visibly closed postings.
+7. Score with Gemini or a visibly labelled deterministic fallback.
+8. Review actionable or already-applied jobs and alternate source links.
+9. Apply externally and record status manually.
 
 ## Included
 
-- Contact-free public candidate profile supported by the supplied CV.
-- Private PDF, DOCX, and best-effort legacy DOC storage and text extraction.
-- Optional CV signal display; CV upload is not required for search.
-- Editable target titles, primary keywords, bonus keywords, hard skips,
-  strong-match goal, and maximum jobs per session.
-- One searchable Malaysia city selector backed by a public API and local fallback.
-- LinkedIn, JobStreet, Indeed, Foundit, and selected company-career search targets.
-- Optional SerpAPI search configured through Streamlit secrets or environment.
-- Public-result fallback when no API key is configured.
-- Provider posting-age filters with a past-month default.
-- Posting-date extraction from structured job metadata, platform cards, and recognizable search-result dates.
-- Posting-date enrichment from known provider fields, job-page metadata,
-  posting-time elements, embedded job data, and labeled visible text.
-- Bounded HTTPS redirect handling for supported job and applicant-tracking domains.
-- A second recency check that rejects known dates older than the user-selected limit.
-- Punctuation-tolerant local-only and Malaysian-only exclusion before active-queue insertion.
-- Closed-job checks on result cards and trusted destination pages.
-- Deterministic explainable scoring with mandatory remarks for weak and skipped jobs.
-- SQLite queue migration that preserves existing local rows.
-- Exact cross-platform duplicate detection by title, company, and location.
-- Official HTTPS Apply URL discovery with original-posting fallback.
-- One Streamlit workflow: **Profile & CV**, **Search jobs**, and **Job queue**.
-- One Search criteria panel whose titles and keywords drive both discovery and
-  scoring, without duplicated controls.
-- Direct navigation from a saved CV to Search jobs.
-- Readable queue table with wrapping, wide text columns, posting date, and application status.
-- Reversible Applied / Not applied tracking that keeps applied jobs visible.
-- Automated tests, local check script, versioned changelog, design, and implementation plans.
+- Session-isolated hosted CV, queue, cache, and application records.
+- Criteria-only mode that never sends CV text.
+- CV-based evidence matching with no unsupported claims.
+- SerpAPI discovery plus a limited public fallback.
+- LinkedIn, JobStreet, Indeed, Foundit, company pages, and validated custom domains.
+- Title OR description discovery, a fixed 50-unique-job target, bounded concurrency, progress, and Stop.
+- Full/snippet/unavailable description provenance.
+- Job-specific date provenance and user-selected age filtering.
+- Punctuation-tolerant local-only/Malaysian-only and mandatory-Mandarin exclusion.
+- Conservative identity matching and alternate source preservation.
+- Gemini structured scoring, session cache, bounded retry, sanitized errors, and fallback.
+- Explicit manual application evidence and safe external Apply links.
+- Backward-compatible local SQLite/CLI modules.
 
 ## Not Included
 
-- Bypassing login, CAPTCHA, rate limits, access controls, or anti-bot systems.
-- LinkedIn form automation or any activity prohibited by a platform's terms.
-- Generic remote control of a visitor's logged-in browser from Streamlit Cloud.
-- Automatic submission of arbitrary third-party forms.
-- Automatic lookup of application history from third-party platform accounts.
-- Storage of platform passwords, cookies, identity documents, or private form answers.
-- Public-deployment authentication or per-user private storage.
-- Guaranteed extraction from every legacy binary DOC file.
+- Durable hosted user accounts or cross-session history.
+- Guaranteed access to every public job page or complete search coverage.
+- Automatic third-party application-history lookup.
+- Login automation, CAPTCHA bypass, credential storage, or auto-submit.
+- Claims that an unknown posting date means a job is new.
 
 ## Success Criteria
 
-- Search can run when no CV is stored.
-- A saved CV offers direct navigation to Search jobs.
-- Search titles and required keywords appear once and drive both discovery and scoring.
-- The queue never presents application status as posting freshness.
-- Every row shows an ISO posting date or `Unknown`.
-- Known stale or closed jobs are skipped with an explanatory activity message.
-- Local-only jobs are excluded even when punctuation or title wording differs from the configured legacy phrase.
-- Relative month and year posting ages are normalized when the source exposes them in a supported field or label.
-- Apply prefers a discovered safe HTTPS destination and otherwise opens the original safe posting.
-- The app never claims that an application was submitted.
-- Application status changes only through the user's explicit queue action, and applied jobs remain visible.
-- Existing SQLite rows survive migration.
-- A fresh clone passes the complete test gate and starts the Streamlit app without import errors.
-- No CV, contact details, secrets, or local application data enter Git.
+- No hosted visitor can read another visitor's CV, jobs, cache, or application records.
+- Criteria mode works without a CV and cannot include CV text in its model payload.
+- CV mode is disabled until readable CV text is saved.
+- Search shows current activity, 0/50 progress, a working Stop control, and terminal status.
+- No more than the documented request, result, worker, scoring, or deadline ceilings are crossed.
+- Full descriptions replace snippets when safely available; limitations remain visible otherwise.
+- Known stale, closed, or hard-skipped roles never enter the active queue.
+- Applied records remain available under Already applied with fixed manual evidence.
+- A fresh clone passes tests and starts Streamlit without import errors.
+- No private data or secrets enter Git.
 
-## Reference Projects Studied
+## Reference Projects
 
-- `kopi-kompas`: concise README style, explicit API-key boundary, and AI handover notes.
-- `tiny-tapsters`: clear validation gate and strong secret-handling warnings.
-- `agustiar-data-pipeline`: Python layout, Streamlit conventions, config templates, tests, and CI.
-- `random_recall`: starter structure and repository naming patterns.
-
-Only relevant project patterns were adapted; unrelated code was not copied.
+Relevant structure and documentation patterns were studied from `kopi-kompas`, `random-recall`, `tiny-tapsters`, and `agustiar-data-pipeline`. Unrelated code was not copied.

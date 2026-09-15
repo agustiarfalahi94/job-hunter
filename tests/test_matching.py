@@ -5,6 +5,7 @@ from job_hunter.matching import (
     MatchContext,
     MatchingConfig,
     score_match,
+    _classify_provider_error,
 )
 from job_hunter.queue_types import JobInput
 
@@ -52,6 +53,15 @@ def gemini_result(score=92):
 
 
 class MatchingTest(unittest.TestCase):
+    def test_http_429_is_classified_as_retryable_rate_limit(self):
+        error = RuntimeError("too many requests")
+        error.status_code = 429
+
+        classified = _classify_provider_error(error)
+
+        self.assertEqual(classified.kind, "rate_limit")
+        self.assertTrue(classified.retryable)
+
     def test_criteria_mode_payload_never_contains_cv_text(self):
         client = RecordingGeminiClient([gemini_result()])
         context = MatchContext(mode="criteria", criteria=CRITERIA)

@@ -1,45 +1,36 @@
-# AGENTS.md - Instructions for AI Coding Agents
+# AGENTS.md - Job Hunter Engineering Guide
 
 ## Start Here
 
-Job Hunter is a local-first job matching and application planning assistant.
-v0.1 is intentionally conservative: score jobs, prepare application decisions,
-and document the workflow before any browser automation or auto-submit logic.
+Job Hunter v1.14.0 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
-Read this file, then `README.md`, then the files in `docs/`.
+## Non-Negotiable Rules
 
-## Working Agreement
-
-1. Keep the repository safe to make public.
-2. Never commit the actual CV, contact details, job-board credentials, cookies,
-   browser profiles, API keys, or private preferences.
-3. Do not invent candidate experience. Candidate claims must come from
-   `docs/CANDIDATE_PROFILE.md` or a private local source provided by the user.
-4. Browser automation must be human-reviewed by default. Do not build
-   auto-submit behavior without a separate explicit design and approval.
-5. Run `./tool/check.sh` before every commit.
-6. If verification cannot run, report it as unverified instead of guessing.
+1. Keep the repository safe to publish.
+2. Never commit CVs, extracted CV text, contact details, job-board credentials, cookies, API keys, private preferences, local databases, application records, identity documents, or form answers.
+3. Do not invent candidate experience. Gemini and deterministic reasons must use only supplied CV text, editable criteria, and job content.
+4. Criteria-based search must never load or send CV text.
+5. Hosted data stays in `SessionWorkspace`; do not route Streamlit users through shared files or SQLite.
+6. Background workers must not call Streamlit or mutate `st.session_state`. Publish immutable events and matches for the Streamlit thread to accept.
+7. Respect ceilings: 12 discovery requests, 50 unique candidates, 50 page fetches, 50 scoring attempts, two workers, and five minutes of new-work scheduling.
+8. Stop must prevent new work after cancellation is observed. Keep already completed results and use bounded timeouts for in-flight calls.
+9. Do not automate login, CAPTCHA, prohibited platform activity, or final application submission.
+10. Run `./tool/check.sh` before every commit. Report anything unverified instead of guessing.
 
 ## Git Flow
 
-- Use short feature branches for changes after the initial commit.
-- Keep commit messages meaningful and scoped.
-- Public remote should be `https://github.com/agustiarfalahi94/job-hunter.git`
-  once GitHub authentication is available.
+- Use `codex/` feature branches.
+- Keep commits meaningful and scoped.
+- Public remote: `https://github.com/agustiarfalahi94/job-hunter.git`.
+- Verify the feature-branch CI before integrating into `main`, then verify `main` and production separately.
 
 ## Validation
 
 ```sh
-./tool/check.sh
+PYTHON_BIN=/path/to/.venv/bin/python ./tool/check.sh
+python -m compileall -q src tests
+python -m pip check
+git diff --check
 ```
 
-The check runs the Python tests with bytecode writes disabled.
-
-## Safety Rules
-
-- `config/preferences.example.yaml` is public and generic.
-- `config/preferences.local.yaml` is private and git-ignored.
-- `data/private/`, `data/raw/`, local databases, and generated exports are
-  git-ignored.
-- The scoring engine may say "review" or "reject"; it must not fabricate
-  missing qualifications to improve a match.
+Use mocked providers for automated tests. Do not consume SerpAPI or Gemini quota in the test suite.

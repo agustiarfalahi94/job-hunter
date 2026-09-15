@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.14.0 - 2026-09-15
+
+- Moved hosted CVs, queue records, application evidence, and score caches into
+  isolated Streamlit session storage; local SQLite remains CLI-only.
+- Added Criteria-based and CV-based Gemini matching with structured output,
+  content-addressed session cache, bounded retry, sanitized failures, and a
+  visible deterministic fallback.
+- Split discovery into title OR description query families and added validated
+  custom career-site domains when SerpAPI is configured.
+- Added full/snippet/unavailable description provenance and stricter
+  job-specific posting-date provenance.
+- Added conservative provider IDs, URL cleanup, cross-source fingerprints, and
+  alternate source links without treating generic Apply redirects as identity.
+- Added a cancellable two-worker search controller with immutable progress
+  events, stale-run rejection, a fixed 50-unique-job target, and bounded network
+  and model work.
+- Added Actionable, All, and Already applied queue views with explicit manual
+  application time/evidence.
+- Removed obsolete search-goal and adjustable result-cap controls, expanded the
+  tutorial and deployment documentation, and added regression coverage.
+
 ## 1.13.0 - 2026-09-11
 
 - Added punctuation-tolerant local-only eligibility matching, including `Local

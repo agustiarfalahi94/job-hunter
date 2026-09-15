@@ -131,13 +131,30 @@ class SearchTest(unittest.TestCase):
     def test_fetch_job_html_accepts_a_validated_custom_domain(self):
         response = MagicMock(is_redirect=False, text="<main>Power BI role</main>")
 
-        with patch("requests.get", return_value=response):
+        with (
+            patch("requests.get", return_value=response),
+            patch(
+                "job_hunter.search.socket.getaddrinfo",
+                return_value=[(2, 1, 6, "", ("93.184.216.34", 443))],
+            ),
+        ):
             html = fetch_job_html(
                 "https://careers.example.com/jobs/123",
                 allowed_domains=("careers.example.com",),
             )
 
         self.assertIn("Power BI", html)
+
+    def test_fetch_job_html_rejects_custom_domain_resolving_private(self):
+        with patch(
+            "job_hunter.search.socket.getaddrinfo",
+            return_value=[(2, 1, 6, "", ("127.0.0.1", 443))],
+        ):
+            with self.assertRaisesRegex(RuntimeError, "not trusted"):
+                fetch_job_html(
+                    "https://careers.example.com/jobs/123",
+                    allowed_domains=("careers.example.com",),
+                )
 
     def test_normalize_posted_date_accepts_iso_and_relative_values(self):
         today = date(2026, 9, 10)

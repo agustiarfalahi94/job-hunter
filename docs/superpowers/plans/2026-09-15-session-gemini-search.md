@@ -664,25 +664,25 @@ git commit -m "Expose session-safe search modes and cancellation"
   two modes, 50-job ceiling, cancellation guarantees, applied records, and
   deployment limitations.
 
-- [ ] **Step 1: Write documentation/version contract tests**
+- [x] **Step 1: Write documentation/version contract tests**
 
 Assert README contains `v1.14.0`, `GEMINI_API_KEY`, session-only privacy,
 Criteria-based and CV-based mode instructions, and cancellation limitations.
 Assert obsolete Strong-match goal and maximum-jobs instructions are absent.
 Assert secrets examples contain blank example values only.
 
-- [ ] **Step 2: Run contract tests and verify failure**
+- [x] **Step 2: Run contract tests and verify failure**
 
 Expected: FAIL because docs still describe v1.13 deterministic shared storage and obsolete controls.
 
-- [ ] **Step 3: Update documentation and changelog**
+- [x] **Step 3: Update documentation and changelog**
 
 Describe exactly what is implemented. Include local setup, Streamlit secrets,
 search/API limits, full/snippet/unavailable labels, cache behavior, manual
 application evidence, and session reset behavior. Do not claim live Gemini or
 production behavior until separately verified.
 
-- [ ] **Step 4: Run all automated verification**
+- [x] **Step 4: Run all automated verification**
 
 ```bash
 PYTHON_BIN=/Users/lilianyoctoria/Documents/job-hunter/.venv/bin/python ./tool/check.sh
@@ -693,7 +693,7 @@ git diff --check
 
 Expected: all commands exit 0.
 
-- [ ] **Step 5: Run local Streamlit browser smoke tests**
+- [x] **Step 5: Run local Streamlit browser smoke tests**
 
 Start the app on an unused localhost port. Verify desktop and narrow viewport:
 Profile CV lifecycle with a generated non-private test DOCX, both search modes
@@ -701,14 +701,14 @@ with mocked adapters, running/Stop/Cancelled states, actionable/applied filters,
 wrapped queue content, and no console/server exceptions. Remove generated test
 artifacts after verification.
 
-- [ ] **Step 6: Perform code and privacy review**
+- [x] **Step 6: Perform code and privacy review**
 
 Review `git diff 3e03e90...HEAD` for correctness, unsafe URL handling,
 cross-session state, late worker writes, secret/CV leakage, unbounded calls,
 misleading copy, and unrelated refactors. Resolve every blocking finding and
 rerun Step 4.
 
-- [ ] **Step 7: Commit the release**
+- [x] **Step 7: Commit the release**
 
 ```bash
 git add README.md AGENTS.md CHANGELOG.md docs src/job_hunter/__init__.py tests

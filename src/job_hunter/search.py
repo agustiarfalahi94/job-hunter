@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from typing import Callable
+import ipaddress
 import json
 import re
+import socket
 from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urljoin, urlparse
 
 from bs4 import BeautifulSoup
@@ -680,7 +682,7 @@ def fetch_public_html(url: str) -> str:
 
     response = requests.get(
         url,
-        headers={"User-Agent": "JobHunter/1.13 (+https://github.com/agustiarfalahi94/job-hunter)"},
+        headers={"User-Agent": "JobHunter/1.14 (+https://github.com/agustiarfalahi94/job-hunter)"},
         timeout=(5, 20),
     )
     response.raise_for_status()
@@ -696,7 +698,7 @@ def fetch_job_html(url: str, allowed_domains: tuple[str, ...] = ()) -> str:
     for redirect_count in range(4):
         response = requests.get(
             current_url,
-            headers={"User-Agent": "JobHunter/1.13 (+https://github.com/agustiarfalahi94/job-hunter)"},
+            headers={"User-Agent": "JobHunter/1.14 (+https://github.com/agustiarfalahi94/job-hunter)"},
             timeout=(3, 8),
             allow_redirects=False,
         )
@@ -1037,7 +1039,14 @@ def _looks_like_job_result(url: str, title: str, platform: str) -> bool:
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").casefold()
     allowed_domains = PLATFORM_DOMAINS.get(platform, ())
+    if not allowed_domains and "." in platform and " " not in platform:
+        allowed_domains = (platform.casefold(),)
     if parsed.scheme != "https" or not hostname:
+        return False
+    try:
+        if parsed.port not in {None, 443}:
+            return False
+    except ValueError:
         return False
     trusted_domain = any(
         hostname == domain or hostname.endswith(f".{domain}") for domain in allowed_domains
@@ -1057,14 +1066,40 @@ def _looks_like_job_result(url: str, title: str, platform: str) -> bool:
 def _is_trusted_job_url(url: str, allowed_domains: tuple[str, ...] = ()) -> bool:
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").casefold()
+    if parsed.scheme != "https" or not hostname:
+        return False
+    try:
+        if parsed.port not in {None, 443}:
+            return False
+    except ValueError:
+        return False
     trusted_domains = {
         domain
         for domains in PLATFORM_DOMAINS.values()
         for domain in domains
     }
     trusted_domains.update(KNOWN_ATS_DOMAINS)
-    trusted_domains.update(domain.casefold().strip() for domain in allowed_domains)
-    return parsed.scheme == "https" and any(
+    if any(
         hostname == domain or hostname.endswith(f".{domain}")
         for domain in trusted_domains
+    ):
+        return True
+    custom_domains = tuple(domain.casefold().strip() for domain in allowed_domains)
+    custom_match = any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in custom_domains
     )
+    return custom_match and _hostname_resolves_public(hostname)
+
+
+def _hostname_resolves_public(hostname: str) -> bool:
+    try:
+        addresses = {
+            result[4][0]
+            for result in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+        }
+        return bool(addresses) and all(
+            ipaddress.ip_address(address).is_global for address in addresses
+        )
+    except (OSError, ValueError):
+        return False

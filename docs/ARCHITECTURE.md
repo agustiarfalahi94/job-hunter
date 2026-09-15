@@ -1,90 +1,53 @@
 # Architecture
 
-## Shape
-
-Job Hunter is a small Python package behind a Streamlit interface. Public code contains deterministic search and scoring logic; private CV files, queue data, local preferences, and secrets remain outside Git.
+## Hosted Shape
 
 ```text
-optional private CV       editable search/scoring criteria
-         |                              |
-         v                              v
-   profile signals              provider queries
-                                        |
-                                        v
-                              search result adapters
-                                        |
-                       +----------------+----------------+
-                       |                |                |
-                       v                v                v
-          eligibility/closed check date parsing     Apply URL discovery
-                       |                |                |
-                       +----------------+----------------+
-                                        |
-                                        v
-                              deterministic scoring
-                                        |
-                                        v
-                         additive SQLite job queue
-                                        |
-                                        v
-              Streamlit review + status + HTTPS Apply link
-                                        |
-                                        v
-                         user's browser and final submit
+Streamlit session
+  |-- SessionWorkspace: CV, jobs, application records
+  |-- SearchRunController: run ID, cancellation, session score cache
+  |
+  +--> bounded discovery queries
+         +--> two-worker detail enrichment
+                +--> deterministic exclusions
+                +--> Gemini / deterministic fallback
+                +--> immutable events and CompletedMatch values
+                         +--> Streamlit thread accepts active run only
 ```
+
+The hosted app never creates `JobQueue` or `CVStore`. SQLite and disk-backed CV helpers remain only for backward-compatible local CLI use.
 
 ## Components
 
 | Component | Responsibility |
 |---|---|
-| `src/app.py` | Three-page Streamlit journey and live search feedback |
-| `profile.py` | Public, contact-free candidate evidence |
-| `cv_store.py` | Private CV save, replace, remove, and status |
-| `cv_parser.py` | PDF/Word extraction and primary/bonus signal detection |
-| `preferences.py` | Public template plus ignored local preference override |
-| `locations.py` | Malaysia city lookup and local fallback |
-| `runtime_config.py` | SerpAPI key loading from Streamlit secrets or environment |
-| `eligibility.py` | Shared normalized hard-skip and local-only phrase matching |
-| `search.py` | Provider queries, trusted-source parsing, freshness, availability, metadata, and progress |
-| `scoring.py` | Explainable deterministic fit score and remarks |
-| `queue_types.py` | Shared queue input contract |
-| `queue.py` | Additive SQLite migration, persistence, and duplicate detection |
-| `app_ui.py` | Queue row formatting, filtering, and safe application destination selection |
-| `tests/` | Product behavior, privacy, migration, and Streamlit regression coverage |
+| `src/app.py` | Session UI, matching modes, criteria, fragment polling, queue, and Apply |
+| `session_workspace.py` | Session-only CV and queue lifecycle, active run ID, application evidence |
+| `search_runner.py` | Coordinator, two-worker pool, ceilings, cancellation, events, completed matches |
+| `search.py` | Query planning, provider parsers, safe page loading, dates, descriptions, availability |
+| `matching.py` | Mode validation, Gemini adapter, structured output, retry, cache, fallback |
+| `job_identity.py` | Tracking cleanup, provider IDs, fingerprints, alternate source identity |
+| `source_validation.py` | Public HTTPS custom-domain validation |
+| `eligibility.py` | Shared normalized hard-skip matching |
+| `app_ui.py` | Queue filtering, row presentation, and application destinations |
+| `queue.py` | Additive local SQLite compatibility path |
 
-Legacy CLI, draft, packet, and workflow modules remain for compatibility with earlier local versions. They are not part of the v1.11 Streamlit journey.
+## Data Boundaries
 
-## Data Boundary
+Hosted private data lives inside one Streamlit session object. It is not persisted across session loss or app restart. Workers receive plain immutable request values, use a controller-owned session cache, and publish immutable events/results; they do not call Streamlit.
 
-Public:
+Public repository data includes source code, tests, generic criteria templates, allowlists, and contact-free documentation. CVs, extracted text, personal details, secrets, credentials, cookies, application records, and local databases are excluded.
 
-- source code, tests, documentation, and preference templates;
-- contact-free candidate strengths already supported by the CV;
-- provider domain allowlists and generic sample configuration.
+## Network Boundaries
 
-Private:
+SerpAPI is preferred for dependable discovery and required for custom domains. Public fallback coverage may be incomplete. Page requests accept supported platform domains, known ATS domains, and only the custom domains that passed validation. Redirects remain HTTPS and trusted.
 
-- CV files and extracted text;
-- contact and identity data;
-- local preferences and queue databases;
-- platform credentials, cookies, and application answers;
-- Streamlit secrets.
+Gemini receives one mode-specific candidate payload and one job payload. Criteria mode cannot carry CV text. Errors are classified into sanitized user-facing fallback reasons; raw API errors and keys are not logged.
 
-## Search Boundary
+## Cancellation Boundary
 
-SerpAPI is preferred when configured. Otherwise, the app attempts public LinkedIn cards and public web-result pages. Provider filters narrow posting age, while parsed dates supply a second verification layer. Date enrichment checks known provider fields, JSON-LD, page metadata, posting-time elements, embedded job fields, and labeled visible text. Search cards and trusted destination pages are checked for local-only restrictions and closed-job markers.
+The controller schedules at most two jobs at a time and checks cancellation before every new discovery, fetch, and scoring stage. It cannot forcibly interrupt an already executing third-party request, so those calls have bounded timeouts and a short settlement window. A new run activates a new ID; late completed values from an older ID are ignored.
 
-Availability fetches use short timeouts and trusted source domains. Up to three HTTPS redirects may be followed when every destination remains on a supported job platform or recognized applicant-tracking domain. Untrusted redirects are rejected. A blocked page yields an unknown-availability message rather than a false open/closed conclusion.
+## Local SQLite Compatibility
 
-## Apply Boundary
-
-Readable destination HTML is inspected for a link clearly labelled as an application action. Relative links are resolved against the source URL. Only same-site or recognized ATS HTTPS destinations are stored; unknown cross-site links fall back to the original posting. The selected hostname is shown before navigation.
-
-The Streamlit server does not control the visitor's browser session. The Apply control opens the discovered destination, or the original posting as a fallback, in a new tab. Login, CAPTCHA, required questions, review, and submission remain in the user's browser. The user records `Applied` explicitly after submission; opening the link alone does not change status. This boundary also avoids implementing LinkedIn automation that the platform prohibits.
-
-## SQLite Migration
-
-`posted_date`, `apply_url`, and `application_status` are added with `ALTER TABLE` only when missing. Existing rows are retained. Missing dates render as `Unknown`, missing application links fall back safely, and migrated application status defaults to `not_applied`.
-
-When a later search finds the same job again, missing date and Apply metadata
-are backfilled without replacing non-empty values already stored on the row.
+Local queues use additive columns for posting date, Apply URL, application status, recorded time, and manual evidence. Existing rows are retained. This path does not participate in hosted multi-user state.

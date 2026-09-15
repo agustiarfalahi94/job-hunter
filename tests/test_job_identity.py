@@ -36,6 +36,9 @@ class JobIdentityTest(unittest.TestCase):
         self.assertEqual(vacancy_fingerprint("Job", "", "Kuala Lumpur"), "")
         self.assertEqual(vacancy_fingerprint("Data Analyst", "Unknown", "Malaysia"), "")
 
+    def test_malformed_port_is_rejected_without_raising(self):
+        self.assertEqual(canonicalize_job_url("https://example.com:bad/jobs/1"), "")
+
 
 if __name__ == "__main__":
     unittest.main()

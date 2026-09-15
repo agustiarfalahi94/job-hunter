@@ -259,8 +259,12 @@ def _classify_provider_error(exc: Exception) -> GeminiServiceError:
     text = str(exc).casefold()
     if status in {401, 403} or "permission" in name or "unauth" in text:
         return GeminiServiceError("authentication", "Gemini authentication failed", retryable=False)
-    if status == 429 or "quota" in text or "rate" in text:
+    if "quota" in text:
         return GeminiServiceError("quota", "Gemini quota unavailable", retryable=False)
+    if status == 429 or "rate" in text or "too many requests" in text:
+        return GeminiServiceError(
+            "rate_limit", "Gemini request was rate limited", retryable=True
+        )
     if status in {408, 500, 502, 503, 504} or "timeout" in name or "timeout" in text:
         return GeminiServiceError("temporary", "Gemini request failed temporarily", retryable=True)
     return GeminiServiceError("service", "Gemini request failed", retryable=False)

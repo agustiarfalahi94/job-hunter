@@ -168,3 +168,27 @@
   checkbox while keeping applied jobs visible.
 - Added focused regression tests, documentation, review, CI, and production
   verification for the release.
+
+## v1.14 - Session-Safe Gemini Search
+
+- Isolated hosted CV, queue, cache, and application data by Streamlit session.
+- Added separate Criteria-based and CV-based Gemini matching modes with a
+  visible deterministic fallback.
+- Added title OR description discovery and validated custom career-site
+  domains for SerpAPI users.
+- Replaced snippets with full descriptions when available and exposed
+  description and posting-date provenance.
+- Added stable provider identity, alternate source preservation, and manual
+  application evidence.
+- Added a cancellable, bounded two-worker runner with live 0/50 progress and
+  stale-run protection.
+- Simplified the app to one criteria panel with a fixed 50-unique-job target and
+  Actionable / All / Already applied queue views.
+
+## Next
+
+- Add authenticated durable accounts only with an explicit privacy and data
+  retention design.
+- Add more provider adapters where public APIs or platform terms permit them.
+- Improve full-description extraction with provider-specific fixtures.
+- Keep login, CAPTCHA, and final submission outside the hosted app.

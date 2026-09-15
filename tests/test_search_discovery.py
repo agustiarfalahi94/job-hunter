@@ -5,10 +5,28 @@ from job_hunter.search import (
     build_direct_platform_queries,
     build_search_queries,
     build_serpapi_queries,
+    parse_serpapi_results,
 )
 
 
 class SearchDiscoveryTest(unittest.TestCase):
+    def test_custom_source_results_must_stay_on_the_selected_host(self):
+        payload = """
+        {"organic_results": [
+          {"title": "BI Analyst - Acme", "link": "https://unrelated.example/jobs/1"},
+          {"title": "BI Analyst - Acme", "link": "https://careers.acme.example/jobs/1"}
+        ]}
+        """
+
+        candidates = parse_serpapi_results(
+            payload, "careers.acme.example", "Kuala Lumpur", 10
+        )
+
+        self.assertEqual(
+            [job.source_url for job in candidates],
+            ["https://careers.acme.example/jobs/1"],
+        )
+
     def test_serpapi_queries_discover_by_title_or_description_separately(self):
         criteria = SearchCriteria(
             title_terms=("Data Analyst",),

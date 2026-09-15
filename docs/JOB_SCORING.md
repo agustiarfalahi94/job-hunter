@@ -1,94 +1,37 @@
 # Job Scoring
 
-## Goal
+## Principle
 
-Score jobs for fit, not ego. A high score means the role appears aligned with
-the candidate's supported experience and preferences. It does not mean the
-application should be submitted automatically.
+A score estimates fit against supplied evidence. It is not a hiring prediction and never authorizes automatic submission.
 
-## v0.1 Inputs
+## Modes
 
-- Job title.
-- Job description.
-- Location.
-- Remote policy or employment notes.
-- Local preferences from `config/preferences.local.yaml`.
+**Criteria-based search** compares job title, location, and description with editable target roles, primary strengths, bonus skills, hard skips, and the shortlist threshold. CV text is absent from this mode's payload.
 
-CV upload is optional. The active score uses the editable criteria shown in the
-Streamlit Search jobs page; saved CV text is used for private profile signal
-display and must not silently add unsupported experience.
+**CV-based search** sends readable session CV text and the same editable criteria. The prompt permits only supplied evidence and treats missing qualifications as unknown.
 
-## Current Criteria
+## Criteria
 
-Target titles:
+Default target roles include Data Analyst, Data Engineer, BI Developer, Reporting Analyst, Reporting Engineer, Business Intelligence Analyst, BI Analyst, and BI Engineer.
 
-- Data Analyst
-- Data Engineer
-- BI Developer
-- Reporting Analyst
-- Reporting Engineer
-- Business Intelligence Analyst
-- BI Analyst
-- BI Engineer
+Primary strengths are Power BI, SSRS, and Google BigQuery. Bonus experience includes PostgreSQL, Alibaba MaxCompute, Domo, MySQL, T-SQL/MSSQL, data migration, Apache Airflow, Docker, Python, Python scripts, PySpark, Git/GitHub/GitLab, CI/CD pipeline variables, Agile/Scrum, and CAB deployment. Users can edit all of these fields in the app.
 
-Primary keywords:
+Hard skips include local/Malaysian-only requirements and mandatory Mandarin-speaker requirements. Normalized hard-skip matching runs before Gemini. Managerial titles remain eligible when their descriptions fit the supplied evidence.
 
-- Power BI
-- SSRS
-- Google BigQuery / BigQuery
+## Gemini Result
 
-A strong match should include at least one primary keyword. Bonus keywords add
-confidence, but they do not replace the primary signal.
-
-Bonus keywords include PostgreSQL, Alibaba MaxCompute, Domo, MySQL, T-SQL,
-MSSQL, data migration, Apache Airflow, Docker, Python, Python scripts, PySpark,
-Git/GitHub/GitLab, CI/CD pipeline variables, Agile/Scrum, and CAB deployment.
-
-Hard skip keywords:
-
-- `locals/malaysian only`
-- `local applicant only`
-- `mandarin speaker is mandatory`
-
-Hard-skip matching ignores case and punctuation. The local-only rule also
-recognizes `local applicants only`, `local candidate(s) only`, `locals only`,
-and `Malaysian(s) only`. New matches are excluded before queue insertion;
-matching historical rows are hidden from the active queue without deletion.
-
-Managerial titles are allowed when the description still fits the candidate's
-hands-on BI/reporting/data engineering experience.
-
-## Default Weights
-
-| Signal | Points | Reason |
-|---|---:|---|
-| Role title match | 30 | Strong signal that the role category is right |
-| Primary keyword match | 50-60 | Captures the main advantage: Power BI, SSRS, or BigQuery |
-| Bonus keyword match | 10 | Captures supporting experience |
-| Location match | 15 | Avoids spending effort on impossible roles |
-| Remote/hybrid compatibility | 10 | Helps prioritise practical roles |
-| Avoid keyword penalty | -30 | Rejects roles with strong mismatch signals |
-
-Scores are clamped to 0-100.
-
-## Decisions
+Gemini returns structured JSON containing a 0-100 score, reasons, and remarks. The app derives the displayed decision from the configured threshold:
 
 | Score | Decision |
 |---:|---|
-| 90-100 | `shortlist` |
-| 50 to one point below the configured shortlist threshold | `review` |
+| shortlist threshold to 100 | `shortlist` |
+| 50 to below threshold | `review` |
 | 0-49 | `reject` |
 
-Hard skips return `skip` at score 0 with remarks. Low-suitability and 0% jobs
-must include remarks so it is clear why the job was skipped or deprioritised.
+Weak results receive remarks. A result scored from a snippet or unavailable description is marked as limited evidence.
 
-The default strong-match goal is 20 jobs at or above the configured shortlist
-score, currently 90%. This is an exact planning goal, not a minimum requirement,
-maximum result count, or search stopping condition. The session cap controls the
-maximum number of results checked in one run and remains capped at 50.
+## Fallback And Cache
 
-## Future Improvements
+Missing configuration, authentication failure, quota exhaustion, timeout, invalid model output, service failure, or cancellation uses the deterministic scorer and labels the engine `Deterministic fallback`. The fallback uses the same editable criteria and never invents experience.
 
-- Add explainable LLM review after deterministic scoring.
-- Learn from explicit user feedback without silently changing hard skips or
-  primary-strength requirements.
+Successful and fallback results are cached within the visitor's session by a hash of job content, matching mode input, model, and prompt version. CV replacement or removal invalidates CV-mode cache entries. No raw key, prompt, CV text, or cache input is logged.

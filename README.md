@@ -1,107 +1,64 @@
 # Job Hunter
 
-Job Hunter is a Streamlit app that searches, scores, and ranks Kuala Lumpur data jobs using criteria the user controls. Current version: v1.13.0.
-
-Live app: [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/)
+Job Hunter v1.14.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
-- Searches selected public job sources for up to 50 results per session.
-- Supports LinkedIn, JobStreet, Indeed, Foundit, and selected company career pages.
-- Uses SerpAPI when `SERPAPI_API_KEY` is configured and a limited public-search fallback otherwise.
-- Accepts an optional PDF, DOCX, or best-effort legacy DOC CV.
-- Lets users search and score jobs without uploading a CV.
-- Makes target titles, primary strengths, bonus skills, hard skips, location, posting age, strong-match goal, and session cap editable.
-- Scores each result with visible reasons and mandatory remarks for weak or skipped matches.
-- Excludes local-only and Malaysian-only roles using punctuation-tolerant phrase matching.
-- Shows real search progress, including the provider, current result, duplicate checks, stale or closed jobs, and scoring activity.
-- Reads posting dates from provider fields, structured page data, posting-time elements, embedded job data, and labeled visible text.
-- Stores the real posting date when one can be verified and displays `Unknown` with an activity message otherwise.
-- Skips a result when its known posting date is older than the selected limit.
-- Skips visible closed, filled, unavailable, or expired postings.
-- Deduplicates the same title, company, and location across platforms.
-- Finds an official HTTPS application destination when the readable posting provides one.
-- Opens Apply in a new browser tab, falling back to the original posting when no separate application URL is available.
-- Lets users mark retained jobs as `Applied` or `Not applied`; applied jobs stay visible.
-- Keeps CV files, extracted CV text, local queue data, preferences, and secrets out of Git.
+- Searches LinkedIn, JobStreet, Indeed, Foundit, selected company sites, and up to five validated custom career domains.
+- Discovers by job title **or** description keyword, so an unfamiliar title can still be found.
+- Targets up to 50 unique jobs per run with at most 12 discovery requests, 50 detail-page fetches, 50 scoring calls, two job workers, and five minutes of new-work scheduling.
+- Reads full descriptions from structured job data or recognized page sections; otherwise labels scoring as snippet-based or unavailable.
+- Verifies job-specific posting dates where possible, labels unknown dates honestly, and skips known stale or closed jobs.
+- Excludes local-only, Malaysian-only, and mandatory-Mandarin wording before scoring.
+- Uses Gemini for evidence-based matching when configured and visibly labels deterministic fallback scores when Gemini is unavailable.
+- Consolidates confident duplicates while preserving alternate source links.
+- Opens the safest application page in a new tab and lets the user record an application manually.
 
-## How To Use The Web App
+## Web App Tutorial
 
-### 1. Profile & CV
+### 1. Choose A Matching Mode
 
-Uploading a CV is optional.
+Use **Matching mode** in the sidebar:
 
-- Upload PDF, DOCX, or DOC to keep a private profile reference.
-- Replace or remove the saved CV at any time.
-- The app shows primary and bonus skill signals found in readable CV text.
-- After saving, click **Continue to Search jobs** to move directly to the next
-  step.
-- Skip this page if you want to search using only the editable criteria.
+- **Criteria-based search** uses only the editable titles, primary keywords, bonus keywords, hard skips, and location. It never reads or sends CV text.
+- **CV-based search** compares each job with both the editable criteria and readable text from the CV saved in the current session.
 
-On Streamlit Community Cloud, uploaded data belongs to that app session/storage environment. A public deployment should not be treated as a private multi-user account system until authentication and per-user storage are added.
+### 2. Optional CV
 
-### 2. Search Jobs
+Open **Profile & CV** to upload PDF, DOCX, or best-effort legacy DOC. Click **Save CV**, then **Continue to Search jobs**. A CV can be replaced or removed at any time.
 
-1. Use the single **Search criteria** panel to edit target job titles, required
-   description keywords, bonus skills, and hard-skip phrases. These values
-   control both searching and scoring.
-2. Set the **Strong-match goal**. This is the exact number of strong results you hope to find; it is not a minimum, maximum, or stopping rule.
-3. Set **Maximum jobs in one session**. This is the search limit, capped at 50.
-4. Choose one searchable Malaysia **Location**.
-5. Select the job platforms.
-6. Choose **Date posted**: past 24 hours, past week, past month, or any time.
-7. Click **Run search and score jobs**.
-8. Watch the progress bar and activity log.
-9. Click **Review Job queue** when the run finishes.
+CV bytes and extracted text are session-only in the hosted app. They are not written to the repository or a shared server database. They disappear when the Streamlit session resets, the app restarts, or the session expires.
 
-`Past month` is the default. Start with a smaller maximum while testing, especially with SerpAPI's free allowance.
+### 3. Search Jobs
 
-### 3. Job Queue
+1. Open **Search jobs**.
+2. Edit the title, required description, bonus, and hard-skip terms.
+3. Type or select one city in **Location**.
+4. Select job platforms and a posting-age limit.
+5. Optionally add up to five HTTPS career-site domains. Custom domains require SerpAPI.
+6. Click **Run search and score jobs**.
+7. Follow the 0/50 progress bar and activity log.
+8. Use **Stop search** when needed, then click **Review Job queue**.
 
-The queue is ordered by score and shows:
+Stop prevents new discovery, page-fetch, and scoring work after cancellation is observed. An in-flight network or Gemini request has its own timeout and may take a short time to settle; completed results are kept.
 
-- score and decision;
-- actual posting date, or `Unknown` when the source does not expose one;
-- application status, shown as `Applied` or `Not applied`;
-- title, company, and location;
-- match reasons and low-suitability remarks;
-- description and source link.
+### 4. Review And Apply
 
-Filter by decision, choose a job, and click **Apply**. Job Hunter prefers a discovered official application URL and otherwise opens the original posting in a new browser tab. After completing the external application, select **I have applied to this job**. You can clear the checkbox if it was marked by mistake.
+The queue defaults to **Actionable** jobs. Use **All** or **Already applied** to change the view, then filter by match decision. Each row shows the scoring engine, evidence limit, description quality, date source or limitation, reasons, remarks, and alternate sources.
 
-## Apply Boundary
+Select a job and click **Apply** to open the safest official destination. Login, CAPTCHA, required questions, review, and submission stay on that platform. Opening Apply never changes application status. After submitting, explicitly select **I have applied to this job**; the record is labelled as manually recorded, not platform-verified.
 
-The hosted Streamlit server cannot take over the visitor's existing logged-in browser session, bypass CAPTCHA, or safely complete arbitrary third-party forms. LinkedIn also prohibits third-party software and browser extensions that automate activity on LinkedIn.
+## API Setup
 
-For that reason, Job Hunter performs the supported part of the application flow:
-
-1. locate a same-site or recognized ATS HTTPS application destination where possible;
-2. fall back to the original job posting when discovery is blocked or unsupported;
-3. show its hostname and open that destination in a new tab;
-4. leave login, CAPTCHA, required questions, final review, and submission in the user's browser.
-
-Opening a page is never recorded or described as a submitted application. Application status changes only when the user selects or clears the queue checkbox.
-
-## Search Boundary
-
-With SerpAPI configured, the app reads Google organic results for the selected platforms. Without it, the app tries public LinkedIn job cards and public web-result pages. Public pages can be incomplete or blocked.
-
-Posting-age filters are sent to providers that support them. Job Hunter also checks known provider fields, structured `JobPosting` data, job-page metadata, posting-time elements, embedded job fields, and labeled text such as `Date posted: 2 months ago`. Unknown dates remain visible for review rather than being mislabeled as new.
-
-Hard-skip rules normalize punctuation and recognize common local-only wording. Restricted new results never enter the active queue; matching historical rows are hidden without being deleted from local storage.
-
-Destination availability checks are limited to trusted source domains. If a site blocks the check, the activity log says availability could not be confirmed and keeps the result for review.
-Safe HTTPS redirects within supported job platforms and recognized applicant-tracking systems are followed during enrichment; untrusted redirects are rejected.
-
-## SerpAPI Setup
-
-Add this to Streamlit Community Cloud secrets:
+Create `.streamlit/secrets.toml` locally or add these values in Streamlit Community Cloud secrets:
 
 ```toml
-SERPAPI_API_KEY = "your-key-here"
+SERPAPI_API_KEY = "your-serpapi-key"
+GEMINI_API_KEY = "your-gemini-api-key"
+GEMINI_MODEL = "gemini-2.5-flash"
 ```
 
-Do not commit the real key or `.streamlit/secrets.toml`.
+`SERPAPI_API_KEY` enables dependable Google-backed source discovery and custom domains. Without it, the app uses a limited public-search fallback that may be blocked or incomplete. `GEMINI_API_KEY` enables Gemini matching. Without it, searches still work with a clearly labelled deterministic fallback. Never commit real keys or `.streamlit/secrets.toml`.
 
 ## Run Locally
 
@@ -112,51 +69,31 @@ pip install -r requirements.txt
 streamlit run src/app.py
 ```
 
-Run the complete automated check:
+Run the complete verification gate with `./tool/check.sh`.
 
-```sh
-./tool/check.sh
-```
+## Deploy
 
-## Deploy On Streamlit Community Cloud
+On Streamlit Community Cloud, select this repository, use `src/app.py` as the entry point, and add the secrets above. Anyone with the public app URL can open it, but each visitor receives separate session-only app data rather than an account with durable storage.
 
-Use this repository and set the app entry point to:
+## Privacy And Boundaries
 
-```text
-src/app.py
-```
+Never commit CVs, extracted CV text, contact details, platform credentials, cookies, identity documents, private form answers, application records, local databases, API keys, `config/preferences.local.yaml`, or `.streamlit/secrets.toml`.
 
-Add `SERPAPI_API_KEY` in the deployment's Secrets settings. The live app automatically redeploys from the configured GitHub branch after a push.
-
-## Public And Private Data
-
-This repository is public. Never commit:
-
-- the actual CV or extracted CV text;
-- email, phone number, home address, passport, or visa details;
-- platform passwords, cookies, exported browser profiles, or CAPTCHA data;
-- API keys;
-- local queue databases or application records;
-- `config/preferences.local.yaml` or `.streamlit/secrets.toml`.
-
-Use `config/preferences.example.yaml` as the safe public template.
+Job Hunter does not bypass login, CAPTCHA, anti-bot controls, or platform terms, and it does not auto-submit applications. Search coverage, full-description extraction, posting dates, and application availability depend on what public providers expose.
 
 ## Project Layout
 
 | Path | Purpose |
 |---|---|
-| `src/app.py` | Streamlit interface for Profile, Search, Queue, and Apply links |
-| `src/job_hunter/search.py` | Query building, result parsing, freshness checks, metadata discovery, and live progress |
-| `src/job_hunter/eligibility.py` | Shared punctuation-tolerant hard-skip matching |
-| `src/job_hunter/scoring.py` | Deterministic explainable job scoring |
-| `src/job_hunter/queue.py` | Additive SQLite storage, application status, and duplicate detection |
-| `src/job_hunter/cv_store.py` | Private CV save, replace, and removal |
-| `src/job_hunter/cv_parser.py` | PDF and Word text extraction plus skill-signal detection |
-| `src/job_hunter/locations.py` | Malaysia city lookup with local fallback |
-| `src/job_hunter/runtime_config.py` | Streamlit secrets and environment configuration |
+| `src/app.py` | Three-page Streamlit interface, modes, progress, Stop, queue, and Apply |
+| `src/job_hunter/search_runner.py` | Bounded background search, cancellation, and immutable events |
+| `src/job_hunter/search.py` | Queries, provider parsing, descriptions, dates, availability, and safe URLs |
+| `src/job_hunter/matching.py` | Gemini matching, structured output, cache, retry, and fallback |
+| `src/job_hunter/session_workspace.py` | Session-only CV, jobs, application records, and active run identity |
+| `src/job_hunter/job_identity.py` | Canonical links, provider IDs, fingerprints, and source consolidation |
+| `src/job_hunter/queue.py` | Backward-compatible local SQLite queue for CLI use |
 | `config/preferences.example.yaml` | Public criteria template |
-| `docs/` | Product, scoring, architecture, pipeline, and release plans |
-| `tests/` | Queue, search, scoring, privacy, and Streamlit regression tests |
-| `tool/check.sh` | Complete local test gate |
+| `docs/` | Product, architecture, scoring, pipeline, and release documentation |
+| `tests/` | Unit, integration, cancellation, privacy, and Streamlit regression tests |
 
-The older command-line helpers remain for backward compatibility, but the supported user journey is the Streamlit app described above.
+The Streamlit app uses session memory. The SQLite queue and older command-line helpers remain for local backward compatibility.

@@ -44,8 +44,12 @@ def canonicalize_job_url(url: str) -> str:
     if hostname.startswith("www."):
         hostname = hostname[4:]
     netloc = hostname
-    if parsed.port and parsed.port not in {80, 443}:
-        netloc = f"{hostname}:{parsed.port}"
+    try:
+        port = parsed.port
+    except ValueError:
+        return ""
+    if port and port not in {80, 443}:
+        netloc = f"{hostname}:{port}"
     filtered_query = []
     for key, value in parse_qsl(parsed.query, keep_blank_values=False):
         normalized_key = key.casefold()
