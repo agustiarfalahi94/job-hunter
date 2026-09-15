@@ -231,12 +231,13 @@ class SearchTest(unittest.TestCase):
 
         queries = build_search_queries(criteria)
 
-        self.assertEqual(len(queries), 2)
+        self.assertEqual(len(queries), 4)
         self.assertIn("site:linkedin.com/jobs", queries[0].query)
         self.assertIn('"Data Analyst" OR "BI Developer"', queries[0].query)
-        self.assertIn('"Power BI"', queries[0].query)
+        self.assertNotIn('"Power BI"', queries[0].query)
         self.assertIn('"Kuala Lumpur"', queries[0].query)
         self.assertIn("site:careers.accenture.com", queries[1].query)
+        self.assertIn('"Power BI"', queries[2].query)
 
     def test_build_direct_platform_queries_creates_linkedin_public_url(self):
         criteria = SearchCriteria(
@@ -249,10 +250,12 @@ class SearchTest(unittest.TestCase):
 
         queries = build_direct_platform_queries(criteria)
 
-        self.assertEqual(len(queries), 1)
+        self.assertEqual(len(queries), 2)
         self.assertEqual(queries[0].platform, "LinkedIn")
         self.assertIn("linkedin.com/jobs/search", queries[0].url)
-        self.assertIn("BI+Developer+Power+BI", queries[0].url)
+        self.assertIn("BI+Developer", queries[0].url)
+        self.assertNotIn("Power+BI", queries[0].url)
+        self.assertIn("Power+BI", queries[1].url)
 
     def test_posting_age_filters_reach_linkedin_and_serpapi_queries(self):
         criteria = SearchCriteria(
@@ -281,7 +284,7 @@ class SearchTest(unittest.TestCase):
 
         queries = build_serpapi_queries(criteria, api_key="secret-key")
 
-        self.assertEqual(len(queries), 1)
+        self.assertEqual(len(queries), 2)
         self.assertEqual(queries[0].parser, "serpapi")
         self.assertIn("api_key=secret-key", queries[0].url)
         self.assertNotIn("secret-key", queries[0].query)
@@ -786,7 +789,7 @@ class SearchTest(unittest.TestCase):
                 provider_config=SearchProviderConfig(serpapi_key="secret-key"),
             )
 
-        self.assertEqual(summary.skipped, 1)
+        self.assertEqual(summary.skipped, 2)
         self.assertNotIn("secret-key", "\n".join(summary.logs))
         self.assertIn("request failed", "\n".join(summary.logs))
 

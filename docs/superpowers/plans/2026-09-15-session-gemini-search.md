@@ -322,7 +322,7 @@ git commit -m "Add mode-specific Gemini job matching"
 - Changes: `build_serpapi_queries(criteria, api_key) -> list[PlatformQuery]` emits distinct `signal="title"` and `signal="description"` queries.
 - Changes: the UI never sets `SearchCriteria.max_results`; pipeline constant `MAX_UNIQUE_RESULTS = 50` is authoritative while the field may remain for compatibility tests.
 
-- [ ] **Step 1: Write OR discovery tests**
+- [x] **Step 1: Write OR discovery tests**
 
 ```python
 def test_queries_discover_by_title_or_description_separately():
@@ -340,7 +340,7 @@ def test_queries_discover_by_title_or_description_separately():
     assert '"Power BI"' in next(q.query for q in linkedin if q.signal == "description")
 ```
 
-- [ ] **Step 2: Write custom-source security tests**
+- [x] **Step 2: Write custom-source security tests**
 
 Accept `careers.example.com` and `https://careers.example.com/jobs`; normalize
 both to one host. Reject HTTP, credentials, paths that do not resolve to a host,
@@ -348,24 +348,24 @@ localhost, loopback/private IPs, more than five unique hosts, and all custom
 sources when SerpAPI is unavailable. Assert API keys are absent from validation
 messages.
 
-- [ ] **Step 3: Run focused tests and verify failure**
+- [x] **Step 3: Run focused tests and verify failure**
 
 Expected: FAIL because queries have no signal split and validation module is missing.
 
-- [ ] **Step 4: Implement bounded query planning**
+- [x] **Step 4: Implement bounded query planning**
 
 Emit title and description query families, then deterministically cap the plan
 at 12 requests while giving each selected predefined source one query before
 second-signal queries. Add custom site filters only when SerpAPI is active.
 Retain location and posting-age filters on all planned queries.
 
-- [ ] **Step 5: Implement source validation and run tests**
+- [x] **Step 5: Implement source validation and run tests**
 
 Parse with `urllib.parse`, resolve literal IPs with `ipaddress`, normalize IDNA
 hostnames, strip `www.`, and return concise user-facing errors. Do not perform
 DNS lookups or claim native platform integration.
 
-- [ ] **Step 6: Run complete check and commit**
+- [x] **Step 6: Run complete check and commit**
 
 ```bash
 git add src/job_hunter/search.py src/job_hunter/source_validation.py tests/test_search_discovery.py tests/test_source_validation.py

@@ -62,6 +62,9 @@ CLOSED_JOB_MARKERS = (
     "this job has expired",
     "job has expired",
 )
+MAX_SEARCH_REQUESTS = 12
+
+
 @dataclass(frozen=True)
 class SearchCriteria:
     title_terms: tuple[str, ...]
@@ -70,6 +73,7 @@ class SearchCriteria:
     platforms: tuple[str, ...]
     max_results: int = 50
     posted_within_days: int | None = 30
+    custom_domains: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -78,6 +82,7 @@ class PlatformQuery:
     query: str
     url: str
     parser: str = "duckduckgo"
+    signal: str = "combined"
 
 
 @dataclass(frozen=True)
@@ -126,45 +131,86 @@ class SearchProgress:
 
 
 def build_search_queries(criteria: SearchCriteria) -> list[PlatformQuery]:
-    title_part = _quoted_or(criteria.title_terms)
-    description_part = _quoted_or(criteria.description_terms)
     location_part = f'"{criteria.location}"' if criteria.location else ""
-    queries = []
+    sources: list[tuple[str, str]] = []
     for platform in criteria.platforms:
         site_filter = PLATFORM_SITE_FILTERS.get(platform)
         if not site_filter:
             continue
-        query = " ".join(part for part in (site_filter, title_part, description_part, location_part) if part)
-        url = DUCKDUCKGO_HTML_URL.format(query=quote_plus(query))
-        date_filter = _duckduckgo_date_filter(criteria.posted_within_days)
-        if date_filter:
-            url = f"{url}&df={date_filter}"
-        queries.append(PlatformQuery(platform=platform, query=query, url=url))
-    return queries
+        sources.append((platform, site_filter))
+    sources.extend((domain, f"site:{domain}") for domain in criteria.custom_domains)
+    return _bounded_signal_queries(
+        criteria,
+        sources,
+        location_part,
+        parser="duckduckgo",
+    )
+
+
+def _bounded_signal_queries(
+    criteria: SearchCriteria,
+    sources: list[tuple[str, str]],
+    location_part: str,
+    *,
+    parser: str,
+) -> list[PlatformQuery]:
+    first_pass: list[PlatformQuery] = []
+    second_pass: list[PlatformQuery] = []
+    signals = (
+        ("title", _quoted_or(criteria.title_terms)),
+        ("description", _quoted_or(criteria.description_terms)),
+    )
+    for signal_index, (signal, terms) in enumerate(signals):
+        if not terms:
+            continue
+        destination = first_pass if signal_index == 0 else second_pass
+        for platform, site_filter in sources:
+            query = " ".join(
+                part for part in (site_filter, terms, location_part) if part
+            )
+            url = DUCKDUCKGO_HTML_URL.format(query=quote_plus(query))
+            date_filter = _duckduckgo_date_filter(criteria.posted_within_days)
+            if date_filter:
+                url = f"{url}&df={date_filter}"
+            destination.append(
+                PlatformQuery(
+                    platform=platform,
+                    query=query,
+                    url=url,
+                    parser=parser,
+                    signal=signal,
+                )
+            )
+    return (first_pass + second_pass)[:MAX_SEARCH_REQUESTS]
 
 
 def build_direct_platform_queries(criteria: SearchCriteria) -> list[PlatformQuery]:
     queries = []
     if "LinkedIn" not in criteria.platforms:
         return queries
-    keywords = " ".join(tuple(criteria.title_terms) + tuple(criteria.description_terms))
-    if not keywords.strip():
-        return queries
-    query = f"{keywords.strip()} {criteria.location}".strip()
-    queries.append(
-        PlatformQuery(
-            platform="LinkedIn",
-            query=query,
-            url=_with_linkedin_date_filter(
-                LINKEDIN_SEARCH_URL.format(
-                    keywords=quote_plus(keywords.strip()),
-                    location=quote_plus(criteria.location),
+    for signal, terms in (
+        ("title", criteria.title_terms),
+        ("description", criteria.description_terms),
+    ):
+        keywords = " ".join(terms).strip()
+        if not keywords:
+            continue
+        query = f"{keywords} {criteria.location}".strip()
+        queries.append(
+            PlatformQuery(
+                platform="LinkedIn",
+                query=query,
+                url=_with_linkedin_date_filter(
+                    LINKEDIN_SEARCH_URL.format(
+                        keywords=quote_plus(keywords),
+                        location=quote_plus(criteria.location),
+                    ),
+                    criteria.posted_within_days,
                 ),
-                criteria.posted_within_days,
-            ),
-            parser="linkedin",
+                parser="linkedin",
+                signal=signal,
+            )
         )
-    )
     return queries
 
 
@@ -188,9 +234,10 @@ def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[Platfo
                 query=platform_query.query,
                 url=SERPAPI_URL.format(params=urlencode(params)),
                 parser="serpapi",
+                signal=platform_query.signal,
             )
         )
-    return queries
+    return queries[:MAX_SEARCH_REQUESTS]
 
 
 def parse_serpapi_results(payload: str, platform: str, location: str, limit: int) -> list[SearchCandidate]:
