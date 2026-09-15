@@ -11,10 +11,16 @@ from typing import Any
 @dataclass(frozen=True)
 class SearchProviderConfig:
     serpapi_key: str = ""
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
 
     @property
     def has_api_search(self) -> bool:
         return bool(self.serpapi_key)
+
+    @property
+    def has_gemini(self) -> bool:
+        return bool(self.gemini_api_key)
 
 
 def load_search_provider_config(
@@ -25,7 +31,14 @@ def load_search_provider_config(
     return SearchProviderConfig(
         serpapi_key=_secret_value(secrets, "SERPAPI_API_KEY")
         or _nested_secret_value(secrets, "search", "serpapi_api_key")
-        or env.get("SERPAPI_API_KEY", "")
+        or env.get("SERPAPI_API_KEY", ""),
+        gemini_api_key=_secret_value(secrets, "GEMINI_API_KEY")
+        or _nested_secret_value(secrets, "matching", "gemini_api_key")
+        or env.get("GEMINI_API_KEY", ""),
+        gemini_model=_secret_value(secrets, "GEMINI_MODEL")
+        or _nested_secret_value(secrets, "matching", "gemini_model")
+        or env.get("GEMINI_MODEL", "")
+        or "gemini-2.5-flash",
     )
 
 

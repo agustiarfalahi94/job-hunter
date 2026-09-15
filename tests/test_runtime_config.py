@@ -22,6 +22,25 @@ class RuntimeConfigTest(unittest.TestCase):
 
         self.assertEqual(config.serpapi_key, "nested-key")
 
+    def test_load_search_provider_config_reads_gemini_settings(self):
+        config = load_search_provider_config(
+            secrets={
+                "GEMINI_API_KEY": "gemini-secret",
+                "GEMINI_MODEL": "gemini-test-model",
+            },
+            environ={},
+        )
+
+        self.assertEqual(config.gemini_api_key, "gemini-secret")
+        self.assertEqual(config.gemini_model, "gemini-test-model")
+        self.assertTrue(config.has_gemini)
+
+    def test_load_search_provider_config_uses_safe_default_gemini_model(self):
+        config = load_search_provider_config(secrets={}, environ={})
+
+        self.assertEqual(config.gemini_model, "gemini-2.5-flash")
+        self.assertFalse(config.has_gemini)
+
 
 if __name__ == "__main__":
     unittest.main()

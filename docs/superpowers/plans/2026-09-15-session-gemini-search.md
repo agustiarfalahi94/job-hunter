@@ -235,7 +235,7 @@ git commit -m "Use full job descriptions and verified dates"
 - Produces: `MatchResult(score: int, decision: str, reasons: tuple[str, ...], remarks: tuple[str, ...], engine: str, model: str, limited: bool, cache_hit: bool)`.
 - Produces: `score_match(job: JobInput, context: MatchContext, config: MatchingConfig, cache: MutableMapping[str, MatchResult], client: GeminiClient | None = None, cancel: Callable[[], bool] | None = None) -> MatchResult`.
 
-- [ ] **Step 1: Write mode isolation tests**
+- [x] **Step 1: Write mode isolation tests**
 
 ```python
 def test_criteria_mode_payload_never_contains_cv_text():
@@ -265,7 +265,7 @@ prompt)` method that stores both arguments and returns the constructor result.
 The production `GeminiClient` protocol uses that same signature so no live API
 is involved in these tests.
 
-- [ ] **Step 2: Write Gemini, fallback, retry, and cache tests**
+- [x] **Step 2: Write Gemini, fallback, retry, and cache tests**
 
 Cover structured success, missing key, 429 then success, two 429 failures,
 authentication failure, timeout, malformed JSON, cancellation before retry, and
@@ -273,17 +273,17 @@ cache invalidation after job text, mode input, model, or prompt version changes.
 Assert every fallback result has `engine == "Deterministic fallback"` and
 `limited is True`.
 
-- [ ] **Step 3: Run matching tests and verify failure**
+- [x] **Step 3: Run matching tests and verify failure**
 
 Expected: FAIL because `matching.py` and Gemini configuration do not exist.
 
-- [ ] **Step 4: Add the official SDK and runtime configuration**
+- [x] **Step 4: Add the official SDK and runtime configuration**
 
 Add `google-genai>=1.33.0,<2` to requirements. Load `GEMINI_API_KEY` and optional
 `GEMINI_MODEL` from Streamlit secrets or environment without ever including
 their values in reprs, logs, URLs, or exceptions.
 
-- [ ] **Step 5: Implement the scorer**
+- [x] **Step 5: Implement the scorer**
 
 Build structured JSON output with score, decision, reasons, and remarks. The
 prompt must state that only supplied candidate evidence is valid and missing
@@ -292,13 +292,13 @@ short HTTP timeout, and two total attempts. Classify auth, quota/rate-limit,
 timeout, invalid-response, and cancellation outcomes into sanitized errors.
 Use deterministic `score_job` for a clearly labelled fallback.
 
-- [ ] **Step 6: Implement content-addressed session cache**
+- [x] **Step 6: Implement content-addressed session cache**
 
 Hash canonical JSON containing job title/company/location/description and kind,
 mode-specific candidate input, model, and prompt version. Never expose raw cache
 input. Return a copied result with `cache_hit=True` on hits.
 
-- [ ] **Step 7: Install dependency, run tests, and commit**
+- [x] **Step 7: Install dependency, run tests, and commit**
 
 ```bash
 /Users/lilianyoctoria/Documents/job-hunter/.venv/bin/python -m pip install -r requirements.txt
