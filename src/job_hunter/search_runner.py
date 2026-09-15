@@ -108,6 +108,7 @@ class SearchRunController:
     ) -> None:
         self._discovery_fetcher = discovery_fetcher or fetch_public_html
         self._page_fetcher = page_fetcher or fetch_job_html
+        self._uses_default_page_fetcher = page_fetcher is None
         self._scorer = scorer
         self._max_workers = max(1, min(2, max_workers))
         self._clock = clock
@@ -298,7 +299,13 @@ class SearchRunController:
         posted_date_reason = "" if posted_date else "Job page was not checked"
         apply_url = candidate.apply_url
         try:
-            page = self._page_fetcher(candidate.source_url)
+            if self._uses_default_page_fetcher:
+                page = fetch_job_html(
+                    candidate.source_url,
+                    allowed_domains=request.criteria.custom_domains,
+                )
+            else:
+                page = self._page_fetcher(candidate.source_url)
         except Exception:
             page = ""
             if not posted_date:

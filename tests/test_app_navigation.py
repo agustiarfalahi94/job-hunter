@@ -37,11 +37,12 @@ class AppNavigationTest(unittest.TestCase):
         app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
 
         self.assertEqual(len(app_test.exception), 0)
-        self.assertTrue(any("No CV is saved" in item.value for item in app_test.info))
         search_button = next(
             button for button in app_test.button if button.label == "Run search and score jobs"
         )
         self.assertFalse(search_button.disabled)
+        stop_button = next(button for button in app_test.button if button.label == "Stop search")
+        self.assertTrue(stop_button.disabled)
 
     def test_profile_has_a_button_that_opens_search_jobs(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
@@ -63,11 +64,26 @@ class AppNavigationTest(unittest.TestCase):
         self.assertEqual(labels.count("Hard skip keywords"), 1)
         self.assertNotIn("Job title contains", labels)
         self.assertNotIn("Primary strengths / description keywords", labels)
-        self.assertEqual(
-            sum(widget.label == "Maximum jobs in one session" for widget in app_test.slider),
-            1,
+        self.assertFalse(
+            any(widget.label == "Maximum jobs in one session" for widget in app_test.slider)
         )
+        self.assertFalse(any(widget.label == "Strong-match goal" for widget in app_test.number_input))
         self.assertFalse(any(widget.label == "Session cap" for widget in app_test.number_input))
+
+    def test_cv_mode_requires_a_saved_cv_and_offers_profile_navigation(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path)).run(timeout=10)
+
+        mode = next(radio for radio in app_test.radio if radio.key == "search_mode")
+        mode.set_value("CV-based search").run(timeout=10)
+        app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+
+        search_button = next(
+            button for button in app_test.button if button.label == "Run search and score jobs"
+        )
+        upload_button = next(button for button in app_test.button if button.label == "Upload CV")
+        self.assertTrue(search_button.disabled)
+        self.assertFalse(upload_button.disabled)
 
     def test_removed_workflow_actions_are_not_in_streamlit_entrypoint(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"

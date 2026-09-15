@@ -687,10 +687,10 @@ def fetch_public_html(url: str) -> str:
     return response.text
 
 
-def fetch_job_html(url: str) -> str:
+def fetch_job_html(url: str, allowed_domains: tuple[str, ...] = ()) -> str:
     import requests
 
-    if not _is_trusted_job_url(url):
+    if not _is_trusted_job_url(url, allowed_domains):
         raise RuntimeError("Job page URL is not trusted")
     current_url = url
     for redirect_count in range(4):
@@ -706,7 +706,7 @@ def fetch_job_html(url: str) -> str:
         if redirect_count == 3:
             raise RuntimeError("Job page redirected too many times")
         next_url = urljoin(current_url, response.headers.get("Location", ""))
-        if not _is_trusted_job_url(next_url):
+        if not _is_trusted_job_url(next_url, allowed_domains):
             raise RuntimeError("Job page redirected to an untrusted destination")
         current_url = next_url
     raise RuntimeError("Job page could not be loaded")
@@ -1054,7 +1054,7 @@ def _looks_like_job_result(url: str, title: str, platform: str) -> bool:
     return any(hint in normalized_url for hint in hints)
 
 
-def _is_trusted_job_url(url: str) -> bool:
+def _is_trusted_job_url(url: str, allowed_domains: tuple[str, ...] = ()) -> bool:
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").casefold()
     trusted_domains = {
@@ -1063,6 +1063,7 @@ def _is_trusted_job_url(url: str) -> bool:
         for domain in domains
     }
     trusted_domains.update(KNOWN_ATS_DOMAINS)
+    trusted_domains.update(domain.casefold().strip() for domain in allowed_domains)
     return parsed.scheme == "https" and any(
         hostname == domain or hostname.endswith(f".{domain}")
         for domain in trusted_domains

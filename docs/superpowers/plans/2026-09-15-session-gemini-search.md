@@ -581,7 +581,7 @@ git commit -m "Add cancellable shared search pipeline"
 - Produces: `_render_run_fragment(workspace: SessionWorkspace) -> None` decorated with `@st.fragment(run_every=...)`.
 - Produces: `_search_is_ready(mode: str, workspace: SessionWorkspace, criteria: SearchCriteria) -> tuple[bool, str]`.
 
-- [ ] **Step 1: Write Streamlit acceptance tests**
+- [x] **Step 1: Write Streamlit acceptance tests**
 
 Use `streamlit.testing.v1.AppTest` with mocked provider/model adapters to assert:
 
@@ -604,25 +604,25 @@ Also verify criteria mode runs without CV, `CV Saved` wording, Replace/Remove,
 free-text location, custom-source errors, no strong-target/max-jobs widgets,
 progress/log updates, Cancelled terminal label, and Review Job queue navigation.
 
-- [ ] **Step 2: Write queue interaction tests**
+- [x] **Step 2: Write queue interaction tests**
 
 Assert default Actionable excludes applied records, Already applied filter shows
 them, manual status control updates evidence, descriptions and date limitations
 wrap visibly, alternate source links render, and Apply does not change status.
 
-- [ ] **Step 3: Run Streamlit tests and verify failure**
+- [x] **Step 3: Run Streamlit tests and verify failure**
 
 Expected: FAIL because current app uses disk stores, one implicit criteria mode,
 synchronous search, and obsolete controls.
 
-- [ ] **Step 4: Rebuild only the affected Streamlit flow**
+- [x] **Step 4: Rebuild only the affected Streamlit flow**
 
 Keep Profile, Search, and Queue navigation and current visual theme. Add the
 sidebar mode selector, accurate session privacy copy, unified criteria panel,
 free-text/suggested location, validated custom-source input, fixed 50-result
 caption, and no strong-target/max control. Do not create new pages.
 
-- [ ] **Step 5: Add fragment polling and Stop control**
+- [x] **Step 5: Add fragment polling and Stop control**
 
 Start the controller once, render recent events and progress from immutable
 snapshots, drain completed matches into the active workspace, and rerun the
@@ -630,13 +630,13 @@ fragment while state is running. Stop sets cancellation and immediately changes
 the visible state to Cancelling; terminal state becomes Cancelled after workers
 settle. Ignore every result whose run ID is no longer active.
 
-- [ ] **Step 6: Update the queue UX**
+- [x] **Step 6: Update the queue UX**
 
 Default to Actionable, offer All and Already applied, display scoring engine,
 description quality, posting-date reason, application evidence, and alternate
 source links. Keep the explicit external Apply boundary.
 
-- [ ] **Step 7: Run Streamlit, focused, and complete tests; commit**
+- [x] **Step 7: Run Streamlit, focused, and complete tests; commit**
 
 ```bash
 git add src/app.py src/job_hunter/app_ui.py tests/test_app_navigation.py tests/test_app_ui.py tests/test_streamlit_app.py

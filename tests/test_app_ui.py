@@ -91,6 +91,11 @@ class AppUiTest(unittest.TestCase):
             status="new",
             application_status="applied",
             application_evidence="Marked manually by the user; not verified with the job platform.",
+            scoring_engine="Gemini",
+            scoring_model="gemini-test",
+            description_kind="snippet",
+            description_limitation="Full description unavailable.",
+            posted_date_reason="No job-specific posting date found",
         )
 
         self.assertEqual(
@@ -109,6 +114,9 @@ class AppUiTest(unittest.TestCase):
         row = jobs_to_rows([applied])[0]
         self.assertEqual(row["Decision"], "Already applied")
         self.assertIn("Marked manually", row["Remarks"])
+        self.assertIn("Gemini", row["Scoring"])
+        self.assertIn("snippet", row["Description quality"])
+        self.assertIn("No job-specific", row["Date details"])
 
     def test_excludes_historical_jobs_that_match_current_hard_skip_rules(self):
         jobs = [

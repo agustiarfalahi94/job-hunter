@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -7,12 +8,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from job_hunter.app_ui import (
-    filter_jobs,
-    jobs_to_rows,
-    provider_status_label,
-    search_summary_to_rows,
-)
+from job_hunter.app_ui import filter_jobs, jobs_to_rows, provider_status_label
 from job_hunter.application_links import (
     application_destination_hostname,
     application_destination_url,
@@ -20,23 +16,25 @@ from job_hunter.application_links import (
 from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
 from job_hunter.cv_store import format_size
 from job_hunter.locations import city_options, fetch_malaysia_cities
+from job_hunter.matching import MatchContext, MatchingConfig
 from job_hunter.preferences import load_preferences
 from job_hunter.runtime_config import SearchProviderConfig, load_search_provider_config
-from job_hunter.search import (
-    SearchCriteria,
-    SearchProgress,
-    build_direct_platform_queries,
-    build_search_queries,
-    build_serpapi_queries,
-    run_public_search,
+from job_hunter.search import SearchCriteria
+from job_hunter.search_runner import (
+    MAX_UNIQUE_RESULTS,
+    SearchRequest,
+    SearchRunController,
 )
 from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
+from job_hunter.source_validation import validate_custom_sources
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFERENCES_PATH = ROOT / "config" / "preferences.local.yaml"
-HERO_IMAGE_URL = "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1600"
-
+HERO_IMAGE_URL = (
+    "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg"
+    "?auto=compress&cs=tinysrgb&w=1600"
+)
 TARGET_TITLES = [
     "Data Analyst",
     "Data Engineer",
@@ -50,19 +48,17 @@ TARGET_TITLES = [
 PRIMARY_KEYWORDS = ["Power BI", "SSRS", "Google BigQuery"]
 SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit", "Company career pages"]
 PAGES = ("Profile & CV", "Search jobs", "Job queue")
+SEARCH_MODES = ("Criteria-based search", "CV-based search")
 POSTING_AGE_OPTIONS = {
     "Past 24 hours": 1,
     "Past week": 7,
     "Past month": 30,
     "Any time": None,
 }
-DEFAULT_STRONG_TARGET = 20
-DEFAULT_SESSION_CAP = 50
 
 
 def main() -> None:
     st.set_page_config(page_title="Job Hunter", page_icon=":material/work:", layout="wide")
-
     workspace = get_session_workspace(st.session_state)
     preferences = load_preferences(PREFERENCES_PATH)
     provider_config = load_search_provider_config(st.secrets)
@@ -70,7 +66,6 @@ def main() -> None:
     _inject_table_styles()
     _render_header()
     _render_sidebar(workspace, provider_config, preferences)
-
     st.session_state.setdefault("page", PAGES[0])
     page = st.segmented_control("Page", PAGES, key="page")
     if page == "Profile & CV":
@@ -85,11 +80,11 @@ def _render_header() -> None:
     left, right = st.columns([1.7, 1], vertical_alignment="center")
     with left:
         st.title("Job Hunter")
-        st.caption("Search, score, and review Kuala Lumpur data jobs using criteria you control.")
+        st.caption("Find, score, and review data jobs using criteria you control.")
         with st.container(horizontal=True, wrap=True):
-            st.badge("Automated search + scoring", icon=":material/search:", color="green")
-            st.badge("CV is optional", icon=":material/description:", color="blue")
-            st.badge("Official application links", icon=":material/open_in_new:", color="gray")
+            st.badge("Automated discovery", icon=":material/search:", color="green")
+            st.badge("Gemini matching", icon=":material/auto_awesome:", color="blue")
+            st.badge("Session-only privacy", icon=":material/lock:", color="gray")
     with right:
         st.image(HERO_IMAGE_URL)
 
@@ -98,9 +93,7 @@ def _inject_table_styles() -> None:
     st.markdown(
         """
         <style>
-        [data-testid="stDataFrame"] div {
-            white-space: normal;
-        }
+        [data-testid="stDataFrame"] div { white-space: normal; }
         [data-testid="stDataFrame"] [role="gridcell"] {
             align-items: start;
             line-height: 1.35;
@@ -117,38 +110,41 @@ def _render_sidebar(
     preferences: dict[str, object],
 ) -> None:
     defaults = _criteria_defaults(preferences)
-    hard_skip_keywords = st.session_state.get(
-        "hard_skip_keywords", defaults["hard_skip_keywords"]
-    )
+    hard_skips = st.session_state.get("hard_skip_keywords", defaults["hard_skip_keywords"])
     jobs = filter_jobs(
-        workspace.list_jobs(), decision="all", hard_skip_keywords=hard_skip_keywords
+        workspace.list_jobs(),
+        decision="all",
+        hard_skip_keywords=hard_skips,
+        application_view="all",
     )
-    cv = workspace.cv
     with st.sidebar:
         st.header("Today")
-        st.metric("Queued jobs", len(jobs))
-        st.metric(
-            "Strong-match goal",
-            st.session_state.get("strong_target", defaults["strong_target"]),
-            help="A goal for how many high-scoring jobs you want to find. It does not stop or limit the search.",
+        st.metric("Jobs in this session", len(jobs))
+        st.radio(
+            "Matching mode",
+            SEARCH_MODES,
+            key="search_mode",
+            help="Criteria mode never reads or sends CV text.",
         )
-        st.caption("Search and scoring work with or without a CV.")
-        if cv is not None:
-            st.success(f"CV Saved ({format_size(cv.size_bytes)})")
+        if workspace.cv is not None:
+            st.success(f"CV Saved ({format_size(workspace.cv.size_bytes)})")
         else:
-            st.caption("No CV saved. You can still search using your criteria.")
+            st.caption("No CV saved in this session.")
         st.caption(provider_status_label(provider_config.has_api_search))
+        st.caption("Gemini enabled" if provider_config.has_gemini else "Gemini fallback mode")
 
 
 def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object]) -> None:
     st.subheader("Profile & CV")
     st.write(
-        "A CV is optional. It stays only in this browser session and can disappear when the session or app restarts."
+        "Your CV stays only in this app session. It is not written to the public repository "
+        "or shared with other visitors, and it can disappear when the session resets."
     )
-    cv = workspace.cv
     with st.container(border=True):
-        if cv is not None:
-            st.success(f"CV Saved: `{cv.filename}` - {format_size(cv.size_bytes)}")
+        if workspace.cv is not None:
+            st.success(
+                f"CV Saved: `{workspace.cv.filename}` - {format_size(workspace.cv.size_bytes)}"
+            )
             if st.button("Remove saved CV", icon=":material/delete:"):
                 workspace.remove_cv()
                 st.toast("Saved CV removed.")
@@ -156,18 +152,20 @@ def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object])
         else:
             st.info("No readable CV is saved in this session yet.")
 
-        uploaded = st.file_uploader("Upload or replace CV", type=["pdf", "docx", "doc"])
+        uploaded = st.file_uploader(
+            "Upload or replace CV", type=["pdf", "docx", "doc"], key="cv_upload"
+        )
         if uploaded is not None and st.button("Save CV", icon=":material/save:"):
-            content = uploaded.getvalue()
             try:
-                extracted_text = extract_cv_text(content, uploaded.name)
-                workspace.save_cv(uploaded.name, content, extracted_text)
-                st.toast("CV Saved")
+                content = uploaded.getvalue()
+                workspace.save_cv(uploaded.name, content, extract_cv_text(content, uploaded.name))
             except Exception as exc:
                 st.warning(f"CV could not be saved because readable text was not extracted: {exc}")
+            else:
+                st.toast("CV Saved")
             st.rerun()
 
-    if cv is not None:
+    if workspace.cv is not None:
         st.button(
             "Continue to Search jobs",
             icon=":material/arrow_forward:",
@@ -175,18 +173,14 @@ def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object])
             on_click=_open_page,
             args=("Search jobs",),
         )
-
-    with st.container(border=True):
-        st.markdown("**What the app currently knows from your CV-backed profile**")
-        cv_text = workspace.cv_text
-        if cv_text:
-            signals = detect_cv_signals(cv_text, preferences)
-            st.success(f"Extracted CV text is available. Detected {signals.total_matches} matching profile signals.")
-            _render_keyword_chips("Detected primary CV signals", list(signals.primary_matches))
-            _render_keyword_chips("Detected bonus CV signals", list(signals.bonus_matches))
-        else:
-            st.caption("No CV text is needed for keyword-based searching and scoring.")
-        st.caption("Search criteria are editable on the Search jobs page.")
+        signals = detect_cv_signals(workspace.cv_text, preferences)
+        with st.container(border=True):
+            st.markdown("**CV evidence detected**")
+            st.caption(
+                f"{signals.total_matches} configured skill signals found in the readable CV text."
+            )
+            _render_keyword_chips("Primary", list(signals.primary_matches))
+            _render_keyword_chips("Bonus", list(signals.bonus_matches))
 
 
 def _render_search_jobs(
@@ -195,172 +189,214 @@ def _render_search_jobs(
     provider_config: SearchProviderConfig,
 ) -> None:
     st.subheader("Search jobs")
-    st.write(
-        "Set title, description keywords, exact location, and selected platforms, then run up to 50 public search-result checks in one session."
-    )
-    cv_text = workspace.cv_text
-    if cv_text:
-        signals = detect_cv_signals(cv_text, preferences)
-        st.success(
-            f"CV available for profile reference. Detected {signals.total_matches} matching signals; scoring uses the editable criteria below."
+    mode = str(st.session_state.get("search_mode", SEARCH_MODES[0]))
+    if mode == "CV-based search" and workspace.cv is None:
+        st.warning("CV-based search needs a readable CV saved in this session.")
+        st.button(
+            "Upload CV",
+            icon=":material/upload_file:",
+            on_click=_open_page,
+            args=("Profile & CV",),
+            key="open_profile",
         )
+    elif mode == "CV-based search":
+        st.success("CV-based matching will compare each job with your saved CV and criteria.")
     else:
-        st.info("No CV is saved, and that is fine. Search and scoring use the editable criteria below.")
+        st.info("Criteria-based matching does not read or send CV text, even when a CV is saved.")
 
-    criteria_defaults = _criteria_defaults(preferences)
-    cities = _cached_malaysia_cities()
+    defaults = _criteria_defaults(preferences)
     with st.container(border=True):
-        st.markdown("**Search criteria**")
-        title_contains = st.multiselect(
+        st.markdown("**Search and scoring criteria**")
+        title_terms = st.multiselect(
             "Target job titles",
-            criteria_defaults["target_roles"],
-            default=criteria_defaults["target_roles"],
+            defaults["target_roles"],
+            default=defaults["target_roles"],
             accept_new_options=True,
             key="target_roles",
+            help="A title match can discover a job even when description keywords are absent.",
         )
-        description_contains = st.multiselect(
+        description_terms = st.multiselect(
             "Required description keywords",
-            criteria_defaults["primary_keywords"],
-            default=criteria_defaults["primary_keywords"],
+            defaults["primary_keywords"],
+            default=defaults["primary_keywords"],
             accept_new_options=True,
             key="primary_keywords",
-            help="A job must contain at least one of these strengths to qualify as a strong match.",
+            help="A description match can discover a job even when its title is unfamiliar.",
         )
         st.multiselect(
             "Bonus keywords",
-            criteria_defaults["bonus_keywords"],
-            default=criteria_defaults["bonus_keywords"],
+            defaults["bonus_keywords"],
+            default=defaults["bonus_keywords"],
             accept_new_options=True,
             key="bonus_keywords",
         )
         st.multiselect(
             "Hard skip keywords",
-            criteria_defaults["hard_skip_keywords"],
-            default=criteria_defaults["hard_skip_keywords"],
+            defaults["hard_skip_keywords"],
+            default=defaults["hard_skip_keywords"],
             accept_new_options=True,
             key="hard_skip_keywords",
-            help="Jobs containing these phrases are skipped entirely.",
+            help="Matching titles, descriptions, or page text are excluded before scoring.",
         )
-        location_options = _location_options(cities)
-        location = st.selectbox("Location", location_options, index=0, accept_new_options=True)
-        platforms = st.multiselect("Platforms to search", SOURCES, default=SOURCES)
+        location = st.selectbox(
+            "Location",
+            _location_options(_cached_malaysia_cities()),
+            index=0,
+            accept_new_options=True,
+            key="search_location",
+            help="Type a Malaysian city or choose a city suggestion.",
+        )
+        platforms = st.multiselect(
+            "Platforms to search", SOURCES, default=SOURCES, key="search_platforms"
+        )
+        custom_text = st.text_area(
+            "Additional career-site domains",
+            key="custom_sources",
+            placeholder="careers.example.com\njobs.example.org",
+            help="Up to five public HTTPS domains. Additional domains require SerpAPI.",
+        )
         posting_age = st.selectbox(
-            "Date posted",
-            tuple(POSTING_AGE_OPTIONS),
-            index=2,
-            help="Limits results to newer postings where the selected search provider supports a date filter.",
+            "Date posted", tuple(POSTING_AGE_OPTIONS), index=2, key="posting_age"
         )
-        left, right = st.columns(2)
-        strong_target = left.number_input(
-            "Strong-match goal",
-            min_value=1,
-            max_value=50,
-            value=int(criteria_defaults["strong_target"]),
-            key="strong_target",
-            help="A planning goal, not a search limit or stopping rule.",
+        custom_sources, source_errors = validate_custom_sources(
+            _split_sources(custom_text), has_api_search=provider_config.has_api_search
         )
-        max_jobs = right.slider(
-            "Maximum jobs in one session",
-            min_value=1,
-            max_value=50,
-            value=min(50, int(criteria_defaults["session_cap"])),
-            key="session_cap",
-            help="The maximum number of job results checked during this search run.",
-        )
-        minimum_score = int(preferences.get("minimum_score_to_apply", 90))
+        for error in source_errors:
+            st.warning(error)
         st.caption(
-            f"Goal: find {strong_target} jobs scoring at least {minimum_score}%. "
-            "The search stops at the maximum above or when results run out."
+            "Each run targets up to 50 unique jobs. It stops earlier when sources run out, "
+            "the five-minute scheduling limit is reached, or you press Stop."
         )
         st.caption(provider_status_label(provider_config.has_api_search))
 
-        active_preferences = _active_preferences(preferences)
-        disabled = not title_contains or not description_contains or not platforms
         criteria = SearchCriteria(
-            title_terms=tuple(str(item) for item in title_contains),
-            description_terms=tuple(str(item) for item in description_contains),
+            title_terms=tuple(str(value) for value in title_terms),
+            description_terms=tuple(str(value) for value in description_terms),
             location=str(location),
-            platforms=tuple(str(item) for item in platforms),
-            max_results=int(max_jobs),
+            platforms=tuple(str(value) for value in platforms),
+            max_results=MAX_UNIQUE_RESULTS,
             posted_within_days=POSTING_AGE_OPTIONS[str(posting_age)],
+            custom_domains=tuple(source.hostname for source in custom_sources),
         )
-        with st.expander("Queries that will run"):
-            for query in _planned_queries(criteria, provider_config):
-                st.markdown(f"**{query.platform}**")
-                st.code(query.query, language="text")
-
+        ready, reason = _search_is_ready(mode, workspace, criteria)
+        controller = _get_controller()
+        running = controller.snapshot().state == "running"
         if st.button(
             "Run search and score jobs",
             icon=":material/search:",
-            disabled=disabled,
+            disabled=not ready or bool(source_errors) or running,
             type="primary",
+            key="run_search",
+            help=reason or None,
         ):
-            with st.status("Searching public results and scoring jobs", expanded=True) as status:
-                progress_bar = st.progress(0, text=f"0/{max_jobs} jobs checked - preparing search")
-                activity_box = st.empty()
-                live_logs: list[str] = []
-
-                def show_progress(event: SearchProgress) -> None:
-                    live_logs.append(event.message)
-                    short_message = (
-                        event.message if len(event.message) <= 120 else f"{event.message[:117]}..."
-                    )
-                    percent = (
-                        100
-                        if event.stage == "complete"
-                        else min(99, int(event.checked / max(1, event.total) * 100))
-                    )
-                    progress_bar.progress(
-                        percent,
-                        text=f"{event.checked}/{event.total} jobs checked - {short_message}",
-                    )
-                    activity_box.code("\n".join(live_logs[-12:]), language="text")
-
-                summary = run_public_search(
-                    criteria,
-                    active_preferences,
-                    workspace,
-                    provider_config=provider_config,
-                    progress_callback=show_progress,
-                )
-                status.update(label="Search run finished", state="complete", expanded=True)
-            st.session_state["last_search_summary"] = summary
-
-        summary = st.session_state.get("last_search_summary")
-        if summary is not None:
-            st.dataframe(search_summary_to_rows(summary), hide_index=True)
-            st.button(
-                "Review Job queue",
-                icon=":material/table_chart:",
-                type="primary",
-                on_click=_open_page,
-                args=("Job queue",),
+            active_preferences = _active_preferences(preferences)
+            context = MatchContext(
+                mode="cv" if mode == "CV-based search" else "criteria",
+                criteria=active_preferences,
+                cv_text=workspace.cv_text if mode == "CV-based search" else "",
             )
+            run_id = controller.start(
+                SearchRequest(
+                    criteria=criteria,
+                    match_context=context,
+                    provider_config=provider_config,
+                    matching_config=MatchingConfig(
+                        api_key=provider_config.gemini_api_key,
+                        model=provider_config.gemini_model,
+                    ),
+                )
+            )
+            workspace.activate_run(run_id)
+            st.session_state["run_logs"] = []
+            st.rerun()
 
-    with st.container(border=True):
-        st.markdown("**Duplicate handling**")
-        st.write(
-            "If LinkedIn and Foundit show the same exact role at the same company and location, Job Hunter keeps one queue item and treats the other as a duplicate. Later we can store the extra platform links as alternate sources."
+    _render_run_fragment(workspace)
+
+
+@st.fragment(run_every="1s")
+def _render_run_fragment(workspace: SessionWorkspace) -> None:
+    controller = _get_controller()
+    events, matches = controller.drain()
+    logs = list(st.session_state.get("run_logs", []))
+    for match in matches:
+        workspace.accept_completed(match)
+    logs.extend(event.message for event in events)
+    st.session_state["run_logs"] = logs[-30:]
+    snapshot = controller.snapshot()
+
+    left, right = st.columns([3, 1], vertical_alignment="bottom")
+    with left:
+        progress_value = min(100, int(snapshot.checked / MAX_UNIQUE_RESULTS * 100))
+        st.progress(
+            progress_value,
+            text=f"{snapshot.checked}/{MAX_UNIQUE_RESULTS} jobs checked - {snapshot.message}",
         )
+    with right:
+        if st.button(
+            "Stop search",
+            icon=":material/stop_circle:",
+            disabled=snapshot.state != "running",
+            key="stop_search",
+        ):
+            controller.cancel()
+            st.rerun(scope="fragment")
+
+    if logs:
+        st.code("\n".join(logs[-12:]), language="text")
+    if snapshot.state == "completed":
+        st.success(snapshot.message)
+    elif snapshot.state == "cancelled":
+        st.warning(snapshot.message)
+    elif snapshot.state == "failed":
+        st.error(snapshot.message)
+    elif snapshot.state == "running":
+        st.caption(
+            f"Found {snapshot.discovered} unique candidates; scored {snapshot.completed}; "
+            f"skipped {snapshot.skipped}."
+        )
+    else:
+        st.caption("Ready to search. Progress and current activity will appear here.")
+
+    if snapshot.completed or workspace.list_jobs():
+        st.button(
+            "Review Job queue",
+            icon=":material/table_chart:",
+            type="primary",
+            on_click=_open_page,
+            args=("Job queue",),
+            key="review_queue",
+        )
+
 
 def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -> None:
     st.subheader("Job queue")
-    st.write("Review the strongest matches first, then open the official application destination.")
-    active_preferences = _active_preferences(preferences)
-    jobs = filter_jobs(
+    st.write("Review scored matches, open an application page, and record applications manually.")
+    all_jobs = filter_jobs(
         workspace.list_jobs(),
         decision="all",
-        hard_skip_keywords=active_preferences.get("hard_skip_keywords", ()),
+        hard_skip_keywords=_active_preferences(preferences).get("hard_skip_keywords", ()),
+        application_view="all",
     )
-    if not jobs:
+    if not all_jobs:
         st.info("No jobs are queued yet. Open Search jobs and run your first search.")
         return
 
-    decision = st.segmented_control(
-        "Decision", ["all", "shortlist", "review", "reject", "skip"], default="all"
+    view = st.segmented_control(
+        "Applications", ("Actionable", "All", "Already applied"), default="Actionable"
     )
-    filtered = filter_jobs(jobs, decision=str(decision))
-
+    decision = st.segmented_control(
+        "Match", ("all", "shortlist", "review", "reject", "skip"), default="all"
+    )
+    application_view = {
+        "Actionable": "actionable",
+        "All": "all",
+        "Already applied": "applied",
+    }[str(view)]
+    filtered = filter_jobs(
+        all_jobs,
+        decision=str(decision),
+        application_view=application_view,
+    )
     if not filtered:
         st.info("No jobs match the current filters.")
         return
@@ -369,7 +405,7 @@ def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -
         jobs_to_rows(filtered),
         column_config={
             "Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100),
-            "Source URL": st.column_config.LinkColumn("Source"),
+            "Source URL": st.column_config.LinkColumn("Primary source"),
             **{
                 column: st.column_config.TextColumn(column, width=width)
                 for column, width in _queue_column_widths().items()
@@ -378,7 +414,7 @@ def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -
         },
         hide_index=True,
         width="stretch",
-        height=520,
+        height=560,
     )
     _render_queue_actions(workspace, filtered)
 
@@ -388,7 +424,6 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
     jobs = list(jobs)
     if not jobs:
         return
-
     options = {f"#{job.id} - {job.title} - {job.company}": job for job in jobs}
     selected = st.selectbox("Job", list(options))
     job = options[selected]
@@ -402,12 +437,14 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
         workspace.update_application_status(job.id, desired_status)
         st.toast("Application status updated.")
         st.rerun()
+
     destination = application_destination_url(job.apply_url, job.source_url)
     destination_host = application_destination_hostname(job.apply_url, job.source_url)
-    if job.apply_url and destination == job.apply_url:
-        st.caption("Job Hunter found an official application destination for this role.")
-    else:
-        st.caption("No separate application destination was found, so Apply opens the original posting.")
+    st.caption(
+        "Job Hunter found an official application destination."
+        if job.apply_url and destination == job.apply_url
+        else "Apply opens the safest available original posting."
+    )
     if destination_host:
         st.caption(f"Destination: `{destination_host}`")
     st.link_button(
@@ -416,16 +453,58 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
         icon=":material/open_in_new:",
         type="primary",
         disabled=not destination,
-        help="Opens the safest available application page in a new tab.",
+        help="Opens the application page in a new browser tab.",
     )
+    alternate_sources = [
+        source for source in job.sources if source.original_url != job.source_url
+    ]
+    if alternate_sources:
+        st.markdown("**Alternate sources**")
+        for index, source in enumerate(alternate_sources, start=1):
+            label = source.platform or f"Source {index}"
+            st.link_button(f"Open {label}", source.original_url, icon=":material/open_in_new:")
     st.info(
-        "Review the destination before submitting. Platform login, CAPTCHA, and required questions stay in your browser."
+        "Review the destination before submitting. Login, CAPTCHA, and required questions "
+        "remain in the platform page. Opening Apply does not mark the job as applied."
     )
+
+
+def _search_is_ready(
+    mode: str, workspace: SessionWorkspace, criteria: SearchCriteria
+) -> tuple[bool, str]:
+    if mode == "CV-based search" and not workspace.cv_text.strip():
+        return False, "Upload a readable CV before using CV-based search."
+    if not criteria.title_terms and not criteria.description_terms:
+        return False, "Add at least one title or description keyword."
+    if not criteria.location.strip():
+        return False, "Choose or type a location."
+    if not criteria.platforms and not criteria.custom_domains:
+        return False, "Select at least one platform or valid custom source."
+    return True, ""
+
+
+def _get_controller() -> SearchRunController:
+    controller = st.session_state.get("search_controller")
+    if not isinstance(controller, SearchRunController):
+        controller = SearchRunController()
+        st.session_state["search_controller"] = controller
+    return controller
 
 
 def _render_keyword_chips(label: str, values: list[str]) -> None:
     st.markdown(f"**{label}**")
-    st.pills(label, values, selection_mode="multi", default=values, disabled=True, label_visibility="collapsed", wrap=True)
+    if values:
+        st.pills(
+            label,
+            values,
+            selection_mode="multi",
+            default=values,
+            disabled=True,
+            label_visibility="collapsed",
+            wrap=True,
+        )
+    else:
+        st.caption("No configured signals detected.")
 
 
 @st.cache_data(ttl=3600)
@@ -433,26 +512,14 @@ def _cached_malaysia_cities() -> tuple[str, ...]:
     return fetch_malaysia_cities()
 
 
-def _criteria_defaults(preferences: dict[str, object]) -> dict[str, object]:
-    defaults = _editable_criteria_defaults(preferences)
-    if not defaults["target_roles"]:
-        defaults["target_roles"] = TARGET_TITLES
-    if not defaults["primary_keywords"]:
-        defaults["primary_keywords"] = PRIMARY_KEYWORDS
-    return defaults
-
-
-def _editable_criteria_defaults(preferences: dict[str, object]) -> dict[str, object]:
-    daily_targets = preferences.get("daily_targets", {})
-    if not isinstance(daily_targets, dict):
-        daily_targets = {}
+def _criteria_defaults(preferences: dict[str, object]) -> dict[str, list[str]]:
+    target_roles = _string_list(preferences.get("target_roles")) or TARGET_TITLES
+    primary = _string_list(preferences.get("primary_keywords")) or PRIMARY_KEYWORDS
     return {
-        "target_roles": _string_list(preferences.get("target_roles")),
-        "primary_keywords": _string_list(preferences.get("primary_keywords")),
+        "target_roles": target_roles,
+        "primary_keywords": primary,
         "bonus_keywords": _string_list(preferences.get("bonus_keywords")),
         "hard_skip_keywords": _string_list(preferences.get("hard_skip_keywords")),
-        "strong_target": int(daily_targets.get("strong_matches", DEFAULT_STRONG_TARGET)),
-        "session_cap": int(daily_targets.get("suitable_matches", DEFAULT_SESSION_CAP)),
     }
 
 
@@ -467,6 +534,10 @@ def _queue_column_widths() -> dict[str, str]:
         "Remarks": "large",
         "Description": "large",
         "Source URL": "medium",
+        "Alternate sources": "large",
+        "Scoring": "medium",
+        "Description quality": "large",
+        "Date details": "large",
     }
 
 
@@ -480,13 +551,15 @@ def _active_preferences(preferences: dict[str, object]) -> dict[str, object]:
     defaults = _criteria_defaults(preferences)
     active = dict(preferences)
     active["target_roles"] = st.session_state.get("target_roles", defaults["target_roles"])
-    active["primary_keywords"] = st.session_state.get("primary_keywords", defaults["primary_keywords"])
-    active["bonus_keywords"] = st.session_state.get("bonus_keywords", defaults["bonus_keywords"])
-    active["hard_skip_keywords"] = st.session_state.get("hard_skip_keywords", defaults["hard_skip_keywords"])
-    active["daily_targets"] = {
-        "strong_matches": st.session_state.get("strong_target", defaults["strong_target"]),
-        "suitable_matches": st.session_state.get("session_cap", defaults["session_cap"]),
-    }
+    active["primary_keywords"] = st.session_state.get(
+        "primary_keywords", defaults["primary_keywords"]
+    )
+    active["bonus_keywords"] = st.session_state.get(
+        "bonus_keywords", defaults["bonus_keywords"]
+    )
+    active["hard_skip_keywords"] = st.session_state.get(
+        "hard_skip_keywords", defaults["hard_skip_keywords"]
+    )
     return active
 
 
@@ -496,18 +569,11 @@ def _open_page(page: str) -> None:
 
 def _location_options(cities: tuple[str, ...]) -> tuple[str, ...]:
     options = city_options("", cities=cities, limit=300)
-    if "Kuala Lumpur" not in options:
-        return ("Kuala Lumpur",) + options
     return ("Kuala Lumpur",) + tuple(city for city in options if city != "Kuala Lumpur")
 
 
-def _planned_queries(criteria: SearchCriteria, provider_config: SearchProviderConfig):
-    if provider_config.has_api_search:
-        return build_serpapi_queries(criteria, provider_config.serpapi_key)
-    queries = build_direct_platform_queries(criteria)
-    direct_platforms = {query.platform for query in queries}
-    queries.extend(query for query in build_search_queries(criteria) if query.platform not in direct_platforms)
-    return queries
+def _split_sources(value: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in re.split(r"[,\n]", value) if part.strip())
 
 
 if __name__ == "__main__":

@@ -128,6 +128,17 @@ class SearchTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "untrusted destination"):
                 fetch_job_html("https://www.linkedin.com/jobs/view/123")
 
+    def test_fetch_job_html_accepts_a_validated_custom_domain(self):
+        response = MagicMock(is_redirect=False, text="<main>Power BI role</main>")
+
+        with patch("requests.get", return_value=response):
+            html = fetch_job_html(
+                "https://careers.example.com/jobs/123",
+                allowed_domains=("careers.example.com",),
+            )
+
+        self.assertIn("Power BI", html)
+
     def test_normalize_posted_date_accepts_iso_and_relative_values(self):
         today = date(2026, 9, 10)
 

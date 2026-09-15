@@ -25,6 +25,16 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
         remarks = "\n".join(
             part for part in (job.remarks, job.application_evidence) if part.strip()
         )
+        scoring = job.scoring_engine
+        if job.scoring_model:
+            scoring = f"{scoring} ({job.scoring_model})"
+        if job.score_limited:
+            scoring = f"{scoring}; limited evidence"
+        description_quality = job.description_kind
+        if job.description_limitation:
+            description_quality = f"{description_quality}: {job.description_limitation}"
+        date_details = job.posted_date_source or job.posted_date_reason or "Date unavailable"
+        source_urls = [source.original_url for source in job.sources if source.original_url]
         rows.append({
             "ID": job.id,
             "Score": job.score,
@@ -40,6 +50,10 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
             "Location": job.location,
             "Description": job.description,
             "Source URL": job.source_url,
+            "Alternate sources": "\n".join(source_urls[1:]),
+            "Scoring": scoring,
+            "Description quality": description_quality,
+            "Date details": date_details,
             "Reasons": job.reasons,
             "Remarks": remarks,
         }
@@ -136,6 +150,10 @@ def queue_column_widths() -> dict[str, str]:
         "Remarks": "large",
         "Description": "large",
         "Source URL": "medium",
+        "Alternate sources": "large",
+        "Scoring": "medium",
+        "Description quality": "large",
+        "Date details": "large",
     }
 
 
