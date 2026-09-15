@@ -61,7 +61,7 @@
 - Produces: `SessionWorkspace.update_application_status(job_id: int, applied: bool) -> None`.
 - Produces: `get_session_workspace(state: MutableMapping[str, object]) -> SessionWorkspace`.
 
-- [ ] **Step 1: Write session isolation and CV lifecycle tests**
+- [x] **Step 1: Write session isolation and CV lifecycle tests**
 
 ```python
 def test_workspaces_do_not_share_private_state():
@@ -89,7 +89,7 @@ def test_replacing_and_removing_cv_clear_cv_cache_entries():
     assert workspace.cv is None
 ```
 
-- [ ] **Step 2: Write the hosted storage boundary test**
+- [x] **Step 2: Write the hosted storage boundary test**
 
 ```python
 def test_streamlit_entrypoint_does_not_construct_disk_stores():
@@ -99,7 +99,7 @@ def test_streamlit_entrypoint_does_not_construct_disk_stores():
     assert "get_session_workspace(st.session_state)" in source
 ```
 
-- [ ] **Step 3: Run the new tests and verify failure**
+- [x] **Step 3: Run the new tests and verify failure**
 
 Run:
 
@@ -109,7 +109,7 @@ PYTHONPATH=src /Users/lilianyoctoria/Documents/job-hunter/.venv/bin/python -m un
 
 Expected: FAIL because `session_workspace` and `get_session_workspace` do not exist.
 
-- [ ] **Step 4: Implement the session workspace and hosted wiring**
+- [x] **Step 4: Implement the session workspace and hosted wiring**
 
 Use dataclasses and in-memory collections only. Generate monotonically
 increasing session job IDs, preserve queue ordering by score then ID, and expose
@@ -122,11 +122,11 @@ workspace = get_session_workspace(st.session_state)
 
 Keep `JobQueue` and `CVStore` unchanged for local CLI compatibility.
 
-- [ ] **Step 5: Run focused and complete tests**
+- [x] **Step 5: Run focused and complete tests**
 
 Run the focused command from Step 3, then the global check. Expected: PASS.
 
-- [ ] **Step 6: Commit the storage boundary**
+- [x] **Step 6: Commit the storage boundary**
 
 ```bash
 git add src/app.py src/job_hunter/session_workspace.py src/job_hunter/queue_types.py tests/test_session_workspace.py tests/test_app_storage_boundary.py

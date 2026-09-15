@@ -18,10 +18,9 @@ from job_hunter.application_links import (
     application_destination_url,
 )
 from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
-from job_hunter.cv_store import CVStore, format_size
+from job_hunter.cv_store import format_size
 from job_hunter.locations import city_options, fetch_malaysia_cities
 from job_hunter.preferences import load_preferences
-from job_hunter.queue import JobQueue
 from job_hunter.runtime_config import SearchProviderConfig, load_search_provider_config
 from job_hunter.search import (
     SearchCriteria,
@@ -31,12 +30,11 @@ from job_hunter.search import (
     build_serpapi_queries,
     run_public_search,
 )
+from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "data" / "applications.db"
 PREFERENCES_PATH = ROOT / "config" / "preferences.local.yaml"
-CV_STORAGE_DIR = ROOT / "data" / "private" / "cv"
 HERO_IMAGE_URL = "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1600"
 
 TARGET_TITLES = [
@@ -65,23 +63,22 @@ DEFAULT_SESSION_CAP = 50
 def main() -> None:
     st.set_page_config(page_title="Job Hunter", page_icon=":material/work:", layout="wide")
 
-    queue = JobQueue(DB_PATH)
+    workspace = get_session_workspace(st.session_state)
     preferences = load_preferences(PREFERENCES_PATH)
-    cv_store = CVStore(CV_STORAGE_DIR)
     provider_config = load_search_provider_config(st.secrets)
 
     _inject_table_styles()
     _render_header()
-    _render_sidebar(queue, cv_store, provider_config, preferences)
+    _render_sidebar(workspace, provider_config, preferences)
 
     st.session_state.setdefault("page", PAGES[0])
     page = st.segmented_control("Page", PAGES, key="page")
     if page == "Profile & CV":
-        _render_profile(cv_store, preferences)
+        _render_profile(workspace, preferences)
     elif page == "Search jobs":
-        _render_search_jobs(queue, preferences, cv_store, provider_config)
+        _render_search_jobs(workspace, preferences, provider_config)
     else:
-        _render_queue(queue, preferences)
+        _render_queue(workspace, preferences)
 
 
 def _render_header() -> None:
@@ -115,8 +112,7 @@ def _inject_table_styles() -> None:
 
 
 def _render_sidebar(
-    queue: JobQueue,
-    cv_store: CVStore,
+    workspace: SessionWorkspace,
     provider_config: SearchProviderConfig,
     preferences: dict[str, object],
 ) -> None:
@@ -125,9 +121,9 @@ def _render_sidebar(
         "hard_skip_keywords", defaults["hard_skip_keywords"]
     )
     jobs = filter_jobs(
-        queue.list_jobs(), decision="all", hard_skip_keywords=hard_skip_keywords
+        workspace.list_jobs(), decision="all", hard_skip_keywords=hard_skip_keywords
     )
-    cv_status = cv_store.status()
+    cv = workspace.cv
     with st.sidebar:
         st.header("Today")
         st.metric("Queued jobs", len(jobs))
@@ -137,42 +133,41 @@ def _render_sidebar(
             help="A goal for how many high-scoring jobs you want to find. It does not stop or limit the search.",
         )
         st.caption("Search and scoring work with or without a CV.")
-        if cv_status.exists:
-            st.success(f"CV saved locally ({format_size(cv_status.size_bytes)}).")
+        if cv is not None:
+            st.success(f"CV Saved ({format_size(cv.size_bytes)})")
         else:
             st.caption("No CV saved. You can still search using your criteria.")
         st.caption(provider_status_label(provider_config.has_api_search))
 
 
-def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
+def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object]) -> None:
     st.subheader("Profile & CV")
     st.write(
-        "A CV is optional. Upload one for private profile reference, or skip this page and search using editable keywords. The repository never commits your actual CV."
+        "A CV is optional. It stays only in this browser session and can disappear when the session or app restarts."
     )
-    status = cv_store.status()
+    cv = workspace.cv
     with st.container(border=True):
-        if status.exists:
-            st.success(f"Saved CV: `{status.path.name}` - {format_size(status.size_bytes)}")
+        if cv is not None:
+            st.success(f"CV Saved: `{cv.filename}` - {format_size(cv.size_bytes)}")
             if st.button("Remove saved CV", icon=":material/delete:"):
-                cv_store.remove()
+                workspace.remove_cv()
                 st.toast("Saved CV removed.")
                 st.rerun()
         else:
-            st.info("No CV is saved for this local app yet.")
+            st.info("No readable CV is saved in this session yet.")
 
         uploaded = st.file_uploader("Upload or replace CV", type=["pdf", "docx", "doc"])
-        if uploaded is not None and st.button("Save CV locally", icon=":material/save:"):
+        if uploaded is not None and st.button("Save CV", icon=":material/save:"):
             content = uploaded.getvalue()
-            cv_store.save_file(content, uploaded.name)
             try:
                 extracted_text = extract_cv_text(content, uploaded.name)
-                cv_store.save_text(extracted_text)
-                st.toast("CV saved and readable text extracted.")
+                workspace.save_cv(uploaded.name, content, extracted_text)
+                st.toast("CV Saved")
             except Exception as exc:
-                st.warning(f"CV was saved, but text extraction failed: {exc}")
+                st.warning(f"CV could not be saved because readable text was not extracted: {exc}")
             st.rerun()
 
-    if status.exists:
+    if cv is not None:
         st.button(
             "Continue to Search jobs",
             icon=":material/arrow_forward:",
@@ -183,7 +178,7 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
 
     with st.container(border=True):
         st.markdown("**What the app currently knows from your CV-backed profile**")
-        cv_text = cv_store.load_text()
+        cv_text = workspace.cv_text
         if cv_text:
             signals = detect_cv_signals(cv_text, preferences)
             st.success(f"Extracted CV text is available. Detected {signals.total_matches} matching profile signals.")
@@ -195,16 +190,15 @@ def _render_profile(cv_store: CVStore, preferences: dict[str, object]) -> None:
 
 
 def _render_search_jobs(
-    queue: JobQueue,
+    workspace: SessionWorkspace,
     preferences: dict[str, object],
-    cv_store: CVStore,
     provider_config: SearchProviderConfig,
 ) -> None:
     st.subheader("Search jobs")
     st.write(
         "Set title, description keywords, exact location, and selected platforms, then run up to 50 public search-result checks in one session."
     )
-    cv_text = cv_store.load_text()
+    cv_text = workspace.cv_text
     if cv_text:
         signals = detect_cv_signals(cv_text, preferences)
         st.success(
@@ -325,7 +319,7 @@ def _render_search_jobs(
                 summary = run_public_search(
                     criteria,
                     active_preferences,
-                    queue,
+                    workspace,
                     provider_config=provider_config,
                     progress_callback=show_progress,
                 )
@@ -349,12 +343,12 @@ def _render_search_jobs(
             "If LinkedIn and Foundit show the same exact role at the same company and location, Job Hunter keeps one queue item and treats the other as a duplicate. Later we can store the extra platform links as alternate sources."
         )
 
-def _render_queue(queue: JobQueue, preferences: dict[str, object]) -> None:
+def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -> None:
     st.subheader("Job queue")
     st.write("Review the strongest matches first, then open the official application destination.")
     active_preferences = _active_preferences(preferences)
     jobs = filter_jobs(
-        queue.list_jobs(),
+        workspace.list_jobs(),
         decision="all",
         hard_skip_keywords=active_preferences.get("hard_skip_keywords", ()),
     )
@@ -386,10 +380,10 @@ def _render_queue(queue: JobQueue, preferences: dict[str, object]) -> None:
         width="stretch",
         height=520,
     )
-    _render_queue_actions(queue, filtered)
+    _render_queue_actions(workspace, filtered)
 
 
-def _render_queue_actions(queue: JobQueue, jobs) -> None:
+def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
     st.subheader("Apply")
     jobs = list(jobs)
     if not jobs:
@@ -405,7 +399,7 @@ def _render_queue_actions(queue: JobQueue, jobs) -> None:
     )
     desired_status = "applied" if applied else "not_applied"
     if desired_status != job.application_status:
-        queue.update_application_status(job.id, desired_status)
+        workspace.update_application_status(job.id, desired_status)
         st.toast("Application status updated.")
         st.rerun()
     destination = application_destination_url(job.apply_url, job.source_url)
