@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urljoin, urlp
 from bs4 import BeautifulSoup
 
 from job_hunter.application_links import KNOWN_ATS_DOMAINS, is_safe_application_url
+from job_hunter.descriptions import JobDescription, extract_job_description
 from job_hunter.eligibility import hard_skip_matches
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
@@ -96,6 +97,15 @@ class SearchCandidate:
 class JobPageMetadata:
     posted_date: str = ""
     apply_url: str = ""
+    posted_date_verified: bool = False
+    posted_date_source: str = ""
+    posted_date_reason: str = ""
+    description: JobDescription = JobDescription(
+        text="",
+        kind="unavailable",
+        source="",
+        limitation="No readable job description was available.",
+    )
 
 
 @dataclass(frozen=True)
@@ -416,6 +426,19 @@ def run_public_search(
                     ),
                 )
                 continue
+            description = JobDescription(
+                text=candidate.description,
+                kind="snippet" if candidate.description else "unavailable",
+                source="search result" if candidate.description else "",
+                limitation=(
+                    "Full job description was unavailable; score uses a search snippet."
+                    if candidate.description
+                    else "No readable job description was available."
+                ),
+            )
+            posted_date_verified = bool(candidate.posted_date)
+            posted_date_source = "search provider" if candidate.posted_date else ""
+            posted_date_reason = "" if candidate.posted_date else "Job page was not checked"
             _report_progress(
                 logs,
                 progress_callback,
@@ -427,6 +450,9 @@ def run_public_search(
             try:
                 job_page = fetch_availability(candidate.source_url)
             except Exception:
+                posted_date_reason = (
+                    "" if candidate.posted_date else "Job page could not be loaded"
+                )
                 _report_progress(
                     logs,
                     progress_callback,
@@ -437,6 +463,9 @@ def run_public_search(
                 )
             else:
                 if _is_blocked_search_page(job_page):
+                    posted_date_reason = (
+                        "" if candidate.posted_date else "Job page was blocked"
+                    )
                     _report_progress(
                         logs,
                         progress_callback,
@@ -446,12 +475,26 @@ def run_public_search(
                         message=_availability_unknown_message(candidate),
                     )
                 else:
-                    metadata = extract_job_metadata(job_page, candidate.source_url)
+                    metadata = extract_job_metadata(
+                        job_page,
+                        candidate.source_url,
+                        snippet=candidate.description,
+                    )
                     candidate = replace(
                         candidate,
                         posted_date=metadata.posted_date or candidate.posted_date,
                         apply_url=metadata.apply_url or candidate.apply_url,
+                        description=metadata.description.text or candidate.description,
                     )
+                    description = metadata.description
+                    if metadata.posted_date:
+                        posted_date_verified = metadata.posted_date_verified
+                        posted_date_source = metadata.posted_date_source
+                        posted_date_reason = metadata.posted_date_reason
+                    elif not candidate.posted_date:
+                        posted_date_verified = False
+                        posted_date_source = ""
+                        posted_date_reason = metadata.posted_date_reason
                     job_page_text = BeautifulSoup(job_page, "html.parser").get_text(" ", strip=True)
                     eligibility_reason = _eligibility_skip_reason(
                         candidate,
@@ -528,6 +571,12 @@ def run_public_search(
                     source_url=candidate.source_url,
                     posted_date=candidate.posted_date,
                     apply_url=candidate.apply_url,
+                    description_kind=description.kind,
+                    description_source=description.source,
+                    description_limitation=description.limitation,
+                    posted_date_verified=posted_date_verified,
+                    posted_date_source=posted_date_source,
+                    posted_date_reason=posted_date_reason,
                 ),
                 preferences,
             )
@@ -689,10 +738,14 @@ def normalize_posted_date(value: str, today: date | None = None) -> str:
 
 
 def extract_job_metadata(
-    html: str, source_url: str, today: date | None = None
+    html: str,
+    source_url: str,
+    today: date | None = None,
+    snippet: str = "",
 ) -> JobPageMetadata:
     soup = BeautifulSoup(html, "html.parser")
     posted_date = ""
+    posted_date_source = ""
     for script in soup.select('script[type="application/ld+json"]'):
         try:
             payload = json.loads(script.string or script.get_text() or "{}")
@@ -702,23 +755,32 @@ def extract_job_metadata(
         if date_posted:
             posted_date = normalize_posted_date(date_posted, today=today)
             if posted_date:
+                posted_date_source = "JobPosting.datePosted"
                 break
 
     if not posted_date:
         posted_date = _date_from_meta(soup, today=today)
+        if posted_date:
+            posted_date_source = "datePosted metadata"
 
     if not posted_date:
         posted_date = _date_from_job_page_nodes(soup, today=today)
+        if posted_date:
+            posted_date_source = "job page element"
 
     if not posted_date:
         posted_date = normalize_posted_date(
             _find_embedded_posted_value(soup), today=today
         )
+        if posted_date:
+            posted_date_source = "embedded job posting data"
 
     if not posted_date:
         posted_date = _labeled_date_from_text(
             soup.get_text(" ", strip=True), today=today
         )
+        if posted_date:
+            posted_date_source = "labelled job page text"
 
     apply_url = ""
     for link in soup.find_all("a", href=True):
@@ -735,14 +797,24 @@ def extract_job_metadata(
         if is_safe_application_url(candidate_url, source_url):
             apply_url = candidate_url
             break
-    return JobPageMetadata(posted_date=posted_date, apply_url=apply_url)
+    return JobPageMetadata(
+        posted_date=posted_date,
+        apply_url=apply_url,
+        posted_date_verified=bool(posted_date),
+        posted_date_source=posted_date_source,
+        posted_date_reason="" if posted_date else "No job-specific posting date found",
+        description=extract_job_description(html, snippet=snippet),
+    )
 
 
 def _find_date_posted(value: object) -> str:
     if isinstance(value, dict):
-        raw_date = value.get("datePosted")
-        if isinstance(raw_date, str) and raw_date.strip():
-            return raw_date.strip()
+        item_type = value.get("@type")
+        item_types = item_type if isinstance(item_type, list) else [item_type]
+        if any(str(candidate).casefold() == "jobposting" for candidate in item_types):
+            raw_date = value.get("datePosted")
+            if isinstance(raw_date, str) and raw_date.strip():
+                return raw_date.strip()
         for child in value.values():
             found = _find_date_posted(child)
             if found:
@@ -776,21 +848,13 @@ def _find_provider_posted_value(value: object, allow_generic_date: bool = True) 
 
 
 def _date_from_meta(soup: BeautifulSoup, today: date | None = None) -> str:
-    date_labels = {
-        "dateposted",
-        "datepublished",
-        "articlepublishedtime",
-        "ogpublishedtime",
-        "publicationdate",
-        "publishdate",
-    }
     for node in soup.find_all("meta"):
         labels = " ".join(
             str(node.get(attribute, ""))
             for attribute in ("itemprop", "property", "name")
         )
         normalized_labels = re.sub(r"[^a-z0-9]+", "", labels.casefold())
-        if not any(label in normalized_labels for label in date_labels):
+        if "dateposted" not in normalized_labels:
             continue
         value = str(node.get("content", "")).strip()
         posted_date = normalize_posted_date(value, today=today)

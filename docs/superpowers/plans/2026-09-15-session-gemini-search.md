@@ -153,7 +153,7 @@ git commit -m "Protect hosted job data with session storage"
 - Produces: `extract_job_description(html: str, snippet: str = "") -> JobDescription`.
 - Extends: `JobPageMetadata(posted_date: str, posted_date_verified: bool, posted_date_source: str, posted_date_reason: str, apply_url: str, description: JobDescription)`.
 
-- [ ] **Step 1: Write description extraction acceptance tests**
+- [x] **Step 1: Write description extraction acceptance tests**
 
 ```python
 def test_structured_jobposting_description_replaces_snippet():
@@ -171,7 +171,7 @@ def test_blocked_or_content_free_page_retains_snippet_limit():
     assert result.limitation
 ```
 
-- [ ] **Step 2: Write date provenance regression tests**
+- [x] **Step 2: Write date provenance regression tests**
 
 ```python
 def test_jobposting_date_wins_over_updated_and_application_dates():
@@ -188,11 +188,11 @@ def test_generic_updated_page_does_not_become_posting_date():
     assert metadata.posted_date_reason == "No job-specific posting date found"
 ```
 
-- [ ] **Step 3: Run focused tests and verify failure**
+- [x] **Step 3: Run focused tests and verify failure**
 
 Run the two new test modules. Expected: FAIL on missing module and provenance fields.
 
-- [ ] **Step 4: Implement structured/container description extraction**
+- [x] **Step 4: Implement structured/container description extraction**
 
 Walk JSON-LD objects for `@type: JobPosting`, strip HTML in
 `description`, then inspect known job-description selectors. Remove script,
@@ -200,14 +200,14 @@ style, nav, footer, form, and cookie/banner nodes. Require meaningful length and
 job-language signals before labelling container text `full`; otherwise retain
 the supplied snippet or return `unavailable`.
 
-- [ ] **Step 5: Narrow posting-date sources and attach reasons**
+- [x] **Step 5: Narrow posting-date sources and attach reasons**
 
 Prefer `JobPosting.datePosted`, known provider posting fields, job-specific time
 nodes, and posting-labelled text. Remove generic article publish/update metadata
 from accepted sources. Keep absolute and relative normalization. Record an
 explicit reason for blocked, missing, malformed, or ambiguous dates.
 
-- [ ] **Step 6: Run focused and complete tests, then commit**
+- [x] **Step 6: Run focused and complete tests, then commit**
 
 ```bash
 git add src/job_hunter/descriptions.py src/job_hunter/search.py src/job_hunter/queue_types.py tests/test_descriptions.py tests/test_search_dates.py tests/fixtures/jobs
