@@ -42,7 +42,7 @@ class AppUiTest(unittest.TestCase):
         )
 
         self.assertEqual(rows[0]["Score"], 96)
-        self.assertEqual(rows[0]["Decision"], "shortlist")
+        self.assertEqual(rows[0]["Decision"], "Already applied")
         self.assertEqual(rows[0]["Remarks"], "Strong match")
         self.assertEqual(rows[0]["Description"], "Power BI role")
         self.assertEqual(rows[0]["Posted"], "2026-09-09")
@@ -66,6 +66,49 @@ class AppUiTest(unittest.TestCase):
         filtered = filter_jobs(jobs, decision="shortlist")
 
         self.assertEqual([job.id for job in filtered], [1])
+
+    def test_default_actionable_view_excludes_applied_jobs(self):
+        actionable = JobRecord(
+            id=1,
+            title="BI Analyst",
+            company="Acme",
+            location="Kuala Lumpur",
+            description="Power BI",
+            source_url="https://example.com/jobs/1",
+            score=90,
+            decision="shortlist",
+            status="new",
+        )
+        applied = JobRecord(
+            id=2,
+            title="Data Analyst",
+            company="Beta",
+            location="Kuala Lumpur",
+            description="SSRS",
+            source_url="https://example.com/jobs/2",
+            score=90,
+            decision="shortlist",
+            status="new",
+            application_status="applied",
+            application_evidence="Marked manually by the user; not verified with the job platform.",
+        )
+
+        self.assertEqual(
+            [job.id for job in filter_jobs([actionable, applied], decision="all")],
+            [1],
+        )
+        self.assertEqual(
+            [
+                job.id
+                for job in filter_jobs(
+                    [actionable, applied], decision="all", application_view="applied"
+                )
+            ],
+            [2],
+        )
+        row = jobs_to_rows([applied])[0]
+        self.assertEqual(row["Decision"], "Already applied")
+        self.assertIn("Marked manually", row["Remarks"])
 
     def test_excludes_historical_jobs_that_match_current_hard_skip_rules(self):
         jobs = [

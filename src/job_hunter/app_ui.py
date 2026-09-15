@@ -20,11 +20,17 @@ DEFAULT_SESSION_CAP = 50
 
 
 def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
-    return [
-        {
+    rows = []
+    for job in jobs:
+        remarks = "\n".join(
+            part for part in (job.remarks, job.application_evidence) if part.strip()
+        )
+        rows.append({
             "ID": job.id,
             "Score": job.score,
-            "Decision": job.decision,
+            "Decision": (
+                "Already applied" if job.application_status == "applied" else job.decision
+            ),
             "Posted": job.posted_date or "Unknown",
             "Application status": (
                 "Applied" if job.application_status == "applied" else "Not applied"
@@ -35,10 +41,10 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
             "Description": job.description,
             "Source URL": job.source_url,
             "Reasons": job.reasons,
-            "Remarks": job.remarks,
+            "Remarks": remarks,
         }
-        for job in jobs
-    ]
+        )
+    return rows
 
 
 def filter_jobs(
@@ -46,12 +52,19 @@ def filter_jobs(
     decision: str,
     status: str = "all",
     hard_skip_keywords: object = (),
+    application_view: str = "actionable",
 ) -> list[JobRecord]:
     filtered = exclude_hard_skipped_jobs(jobs, hard_skip_keywords)
     if decision != "all":
         filtered = [job for job in filtered if job.decision == decision]
     if status != "all":
         filtered = [job for job in filtered if job.status == status]
+    if application_view == "actionable":
+        filtered = [job for job in filtered if job.application_status != "applied"]
+    elif application_view == "applied":
+        filtered = [job for job in filtered if job.application_status == "applied"]
+    elif application_view != "all":
+        raise ValueError(f"Unsupported application view: {application_view}")
     return filtered
 
 

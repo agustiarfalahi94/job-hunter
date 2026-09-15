@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from typing import Any, MutableMapping
 
+from job_hunter.job_identity import JobSource, job_source, vacancy_fingerprint
+from job_hunter.matching import MatchResult
 from job_hunter.queue import AddResult, JobRecord
 from job_hunter.queue_types import JobInput
 from job_hunter.scoring import ScoreResult, score_job
@@ -63,15 +66,19 @@ class SessionWorkspace:
             ),
         )
 
-    def add_scored_job(self, job: JobInput, score: ScoreResult) -> AddResult:
+    def add_scored_job(
+        self, job: JobInput, score: ScoreResult | MatchResult
+    ) -> AddResult:
         existing = self._find_duplicate(job)
         if existing is not None:
+            self._merge_duplicate(existing.id, job)
             return AddResult(
                 job_id=existing.id,
                 created=False,
                 score=existing.score,
                 decision=existing.decision,
             )
+        source = job_source(job.platform, job.source_url)
         record = JobRecord(
             id=self._next_job_id,
             title=job.title.strip(),
@@ -86,6 +93,17 @@ class SessionWorkspace:
             remarks="\n".join(score.remarks),
             posted_date=job.posted_date.strip(),
             apply_url=job.apply_url.strip(),
+            sources=(source,) if source.original_url else (),
+            description_kind=job.description_kind,
+            description_source=job.description_source,
+            description_limitation=job.description_limitation,
+            posted_date_verified=job.posted_date_verified,
+            posted_date_source=job.posted_date_source,
+            posted_date_reason=job.posted_date_reason,
+            scoring_engine=getattr(score, "engine", "Deterministic"),
+            scoring_model=getattr(score, "model", ""),
+            score_limited=bool(getattr(score, "limited", False)),
+            cache_hit=bool(getattr(score, "cache_hit", False)),
         )
         self._jobs.append(record)
         self._next_job_id += 1
@@ -107,27 +125,97 @@ class SessionWorkspace:
             raise ValueError(f"Unsupported application status: {normalized}")
         for index, job in enumerate(self._jobs):
             if job.id == job_id:
-                values = dict(job.__dict__)
-                values["application_status"] = normalized
-                self._jobs[index] = JobRecord(**values)
+                if normalized == "applied":
+                    recorded_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                    evidence = (
+                        "Marked manually by the user; not verified with the job platform."
+                    )
+                else:
+                    recorded_at = ""
+                    evidence = ""
+                self._jobs[index] = replace(
+                    job,
+                    application_status=normalized,
+                    application_recorded_at=recorded_at,
+                    application_evidence=evidence,
+                )
                 return
         raise ValueError(f"Job not found: {job_id}")
 
     def _find_duplicate(self, job: JobInput) -> JobRecord | None:
-        title = _normalize(job.title)
-        company = _normalize(job.company)
-        location = _normalize(job.location)
-        source_url = job.source_url.strip().casefold()
+        candidate_source = job_source(job.platform, job.source_url)
+        fingerprint = vacancy_fingerprint(job.title, job.company, job.location)
         for existing in self._jobs:
-            if source_url and existing.source_url.strip().casefold() == source_url:
+            existing_sources = existing.sources or _legacy_sources(existing)
+            if candidate_source.stable_id and any(
+                source.platform.casefold() == candidate_source.platform.casefold()
+                and source.stable_id == candidate_source.stable_id
+                for source in existing_sources
+            ):
                 return existing
-            if title and company and location and (
-                _normalize(existing.title),
-                _normalize(existing.company),
-                _normalize(existing.location),
-            ) == (title, company, location):
+            if candidate_source.canonical_url and any(
+                source.canonical_url == candidate_source.canonical_url
+                for source in existing_sources
+            ):
+                return existing
+            if fingerprint and fingerprint == vacancy_fingerprint(
+                existing.title, existing.company, existing.location
+            ):
                 return existing
         return None
+
+    def _merge_duplicate(self, job_id: int, incoming: JobInput) -> None:
+        incoming_source = job_source(incoming.platform, incoming.source_url)
+        for index, existing in enumerate(self._jobs):
+            if existing.id != job_id:
+                continue
+            sources = list(existing.sources or _legacy_sources(existing))
+            if incoming_source.original_url and not any(
+                source.canonical_url == incoming_source.canonical_url
+                and source.platform.casefold() == incoming_source.platform.casefold()
+                for source in sources
+            ):
+                sources.append(incoming_source)
+            use_incoming_description = (
+                incoming.description_kind == "full"
+                and existing.description_kind != "full"
+            )
+            self._jobs[index] = replace(
+                existing,
+                sources=tuple(sources),
+                description=(
+                    incoming.description if use_incoming_description else existing.description
+                ),
+                description_kind=(
+                    incoming.description_kind
+                    if use_incoming_description
+                    else existing.description_kind
+                ),
+                description_source=(
+                    incoming.description_source
+                    if use_incoming_description
+                    else existing.description_source
+                ),
+                description_limitation=(
+                    incoming.description_limitation
+                    if use_incoming_description
+                    else existing.description_limitation
+                ),
+                posted_date=existing.posted_date or incoming.posted_date,
+                posted_date_verified=(
+                    existing.posted_date_verified or incoming.posted_date_verified
+                ),
+                posted_date_source=(
+                    existing.posted_date_source or incoming.posted_date_source
+                ),
+                posted_date_reason=(
+                    ""
+                    if existing.posted_date or incoming.posted_date
+                    else existing.posted_date_reason or incoming.posted_date_reason
+                ),
+                apply_url=existing.apply_url or incoming.apply_url,
+            )
+            return
 
     def _clear_cv_cache(self) -> None:
         self.score_cache = {
@@ -145,3 +233,8 @@ def get_session_workspace(state: MutableMapping[str, object]) -> SessionWorkspac
 
 def _normalize(value: str) -> str:
     return " ".join(value.casefold().strip().split())
+
+
+def _legacy_sources(job: JobRecord) -> tuple[JobSource, ...]:
+    source = job_source("", job.source_url)
+    return (source,) if source.original_url else ()

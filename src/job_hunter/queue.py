@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import sqlite3
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any, Iterator
 
 from job_hunter.application_packet import build_application_packet
 from job_hunter.drafts import build_application_draft, draft_to_markdown
+from job_hunter.job_identity import JobSource, job_source
 from job_hunter.queue_types import JobInput
 from job_hunter.scoring import score_job
 
@@ -31,6 +33,19 @@ class JobRecord:
     posted_date: str = ""
     apply_url: str = ""
     application_status: str = "not_applied"
+    sources: tuple[JobSource, ...] = ()
+    description_kind: str = "snippet"
+    description_source: str = "search result"
+    description_limitation: str = ""
+    posted_date_verified: bool = False
+    posted_date_source: str = ""
+    posted_date_reason: str = ""
+    scoring_engine: str = "Deterministic"
+    scoring_model: str = ""
+    score_limited: bool = False
+    cache_hit: bool = False
+    application_recorded_at: str = ""
+    application_evidence: str = ""
 
 
 @dataclass(frozen=True)
@@ -120,7 +135,7 @@ class JobQueue:
         query = """
             SELECT id, title, company, location, description, source_url,
                    score, decision, status, reasons, remarks, posted_date, apply_url,
-                   application_status
+                   application_status, application_recorded_at, application_evidence
             FROM jobs
         """
         params: tuple[str, ...] = ()
@@ -175,14 +190,33 @@ class JobQueue:
             if cursor.rowcount != 1:
                 raise ValueError(f"Job not found: {job_id}")
 
-    def update_application_status(self, job_id: int, application_status: str) -> None:
+    def update_application_status(self, job_id: int, application_status: str | bool) -> None:
+        if application_status is True:
+            application_status = "applied"
+        elif application_status is False:
+            application_status = "not_applied"
         allowed = {"not_applied", "applied"}
         if application_status not in allowed:
             raise ValueError(f"Unsupported application status: {application_status}")
         with self._connect() as conn:
+            recorded_at = (
+                datetime.now(timezone.utc).isoformat(timespec="seconds")
+                if application_status == "applied"
+                else ""
+            )
+            evidence = (
+                "Marked manually by the user; not verified with the job platform."
+                if application_status == "applied"
+                else ""
+            )
             cursor = conn.execute(
-                "UPDATE jobs SET application_status = ? WHERE id = ?",
-                (application_status, job_id),
+                """
+                UPDATE jobs
+                SET application_status = ?, application_recorded_at = ?,
+                    application_evidence = ?
+                WHERE id = ?
+                """,
+                (application_status, recorded_at, evidence, job_id),
             )
             if cursor.rowcount != 1:
                 raise ValueError(f"Job not found: {job_id}")
@@ -219,6 +253,12 @@ class JobQueue:
                 "application_status",
                 "TEXT NOT NULL DEFAULT 'not_applied'",
             )
+            _ensure_column(
+                conn, "jobs", "application_recorded_at", "TEXT NOT NULL DEFAULT ''"
+            )
+            _ensure_column(
+                conn, "jobs", "application_evidence", "TEXT NOT NULL DEFAULT ''"
+            )
 
     def _find_duplicate(self, job: JobInput) -> int | None:
         with self._connect() as conn:
@@ -252,7 +292,7 @@ class JobQueue:
                 """
                 SELECT id, title, company, location, description, source_url,
                        score, decision, status, reasons, remarks, posted_date, apply_url,
-                       application_status
+                       application_status, application_recorded_at, application_evidence
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -292,6 +332,9 @@ def _record_from_row(row: sqlite3.Row) -> JobRecord:
         posted_date=str(row["posted_date"]),
         apply_url=str(row["apply_url"]),
         application_status=str(row["application_status"]),
+        sources=(job_source("", str(row["source_url"])),) if row["source_url"] else (),
+        application_recorded_at=str(row["application_recorded_at"]),
+        application_evidence=str(row["application_evidence"]),
     )
 
 

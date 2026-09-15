@@ -84,9 +84,13 @@ class JobQueueTest(unittest.TestCase):
         self.assertEqual(jobs[0].posted_date, "")
         self.assertEqual(jobs[0].apply_url, "")
         self.assertEqual(jobs[0].application_status, "not_applied")
+        self.assertEqual(jobs[0].application_recorded_at, "")
+        self.assertEqual(jobs[0].application_evidence, "")
         self.assertIn("posted_date", columns)
         self.assertIn("apply_url", columns)
         self.assertIn("application_status", columns)
+        self.assertIn("application_recorded_at", columns)
+        self.assertIn("application_evidence", columns)
 
     def test_updates_application_status_without_hiding_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -107,6 +111,8 @@ class JobQueueTest(unittest.TestCase):
 
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0].application_status, "applied")
+        self.assertTrue(jobs[0].application_recorded_at)
+        self.assertIn("Marked manually", jobs[0].application_evidence)
 
     def test_rejects_invalid_application_status(self):
         with tempfile.TemporaryDirectory() as tmpdir:

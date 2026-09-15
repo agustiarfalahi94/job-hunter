@@ -1,6 +1,7 @@
 import unittest
 
 from job_hunter.queue_types import JobInput
+from job_hunter.matching import MatchResult
 from job_hunter.scoring import DEFAULT_WEIGHTS, ScoreResult
 from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
 
@@ -48,6 +49,103 @@ class SessionWorkspaceTest(unittest.TestCase):
 
         self.assertIs(first, again)
         self.assertIsNot(first, second)
+
+    def test_confident_cross_source_duplicate_keeps_both_sources(self):
+        workspace = SessionWorkspace()
+        score = MatchResult(
+            91,
+            "shortlist",
+            ("Power BI experience matches",),
+            (),
+            "Gemini",
+            "gemini-2.5-flash",
+            False,
+        )
+        foundit = JobInput(
+            title="Senior BI Analyst",
+            company="Example Bank",
+            location="Kuala Lumpur",
+            description="Power BI reporting",
+            source_url="https://www.foundit.my/job/senior-bi-analyst-456789",
+            platform="Foundit",
+        )
+        linkedin = JobInput(
+            title="Senior BI Analyst",
+            company="Example Bank",
+            location="Kuala Lumpur",
+            description="Power BI reporting",
+            source_url="https://www.linkedin.com/jobs/view/123456",
+            platform="LinkedIn",
+        )
+
+        first = workspace.add_scored_job(foundit, score)
+        second = workspace.add_scored_job(linkedin, score)
+
+        self.assertTrue(first.created)
+        self.assertFalse(second.created)
+        job = workspace.list_jobs()[0]
+        self.assertEqual({source.platform for source in job.sources}, {"Foundit", "LinkedIn"})
+
+    def test_apply_redirect_alone_does_not_merge_distinct_vacancies(self):
+        workspace = SessionWorkspace()
+        score = ScoreResult(80, "review", ("Relevant role",), (), DEFAULT_WEIGHTS)
+        shared_apply = "https://www.linkedin.com/jobs/view/123456"
+        workspace.add_scored_job(
+            JobInput(
+                title="BI Analyst",
+                company="Acme",
+                location="Kuala Lumpur",
+                source_url="https://www.foundit.my/job/bi-analyst-111",
+                apply_url=shared_apply,
+                platform="Foundit",
+            ),
+            score,
+        )
+        second = workspace.add_scored_job(
+            JobInput(
+                title="Data Engineer",
+                company="Acme",
+                location="Kuala Lumpur",
+                source_url="https://www.foundit.my/job/data-engineer-222",
+                apply_url=shared_apply,
+                platform="Foundit",
+            ),
+            score,
+        )
+
+        self.assertTrue(second.created)
+        self.assertEqual(len(workspace.list_jobs()), 2)
+
+    def test_manual_application_record_survives_source_consolidation(self):
+        workspace = SessionWorkspace()
+        score = ScoreResult(90, "shortlist", ("Power BI",), (), DEFAULT_WEIGHTS)
+        first = JobInput(
+            title="BI Analyst",
+            company="Example Bank",
+            location="Kuala Lumpur",
+            source_url="https://www.foundit.my/job/bi-analyst-111",
+            platform="Foundit",
+        )
+        second = JobInput(
+            title="BI Analyst",
+            company="Example Bank",
+            location="Kuala Lumpur",
+            source_url="https://www.linkedin.com/jobs/view/222",
+            platform="LinkedIn",
+        )
+        job_id = workspace.add_scored_job(first, score).job_id
+        workspace.update_application_status(job_id, "applied")
+
+        workspace.add_scored_job(second, score)
+
+        job = workspace.list_jobs()[0]
+        self.assertEqual(job.application_status, "applied")
+        self.assertTrue(job.application_recorded_at)
+        self.assertEqual(
+            job.application_evidence,
+            "Marked manually by the user; not verified with the job platform.",
+        )
+        self.assertEqual(len(job.sources), 2)
 
 
 if __name__ == "__main__":

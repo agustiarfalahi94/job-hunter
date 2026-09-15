@@ -20,3 +20,4 @@ class JobInput:
     posted_date_verified: bool = False
     posted_date_source: str = ""
     posted_date_reason: str = ""
+    platform: str = ""

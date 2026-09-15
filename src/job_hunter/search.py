@@ -624,6 +624,7 @@ def run_public_search(
                     posted_date_verified=posted_date_verified,
                     posted_date_source=posted_date_source,
                     posted_date_reason=posted_date_reason,
+                    platform=candidate.platform,
                 ),
                 preferences,
             )
