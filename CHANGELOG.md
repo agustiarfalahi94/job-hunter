@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.15.2 - 2026-09-16
+
+- Set minimal thinking for Gemini 3 Flash scoring and allow 30-second provider requests to reduce hosted latency failures.
+- Require Google SDK 1.75 or newer for current thinking-level support.
+- Accept provider-listed major-only Flash names such as Gemini 3 Flash alongside decimal versions.
+- Add regression coverage for current-model settings and model-name recovery.
+
 ## 1.15.1 - 2026-09-16
 
 - Recover from an unavailable Gemini model using Google's model listing, with a single alternate scoring attempt and stable text-generation Flash preference.

@@ -51,7 +51,7 @@ class MatchingConfig:
     model: str = "gemini-2.5-flash"
     prompt_version: str = "v1.15"
     max_attempts: int = 2
-    timeout_ms: int = 20_000
+    timeout_ms: int = 30_000
 
 
 @dataclass(frozen=True)
@@ -108,12 +108,12 @@ class GoogleGeminiClient:
         for model in islice(models, 100):
             name = (model.name or "").removeprefix("models/")
             match = re.fullmatch(
-                r"gemini-(\d+)\.(\d+)-flash(?:-lite)?(?:-\d+)?(?:-preview(?:-\d+)*)?", name
+                r"gemini-(\d+)(?:\.(\d+))?-flash(?:-lite)?(?:-\d+)?(?:-preview(?:-\d+)*)?", name
             )
             if (match and name != self._model and
                     "generateContent" in (model.supported_actions or [])):
                 candidates.append((
-                    "preview" not in name, int(match[1]), int(match[2]),
+                    "preview" not in name, int(match[1]), int(match[2] or 0),
                     "lite" not in name, name,
                 ))
         if not candidates:
@@ -131,7 +131,9 @@ class GoogleGeminiClient:
                     max_output_tokens=2048,
                     thinking_config=(
                         self._types.ThinkingConfig(thinking_budget=0)
-                        if self._model.startswith("gemini-2.5-flash") else None
+                        if self._model.startswith("gemini-2.5-flash") else
+                        self._types.ThinkingConfig(thinking_level="minimal")
+                        if re.match(r"gemini-3(?:\.|-).*flash", self._model) else None
                     ),
                     response_mime_type="application/json",
                     response_json_schema=RESPONSE_SCHEMA,

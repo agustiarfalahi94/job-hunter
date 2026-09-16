@@ -156,6 +156,29 @@ class MatchingTest(unittest.TestCase):
         self.assertEqual(config.thinking_config.thinking_budget, 0)
         self.assertGreaterEqual(config.max_output_tokens, 2048)
 
+    def test_gemini_three_flash_uses_minimal_thinking(self):
+        with patch("google.genai.Client") as factory:
+            factory.return_value.models.generate_content.return_value = SimpleNamespace(
+                text=json.dumps(gemini_result())
+            )
+            client = GoogleGeminiClient(MatchingConfig(api_key="test-key", model="gemini-3-flash-preview"))
+            client.generate({}, "Score this synthetic job")
+            config = factory.return_value.models.generate_content.call_args.kwargs["config"]
+        self.assertEqual(config.thinking_config.thinking_level, "MINIMAL")
+
+    def test_recovery_accepts_provider_listed_major_only_versions(self):
+        error = RuntimeError("model not found")
+        error.code = 404
+        with patch("google.genai.Client") as factory:
+            models = factory.return_value.models
+            models.generate_content.side_effect = [error, SimpleNamespace(text=json.dumps(gemini_result()))]
+            models.list.return_value = [SimpleNamespace(
+                name="models/gemini-3-flash-preview", supported_actions=["generateContent"]
+            )]
+            result = score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                                 MatchingConfig(api_key="test-key"), {}, sleep=lambda _: None)
+        self.assertEqual(result.model, "gemini-3-flash-preview")
+
     def test_sdk_invalid_json_is_classified_explicitly(self):
         with patch("google.genai.Client") as factory:
             factory.return_value.models.generate_content.return_value = SimpleNamespace(
