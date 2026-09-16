@@ -16,7 +16,7 @@ Default target roles include Data Analyst, Data Engineer, BI Developer, Reportin
 
 Primary strengths are Power BI, SSRS, and Google BigQuery. Bonus experience includes PostgreSQL, Alibaba MaxCompute, Domo, MySQL, T-SQL/MSSQL, data migration, Apache Airflow, Docker, Python, Python scripts, PySpark, Git/GitHub/GitLab, CI/CD pipeline variables, Agile/Scrum, and CAB deployment. Users can edit all of these fields in the app.
 
-Hard skips include local/Malaysian-only requirements and mandatory Mandarin-speaker requirements. Normalized hard-skip matching runs before Gemini. Managerial titles remain eligible when their descriptions fit the supplied evidence.
+Hard skips include local/Malaysian-only requirements and mandatory Mandarin-speaker requirements. Matching normalizes punctuation, word order, plurals, and supported requirement concepts such as `must be Malaysian` or `Mandarin required`; optional wording such as `Mandarin is an advantage` is not excluded. Generic custom phrases receive conservative normalized-term matching. Hard skips run before Gemini. Managerial titles remain eligible when their descriptions fit the supplied evidence.
 
 ## Gemini Result
 
@@ -29,6 +29,8 @@ Gemini returns structured JSON containing a 0-100 score, reasons, and remarks. T
 | 0-49 | `reject` |
 
 Weak results receive remarks. A result scored from a snippet or unavailable description is marked as limited evidence.
+
+Gemini 2.5 Flash scoring disables thinking and allows 2048 output tokens for structured JSON. Malformed JSON is explicitly classified and retried at most once. The connection check sends only a synthetic criteria/job pair, never session CV text.
 
 ## Fallback And Cache
 

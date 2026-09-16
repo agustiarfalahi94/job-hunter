@@ -33,7 +33,7 @@ class StreamlitSearchContractTest(unittest.TestCase):
         self.assertNotIn('"Strong-match goal"', source)
         self.assertNotIn('"Maximum jobs in one session"', source)
         self.assertIn('key="stop_search"', source)
-        self.assertIn("validate_custom_sources", source)
+        self.assertIn("resolve_company_sources", source)
 
 
 if __name__ == "__main__":

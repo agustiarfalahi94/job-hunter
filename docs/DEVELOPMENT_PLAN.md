@@ -185,6 +185,21 @@
 - Simplified the app to one criteria panel with a fixed 50-unique-job target and
   Actionable / All / Already applied queue views.
 
+## v1.15 - Search Completion And Criteria UX
+
+- Clear the uploader widget when a session CV is removed.
+- Match supported hard-skip requirements by conservative intent rather than
+  requiring exact word-for-word phrases.
+- Offer named company career-site presets and flexible public-domain entries in
+  one searchable selector.
+- Separate actual jobs checked from the 50-job ceiling in terminal progress.
+- Route fragment navigation through a pending request consumed by a full app
+  rerun before the page selector is rendered.
+- Add focused regression, release, CI, and production verification.
+- Hide Profile & CV in criteria mode while preserving saved session data.
+- Sort Apply choices by numeric job ID without changing ranked queue ordering.
+- Fix Gemini output allocation and add a non-sensitive Cloud connection check.
+
 ## Next
 
 - Add authenticated durable accounts only with an explicit privacy and data

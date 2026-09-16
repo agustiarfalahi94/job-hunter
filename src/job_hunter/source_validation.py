@@ -11,12 +11,32 @@ from urllib.parse import urlparse
 
 MAX_CUSTOM_SOURCES = 5
 HOST_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+COMPANY_SOURCE_DOMAINS = {
+    "Accenture": "careers.accenture.com",
+    "HCLTech": "hcltech.com",
+    "Razer": "razer.com",
+    "Prudential Malaysia": "prudential.com.my",
+    "Accord Innovations": "accordinnovations.com",
+}
+COMPANY_SOURCE_OPTIONS = tuple(COMPANY_SOURCE_DOMAINS)
 
 
 @dataclass(frozen=True)
 class CustomSource:
     hostname: str
     site_filter: str
+
+
+def resolve_company_sources(
+    values: Iterable[str], *, has_api_search: bool
+) -> tuple[tuple[CustomSource, ...], tuple[str, ...]]:
+    """Resolve friendly company names or user-entered public career domains."""
+    resolved = [
+        _resolve_company_value(str(value))
+        for value in values
+        if str(value).strip()
+    ]
+    return validate_custom_sources(resolved, has_api_search=has_api_search)
 
 
 def validate_custom_sources(
@@ -78,3 +98,26 @@ def _validated_hostname(value: str) -> str:
         if not address.is_global:
             raise ValueError("private or local addresses are not supported")
     return hostname
+
+
+def _normalize_company_name(value: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()).split())
+
+
+def _resolve_company_value(value: str) -> str:
+    if any(marker in value for marker in (".", "/", ":")):
+        return value.strip()
+    normalized = _normalize_company_name(value)
+    compact = normalized.replace(" ", "")
+    matches = []
+    for name, domain in COMPANY_SOURCE_DOMAINS.items():
+        known = _normalize_company_name(name)
+        known_compact = known.replace(" ", "")
+        if (
+            known == normalized
+            or known in normalized
+            or (len(compact) >= 4 and compact in known_compact)
+            or (len(known_compact) >= 4 and known_compact in compact)
+        ):
+            matches.append(domain)
+    return matches[0] if len(set(matches)) == 1 else value.strip()

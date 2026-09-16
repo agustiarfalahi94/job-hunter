@@ -1,4 +1,7 @@
 import unittest
+import json
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from job_hunter.matching import (
     GeminiServiceError,
@@ -6,7 +9,9 @@ from job_hunter.matching import (
     MatchingConfig,
     score_match,
     _classify_provider_error,
+    GoogleGeminiClient,
 )
+from job_hunter.provider_check import check_gemini_connection
 from job_hunter.queue_types import JobInput
 
 
@@ -53,6 +58,47 @@ def gemini_result(score=92):
 
 
 class MatchingTest(unittest.TestCase):
+    def test_connection_check_uses_only_synthetic_data(self):
+        client = RecordingGeminiClient([gemini_result()])
+        result = check_gemini_connection(MatchingConfig(api_key="test-key"), client=client)
+        self.assertEqual(result.engine, "Gemini")
+        self.assertNotIn("cv_text", client.last_payload["candidate"])
+        self.assertEqual(client.last_payload["job"]["company"], "Synthetic test company")
+
+    def test_invalid_key_bad_request_is_classified_as_authentication(self):
+        error = RuntimeError("API_KEY_INVALID")
+        error.code = 400
+        self.assertEqual(_classify_provider_error(error).kind, "authentication")
+
+    def test_unavailable_model_is_classified_explicitly(self):
+        error = RuntimeError("model not found")
+        error.code = 404
+        self.assertEqual(_classify_provider_error(error).kind, "model")
+
+    def test_sdk_adapter_reserves_output_for_json_instead_of_thinking(self):
+        with patch("google.genai.Client") as factory:
+            factory.return_value.models.generate_content.return_value = SimpleNamespace(
+                text=json.dumps(gemini_result()), candidates=[]
+            )
+            client = GoogleGeminiClient(MatchingConfig(api_key="test-key"))
+            value = client.generate({}, "Score this synthetic job")
+            config = factory.return_value.models.generate_content.call_args.kwargs["config"]
+
+        self.assertEqual(value["score"], 92)
+        self.assertEqual(config.thinking_config.thinking_budget, 0)
+        self.assertGreaterEqual(config.max_output_tokens, 2048)
+
+    def test_sdk_invalid_json_is_classified_explicitly(self):
+        with patch("google.genai.Client") as factory:
+            factory.return_value.models.generate_content.return_value = SimpleNamespace(
+                text='{"score":', candidates=[]
+            )
+            client = GoogleGeminiClient(MatchingConfig(api_key="test-key"))
+            with self.assertRaises(GeminiServiceError) as error:
+                client.generate({}, "Score this synthetic job")
+
+        self.assertEqual(error.exception.kind, "invalid_response")
+
     def test_http_429_is_classified_as_retryable_rate_limit(self):
         error = RuntimeError("too many requests")
         error.status_code = 429

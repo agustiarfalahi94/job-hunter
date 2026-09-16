@@ -27,8 +27,8 @@ The hosted app never creates `JobQueue` or `CVStore`. SQLite and disk-backed CV 
 | `search.py` | Query planning, provider parsers, safe page loading, dates, descriptions, availability |
 | `matching.py` | Mode validation, Gemini adapter, structured output, retry, cache, fallback |
 | `job_identity.py` | Tracking cleanup, provider IDs, fingerprints, alternate source identity |
-| `source_validation.py` | Public HTTPS custom-domain validation |
-| `eligibility.py` | Shared normalized hard-skip matching |
+| `source_validation.py` | Friendly company-name resolution and public HTTPS custom-domain validation |
+| `eligibility.py` | Shared normalized and conservative semantic hard-skip matching |
 | `app_ui.py` | Queue filtering, row presentation, and application destinations |
 | `queue.py` | Additive local SQLite compatibility path |
 
@@ -47,6 +47,8 @@ Gemini receives one mode-specific candidate payload and one job payload. Criteri
 ## Cancellation Boundary
 
 The controller schedules at most two jobs at a time and checks cancellation before every new discovery, fetch, and scoring stage. It cannot forcibly interrupt an already executing third-party request, so those calls have bounded timeouts and a short settlement window. A new run activates a new ID; late completed values from an older ID are ignored.
+
+The progress fragment does not mutate the already-rendered page widget. It writes a pending page request and triggers a full app rerun; the request is consumed before the page control is created. Completed searches render as terminally full even when the source pool contains fewer than 50 unique candidates.
 
 ## Local SQLite Compatibility
 

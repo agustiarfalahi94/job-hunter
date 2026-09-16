@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.15.0 - 2026-09-16
+
+- Cleared the Streamlit file-uploader selection when a saved session CV is
+  removed, preventing a stale filename from appearing as if the CV remained.
+- Expanded hard-skip evaluation from literal phrases to normalized terms and
+  conservative semantic variants for local/Malaysian-only and mandatory
+  Mandarin requirements, while excluding optional language wording.
+- Replaced the free-form career-domain text area with a searchable company-site
+  selector containing named presets and support for friendly name variations or
+  public career domains.
+- Made terminally completed searches fill the progress bar while reporting the
+  actual checked count and the fixed 50-job maximum separately.
+- Fixed Review Job queue navigation from the polling fragment by handing the
+  page request to a full app rerun before the page control is instantiated.
+- Added regression coverage for CV removal, semantic exclusions, company-source
+  resolution, terminal progress, and fragment navigation.
+- Sorted the selected-job Apply dropdown by numeric job ID.
+- Hid Profile & CV in Criteria-based mode without removing its implementation
+  or clearing a saved session CV when matching mode changes.
+- Reserved sufficient Gemini JSON output capacity and disabled thinking for
+  supported Gemini 2.5 Flash models to prevent the former 700-token cutoff.
+- Added a synthetic-data Gemini connection check and explicit sanitized error
+  classification for invalid JSON, invalid keys, unavailable models, and quota.
+
 ## 1.14.0 - 2026-09-15
 
 - Moved hosted CVs, queue records, application evidence, and score caches into

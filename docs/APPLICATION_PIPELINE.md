@@ -1,6 +1,6 @@
 # Application Pipeline
 
-## v1.14 Flow
+## v1.15 Flow
 
 ```text
 Criteria only OR session CV + criteria
@@ -37,16 +37,16 @@ User login, review, submit, and manual status record
 
 - Discovery treats title and description as separate signals rather than requiring both.
 - Each run has at most 12 discovery requests, 50 unique candidates, 50 detail fetches, 50 scoring attempts, two job workers, and five minutes of new-work scheduling.
-- Custom domains are HTTPS-only, public, limited to five, and require SerpAPI.
+- Company career sites are selected by friendly preset names or public domains, resolved case-insensitively, HTTPS-only, limited to five, and require SerpAPI.
 - Detail fetches use trusted provider, known ATS, or validated custom domains with bounded redirects and timeouts.
 - Full descriptions come from `JobPosting.description` or recognized job-description containers. A snippet or unavailable state is retained honestly when full text cannot be read.
 - Job-specific date fields beat generic update metadata. Unknown dates remain `Unknown`.
-- Known stale jobs, closed jobs, and hard-skip wording are excluded before matching.
+- Known stale jobs, closed jobs, and semantic hard-skip requirements are excluded before matching.
 - Confident duplicate identities share one queue record while retaining alternate source links. Generic Apply redirects are never vacancy identity.
 
 ## Progress And Stop
 
-Background workers publish immutable events; only the Streamlit thread accepts completed matches into session state. Stop prevents new work after cancellation is observed. In-flight requests retain their bounded timeout and may settle briefly. Completed matches are kept, pending work is cancelled, and stale results from an older run ID are rejected.
+Background workers publish immutable events; only the Streamlit thread accepts completed matches into session state. Stop prevents new work after cancellation is observed. In-flight requests retain their bounded timeout and may settle briefly. Completed matches are kept, pending work is cancelled, and stale results from an older run ID are rejected. During a run, progress is measured against the 50-job ceiling. A normal terminal completion fills the bar and labels the actual checked count separately, so source exhaustion is not mistaken for ongoing work.
 
 ## Apply Rules
 

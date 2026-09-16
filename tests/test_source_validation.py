@@ -1,9 +1,14 @@
 import unittest
 
-from job_hunter.source_validation import validate_custom_sources
+from job_hunter.source_validation import resolve_company_sources, validate_custom_sources
 
 
 class SourceValidationTest(unittest.TestCase):
+    def test_company_named_url_still_undergoes_url_validation(self):
+        sources, errors = resolve_company_sources(["http://accenture.com/jobs"], has_api_search=True)
+        self.assertEqual(sources, ())
+        self.assertEqual(len(errors), 1)
+
     def test_normalizes_https_url_and_domain_to_one_source(self):
         sources, errors = validate_custom_sources(
             ["careers.example.com", "https://careers.example.com/jobs"],
@@ -48,6 +53,36 @@ class SourceValidationTest(unittest.TestCase):
 
         self.assertEqual(len(sources), 5)
         self.assertIn("Only the first 5 additional domains are used.", errors)
+
+    def test_company_source_names_resolve_without_exact_case(self):
+        sources, errors = resolve_company_sources(
+            ["accenture", "Prudential Malaysia"], has_api_search=True
+        )
+
+        self.assertEqual(errors, ())
+        self.assertEqual(
+            tuple(source.hostname for source in sources),
+            ("careers.accenture.com", "prudential.com.my"),
+        )
+
+    def test_company_source_names_allow_friendly_variations(self):
+        sources, errors = resolve_company_sources(
+            ["Accenture Malaysia careers", "HCL Tech"], has_api_search=True
+        )
+
+        self.assertEqual(errors, ())
+        self.assertEqual(
+            tuple(source.hostname for source in sources),
+            ("careers.accenture.com", "hcltech.com"),
+        )
+
+    def test_company_source_selector_also_accepts_public_domains(self):
+        sources, errors = resolve_company_sources(
+            ["jobs.example.com"], has_api_search=True
+        )
+
+        self.assertEqual(errors, ())
+        self.assertEqual(tuple(source.hostname for source in sources), ("jobs.example.com",))
 
 
 if __name__ == "__main__":

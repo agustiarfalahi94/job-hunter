@@ -47,7 +47,7 @@ class MatchContext:
 class MatchingConfig:
     api_key: str = ""
     model: str = "gemini-2.5-flash"
-    prompt_version: str = "v1.14"
+    prompt_version: str = "v1.15"
     max_attempts: int = 2
     timeout_ms: int = 20_000
 
@@ -101,12 +101,23 @@ class GoogleGeminiClient:
                 contents=f"{prompt}\n\nINPUT JSON:\n{json.dumps(payload, ensure_ascii=True)}",
                 config=self._types.GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=700,
+                    max_output_tokens=2048,
+                    thinking_config=(
+                        self._types.ThinkingConfig(thinking_budget=0)
+                        if self._model.startswith("gemini-2.5-flash") else None
+                    ),
                     response_mime_type="application/json",
                     response_json_schema=RESPONSE_SCHEMA,
                 ),
             )
-            return json.loads(response.text or "{}")
+            try:
+                return json.loads(response.text or "{}")
+            except (TypeError, ValueError) as exc:
+                raise GeminiServiceError(
+                    "invalid_response", "Gemini returned incomplete JSON", retryable=True
+                ) from exc
+        except GeminiServiceError:
+            raise
         except Exception as exc:
             raise _classify_provider_error(exc) from exc
 
@@ -257,8 +268,10 @@ def _classify_provider_error(exc: Exception) -> GeminiServiceError:
     status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
     name = type(exc).__name__.casefold()
     text = str(exc).casefold()
-    if status in {401, 403} or "permission" in name or "unauth" in text:
+    if status in {401, 403} or "permission" in name or "unauth" in text or "api_key_invalid" in text:
         return GeminiServiceError("authentication", "Gemini authentication failed", retryable=False)
+    if status == 404:
+        return GeminiServiceError("model", "Gemini model is unavailable", retryable=False)
     if "quota" in text:
         return GeminiServiceError("quota", "Gemini quota unavailable", retryable=False)
     if status == 429 or "rate" in text or "too many requests" in text:
@@ -277,4 +290,6 @@ def _safe_error_message(kind: str) -> str:
         "rate_limit": "Gemini rate limit persisted; deterministic fallback was used.",
         "temporary": "Gemini timed out or was temporarily unavailable; deterministic fallback was used.",
         "configuration": "Gemini SDK is unavailable; deterministic fallback was used.",
+        "invalid_response": "Gemini returned incomplete or invalid JSON; deterministic fallback was used.",
+        "model": "Gemini model is unavailable. Check GEMINI_MODEL in Streamlit secrets.",
     }.get(kind, "Gemini scoring was unavailable; deterministic fallback was used.")

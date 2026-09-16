@@ -406,7 +406,10 @@ class SearchRunController:
             run_id,
             "matched",
             f"Scored {processed.job.title} at {processed.job.company or 'unknown company'} "
-            f"({processed.result.score}/100, {processed.result.engine}).",
+            f"({processed.result.score}/100, {processed.result.engine})."
+            + (f" {processed.result.remarks[-1]}"
+               if processed.result.engine == "Deterministic fallback" and processed.result.remarks
+               else ""),
         )
 
     def _should_stop(self, started: float) -> bool:

@@ -1,15 +1,15 @@
 # Job Hunter
 
-Job Hunter v1.14.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.15.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
-- Searches LinkedIn, JobStreet, Indeed, Foundit, selected company sites, and up to five validated custom career domains.
+- Searches LinkedIn, JobStreet, Indeed, Foundit, and up to five selected or user-entered company career sites.
 - Discovers by job title **or** description keyword, so an unfamiliar title can still be found.
 - Targets up to 50 unique jobs per run with at most 12 discovery requests, 50 detail-page fetches, 50 scoring calls, two job workers, and five minutes of new-work scheduling.
 - Reads full descriptions from structured job data or recognized page sections; otherwise labels scoring as snippet-based or unavailable.
 - Verifies job-specific posting dates where possible, labels unknown dates honestly, and skips known stale or closed jobs.
-- Excludes local-only, Malaysian-only, and mandatory-Mandarin wording before scoring.
+- Excludes semantic variants of local-only, Malaysian-only, and mandatory-Mandarin requirements before scoring.
 - Uses Gemini for evidence-based matching when configured and visibly labels deterministic fallback scores when Gemini is unavailable.
 - Consolidates confident duplicates while preserving alternate source links.
 - Opens the safest application page in a new tab and lets the user record an application manually.
@@ -23,21 +23,23 @@ Use **Matching mode** in the sidebar:
 - **Criteria-based search** uses only the editable titles, primary keywords, bonus keywords, hard skips, and location. It never reads or sends CV text.
 - **CV-based search** compares each job with both the editable criteria and readable text from the CV saved in the current session.
 
+Profile & CV is hidden in Criteria-based mode. Switching modes does not clear a saved CV; it remains available when you switch back to CV-based mode, within the same session.
+
 ### 2. Optional CV
 
-Open **Profile & CV** to upload PDF, DOCX, or best-effort legacy DOC. Click **Save CV**, then **Continue to Search jobs**. A CV can be replaced or removed at any time.
+Open **Profile & CV** to upload PDF, DOCX, or best-effort legacy DOC. Click **Save CV**, then **Continue to Search jobs**. A CV can be replaced or removed at any time. Removing it also clears the visible upload selection.
 
 CV bytes and extracted text are session-only in the hosted app. They are not written to the repository or a shared server database. They disappear when the Streamlit session resets, the app restarts, or the session expires.
 
 ### 3. Search Jobs
 
 1. Open **Search jobs**.
-2. Edit the title, required description, bonus, and hard-skip terms.
+2. Edit the title, required description, bonus, and hard-skip terms. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
 3. Type or select one city in **Location**.
 4. Select job platforms and a posting-age limit.
-5. Optionally add up to five HTTPS career-site domains. Custom domains require SerpAPI.
+5. In **Company career sites**, choose Accenture, HCLTech, Razer, Prudential Malaysia, or Accord Innovations. The selector is case-insensitive and also accepts a public HTTPS careers domain, up to five sites total. Company sites require SerpAPI.
 6. Click **Run search and score jobs**.
-7. Follow the 0/50 progress bar and activity log.
+7. Follow the progress bar and activity log. Fifty is the maximum, not a required result count; a completed search fills the bar even when sources return fewer jobs and reports the number actually checked.
 8. Use **Stop search** when needed, then click **Review Job queue**.
 
 Stop prevents new discovery, page-fetch, and scoring work after cancellation is observed. An in-flight network or Gemini request has its own timeout and may take a short time to settle; completed results are kept.
@@ -59,6 +61,8 @@ GEMINI_MODEL = "gemini-2.5-flash"
 ```
 
 `SERPAPI_API_KEY` enables dependable Google-backed source discovery and custom domains. Without it, the app uses a limited public-search fallback that may be blocked or incomplete. `GEMINI_API_KEY` enables Gemini matching. Without it, searches still work with a clearly labelled deterministic fallback. Never commit real keys or `.streamlit/secrets.toml`.
+
+Use **Check Gemini connection** on Search jobs to test the configured service with synthetic data only. It does not use your CV or SerpAPI. A configured key does not guarantee valid permissions, available model access, or quota; failures are shown with a sanitized reason in this check and in search logs.
 
 ## Run Locally
 

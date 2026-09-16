@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
+from typing import MutableMapping
 
 import streamlit as st
 
@@ -18,15 +18,20 @@ from job_hunter.cv_store import format_size
 from job_hunter.locations import city_options, fetch_malaysia_cities
 from job_hunter.matching import MatchContext, MatchingConfig
 from job_hunter.preferences import load_preferences
+from job_hunter.provider_check import check_gemini_connection
 from job_hunter.runtime_config import SearchProviderConfig, load_search_provider_config
 from job_hunter.search import SearchCriteria
 from job_hunter.search_runner import (
     MAX_UNIQUE_RESULTS,
+    RunSnapshot,
     SearchRequest,
     SearchRunController,
 )
 from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
-from job_hunter.source_validation import validate_custom_sources
+from job_hunter.source_validation import (
+    COMPANY_SOURCE_OPTIONS,
+    resolve_company_sources,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +51,7 @@ TARGET_TITLES = [
     "BI Engineer",
 ]
 PRIMARY_KEYWORDS = ["Power BI", "SSRS", "Google BigQuery"]
-SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit", "Company career pages"]
+SOURCES = ["LinkedIn", "JobStreet", "Indeed", "Foundit"]
 PAGES = ("Profile & CV", "Search jobs", "Job queue")
 SEARCH_MODES = ("Criteria-based search", "CV-based search")
 POSTING_AGE_OPTIONS = {
@@ -66,8 +71,11 @@ def main() -> None:
     _inject_table_styles()
     _render_header()
     _render_sidebar(workspace, provider_config, preferences)
-    st.session_state.setdefault("page", PAGES[0])
-    page = st.segmented_control("Page", PAGES, key="page")
+    _consume_page_request()
+    visible_pages = PAGES if st.session_state.get("search_mode") == SEARCH_MODES[1] else PAGES[1:]
+    if st.session_state.get("page") not in visible_pages:
+        st.session_state["page"] = visible_pages[0]
+    page = st.segmented_control("Page", visible_pages, key="page")
     if page == "Profile & CV":
         _render_profile(workspace, preferences)
     elif page == "Search jobs":
@@ -146,14 +154,16 @@ def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object])
                 f"CV Saved: `{workspace.cv.filename}` - {format_size(workspace.cv.size_bytes)}"
             )
             if st.button("Remove saved CV", icon=":material/delete:"):
-                workspace.remove_cv()
+                _remove_saved_cv(workspace)
                 st.toast("Saved CV removed.")
                 st.rerun()
         else:
             st.info("No readable CV is saved in this session yet.")
 
         uploaded = st.file_uploader(
-            "Upload or replace CV", type=["pdf", "docx", "doc"], key="cv_upload"
+            "Upload or replace CV",
+            type=["pdf", "docx", "doc"],
+            key=_cv_upload_key(st.session_state),
         )
         if uploaded is not None and st.button("Save CV", icon=":material/save:"):
             try:
@@ -189,6 +199,21 @@ def _render_search_jobs(
     provider_config: SearchProviderConfig,
 ) -> None:
     st.subheader("Search jobs")
+    if provider_config.has_gemini:
+        if st.button("Check Gemini connection", icon=":material/health_and_safety:"):
+            with st.spinner("Checking Gemini with synthetic data..."):
+                result = check_gemini_connection(MatchingConfig(
+                    api_key=provider_config.gemini_api_key, model=provider_config.gemini_model
+                ))
+            st.session_state["gemini_check_result"] = (
+                "Gemini connection succeeded." if result.engine == "Gemini"
+                else result.remarks[-1]
+            )
+        if message := st.session_state.get("gemini_check_result"):
+            if message == "Gemini connection succeeded.":
+                st.success(message)
+            else:
+                st.warning(message)
     mode = str(st.session_state.get("search_mode", SEARCH_MODES[0]))
     if mode == "CV-based search" and workspace.cv is None:
         st.warning("CV-based search needs a readable CV saved in this session.")
@@ -249,17 +274,22 @@ def _render_search_jobs(
         platforms = st.multiselect(
             "Platforms to search", SOURCES, default=SOURCES, key="search_platforms"
         )
-        custom_text = st.text_area(
-            "Additional career-site domains",
-            key="custom_sources",
-            placeholder="careers.example.com\njobs.example.org",
-            help="Up to five public HTTPS domains. Additional domains require SerpAPI.",
+        company_values = st.multiselect(
+            "Company career sites",
+            COMPANY_SOURCE_OPTIONS,
+            default=COMPANY_SOURCE_OPTIONS if provider_config.has_api_search else (),
+            accept_new_options=True,
+            key="company_sources",
+            help=(
+                "Choose a company or type a public careers domain. Names are matched "
+                "without case sensitivity; up to five sites are searched through SerpAPI."
+            ),
         )
         posting_age = st.selectbox(
             "Date posted", tuple(POSTING_AGE_OPTIONS), index=2, key="posting_age"
         )
-        custom_sources, source_errors = validate_custom_sources(
-            _split_sources(custom_text), has_api_search=provider_config.has_api_search
+        custom_sources, source_errors = resolve_company_sources(
+            company_values, has_api_search=provider_config.has_api_search
         )
         for error in source_errors:
             st.warning(error)
@@ -326,10 +356,10 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
 
     left, right = st.columns([3, 1], vertical_alignment="bottom")
     with left:
-        progress_value = min(100, int(snapshot.checked / MAX_UNIQUE_RESULTS * 100))
+        progress_value, progress_label = _run_progress(snapshot)
         st.progress(
             progress_value,
-            text=f"{snapshot.checked}/{MAX_UNIQUE_RESULTS} jobs checked - {snapshot.message}",
+            text=progress_label,
         )
     with right:
         if st.button(
@@ -358,14 +388,13 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
         st.caption("Ready to search. Progress and current activity will appear here.")
 
     if snapshot.completed or workspace.list_jobs():
-        st.button(
+        if st.button(
             "Review Job queue",
             icon=":material/table_chart:",
             type="primary",
-            on_click=_open_page,
-            args=("Job queue",),
             key="review_queue",
-        )
+        ):
+            _navigate_from_fragment("Job queue")
 
 
 def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -> None:
@@ -424,7 +453,7 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
     jobs = list(jobs)
     if not jobs:
         return
-    options = {f"#{job.id} - {job.title} - {job.company}": job for job in jobs}
+    options = _application_job_options(jobs)
     selected = st.selectbox("Job", list(options))
     job = options[selected]
     applied = st.checkbox(
@@ -567,13 +596,53 @@ def _open_page(page: str) -> None:
     st.session_state["page"] = page
 
 
+def _application_job_options(jobs) -> dict[str, object]:
+    return {
+        f"#{job.id} - {job.title} - {job.company}": job
+        for job in sorted(jobs, key=lambda job: job.id)
+    }
+
+
+def _navigate_from_fragment(page: str) -> None:
+    st.session_state["requested_page"] = page
+    st.rerun()
+
+
+def _consume_page_request() -> None:
+    requested = st.session_state.pop("requested_page", None)
+    if requested in PAGES:
+        st.session_state["page"] = requested
+
+
+def _cv_upload_key(state: MutableMapping[str, object]) -> str:
+    revision = state.get("cv_upload_revision", 0)
+    return f"cv_upload_{revision if isinstance(revision, int) else 0}"
+
+
+def _remove_saved_cv(workspace: SessionWorkspace) -> None:
+    current_key = _cv_upload_key(st.session_state)
+    workspace.remove_cv()
+    st.session_state.pop(current_key, None)
+    revision = st.session_state.get("cv_upload_revision", 0)
+    st.session_state["cv_upload_revision"] = (
+        revision + 1 if isinstance(revision, int) else 1
+    )
+
+
+def _run_progress(snapshot: RunSnapshot) -> tuple[int, str]:
+    if snapshot.state == "completed":
+        return (
+            100,
+            f"{snapshot.checked} jobs checked - Search complete "
+            f"({MAX_UNIQUE_RESULTS}-job maximum).",
+        )
+    value = min(100, int(snapshot.checked / MAX_UNIQUE_RESULTS * 100))
+    return value, f"{snapshot.checked}/{MAX_UNIQUE_RESULTS} jobs checked - {snapshot.message}"
+
+
 def _location_options(cities: tuple[str, ...]) -> tuple[str, ...]:
     options = city_options("", cities=cities, limit=300)
     return ("Kuala Lumpur",) + tuple(city for city in options if city != "Kuala Lumpur")
-
-
-def _split_sources(value: str) -> tuple[str, ...]:
-    return tuple(part.strip() for part in re.split(r"[,\n]", value) if part.strip())
 
 
 if __name__ == "__main__":
