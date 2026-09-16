@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.15.1 - 2026-09-16
+
+- Recover from an unavailable Gemini model using Google's model listing, with a single alternate scoring attempt and stable text-generation Flash preference.
+- Report the actual scoring model; retain sanitized authentication/quota failures without switching models.
+- Add regression coverage for recovery, unsupported models, failed alternates, and authentication/quota boundaries.
+- Follow up on the production synthetic connection check, which confirmed model availability was blocking scoring after v1.15.0.
+
 ## 1.15.0 - 2026-09-16
 
 - Cleared the Streamlit file-uploader selection when a saved session CV is

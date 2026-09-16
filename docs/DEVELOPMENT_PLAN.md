@@ -185,6 +185,13 @@
 - Simplified the app to one criteria panel with a fixed 50-unique-job target and
   Actionable / All / Already applied queue views.
 
+## v1.15.1 - Production Gemini Model Recovery
+
+- Diagnose with synthetic data against the deployed provider configuration.
+- Test model discovery and bounded recovery before implementation.
+- Select only provider-listed text-generation Flash models and preserve the two-generation ceiling.
+- Run the full release gate, feature CI, main CI, and repeat the production connection check.
+
 ## v1.15 - Search Completion And Criteria UX
 
 - Clear the uploader widget when a session CV is removed.

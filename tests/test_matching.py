@@ -58,6 +58,74 @@ def gemini_result(score=92):
 
 
 class MatchingTest(unittest.TestCase):
+    def test_unavailable_model_recovers_once_and_reports_actual_model(self):
+        error = RuntimeError("model not found")
+        error.code = 404
+        with patch("google.genai.Client") as factory:
+            models = factory.return_value.models
+            models.generate_content.side_effect = [
+                error, SimpleNamespace(text=json.dumps(gemini_result()))
+            ]
+            models.list.return_value = [
+                SimpleNamespace(name="models/gemini-3.1-flash-preview", supported_actions=["generateContent"]),
+                SimpleNamespace(name="models/gemini-3.0-flash", supported_actions=["generateContent"]),
+                SimpleNamespace(name="models/gemini-3.0-flash-image", supported_actions=["generateContent"]),
+            ]
+            result = score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                                 MatchingConfig(api_key="test-key"), {}, sleep=lambda _: None)
+            self.assertEqual(models.generate_content.call_count, 2)
+            self.assertEqual(models.list.call_count, 1)
+            self.assertEqual(models.generate_content.call_args.kwargs["model"], "gemini-3.0-flash")
+        self.assertEqual(result.engine, "Gemini")
+        self.assertEqual(result.model, "gemini-3.0-flash")
+
+    def test_model_recovery_does_not_guess_when_no_supported_flash_exists(self):
+        error = RuntimeError("model not found")
+        error.code = 404
+        with patch("google.genai.Client") as factory:
+            models = factory.return_value.models
+            models.generate_content.side_effect = error
+            models.list.return_value = [
+                SimpleNamespace(name="models/gemini-3.0-flash", supported_actions=["embedContent"])
+            ]
+            result = score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                                 MatchingConfig(api_key="test-key"), {}, sleep=lambda _: None)
+            self.assertEqual(models.generate_content.call_count, 1)
+        self.assertEqual(result.engine, "Deterministic fallback")
+
+    def test_authentication_failure_never_lists_models(self):
+        error = RuntimeError("invalid key")
+        error.code = 403
+        with patch("google.genai.Client") as factory:
+            factory.return_value.models.generate_content.side_effect = error
+            score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                        MatchingConfig(api_key="test-key"), {}, sleep=lambda _: None)
+            factory.return_value.models.list.assert_not_called()
+
+    def test_alternate_model_failure_stays_within_two_generations(self):
+        error = RuntimeError("model not found")
+        error.code = 404
+        with patch("google.genai.Client") as factory:
+            models = factory.return_value.models
+            models.generate_content.side_effect = error
+            models.list.return_value = [
+                SimpleNamespace(name="models/gemini-3.0-flash", supported_actions=["generateContent"])
+            ]
+            result = score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                                 MatchingConfig(api_key="test-key"), {}, sleep=lambda _: None)
+            self.assertEqual(models.generate_content.call_count, 2)
+            self.assertEqual(models.list.call_count, 1)
+        self.assertEqual(result.engine, "Deterministic fallback")
+
+    def test_quota_failure_never_lists_models(self):
+        error = RuntimeError("quota exhausted")
+        error.code = 429
+        with patch("google.genai.Client") as factory:
+            factory.return_value.models.generate_content.side_effect = error
+            score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                        MatchingConfig(api_key="test-key"), {}, sleep=lambda _: None)
+            factory.return_value.models.list.assert_not_called()
+
     def test_connection_check_uses_only_synthetic_data(self):
         client = RecordingGeminiClient([gemini_result()])
         result = check_gemini_connection(MatchingConfig(api_key="test-key"), client=client)

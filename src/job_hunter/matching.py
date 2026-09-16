@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import hashlib
 import json
+from itertools import islice
+import re
 import time
 from typing import Callable, Literal, MutableMapping, Protocol
 
@@ -86,6 +88,7 @@ class GoogleGeminiClient:
             ) from exc
         self._types = types
         self._model = config.model
+        self._recovery_attempted = False
         self._client = genai.Client(
             api_key=config.api_key,
             http_options=types.HttpOptions(
@@ -93,6 +96,30 @@ class GoogleGeminiClient:
                 retry_options=types.HttpRetryOptions(attempts=1),
             ),
         )
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    def _recover_model(self) -> bool:
+        self._recovery_attempted = True
+        models = self._client.models.list(config={"page_size": 100})
+        candidates = []
+        for model in islice(models, 100):
+            name = (model.name or "").removeprefix("models/")
+            match = re.fullmatch(
+                r"gemini-(\d+)\.(\d+)-flash(?:-lite)?(?:-\d+)?(?:-preview(?:-\d+)*)?", name
+            )
+            if (match and name != self._model and
+                    "generateContent" in (model.supported_actions or [])):
+                candidates.append((
+                    "preview" not in name, int(match[1]), int(match[2]),
+                    "lite" not in name, name,
+                ))
+        if not candidates:
+            return False
+        self._model = max(candidates)[-1]
+        return True
 
     def generate(self, payload: dict[str, object], prompt: str) -> object:
         try:
@@ -119,7 +146,17 @@ class GoogleGeminiClient:
         except GeminiServiceError:
             raise
         except Exception as exc:
-            raise _classify_provider_error(exc) from exc
+            classified = _classify_provider_error(exc)
+            if classified.kind == "model" and not self._recovery_attempted:
+                try:
+                    recovered = self._recover_model()
+                except Exception as discovery_error:
+                    raise _classify_provider_error(discovery_error) from discovery_error
+                if recovered:
+                    raise GeminiServiceError(
+                        "model", "An available Gemini model was selected", retryable=True
+                    ) from exc
+            raise classified from exc
 
 
 def score_match(
@@ -157,7 +194,8 @@ def score_match(
             return _fallback(job, context, "Gemini scoring was cancelled.")
         try:
             raw_result = active_client.generate(payload, PROMPT)
-            result = _validated_result(raw_result, job, context, config)
+            actual_model = getattr(active_client, "model", config.model)
+            result = _validated_result(raw_result, job, context, replace(config, model=actual_model))
         except GeminiServiceError as exc:
             if exc.retryable and attempt + 1 < attempts:
                 sleep(0.25)

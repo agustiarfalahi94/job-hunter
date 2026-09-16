@@ -44,6 +44,8 @@ SerpAPI is preferred for dependable discovery and required for custom domains. P
 
 Gemini receives one mode-specific candidate payload and one job payload. Criteria mode cannot carry CV text. Errors are classified into sanitized user-facing fallback reasons; raw API errors and keys are not logged.
 
+On model-not-found only, the adapter lists at most 100 provider model entries and selects a supported text-generation Flash model, preferring stable versions. Recovery consumes the existing second generation attempt, never an unbounded retry. Results carry the actual model name. Authentication/quota failures do not perform discovery.
+
 ## Cancellation Boundary
 
 The controller schedules at most two jobs at a time and checks cancellation before every new discovery, fetch, and scoring stage. It cannot forcibly interrupt an already executing third-party request, so those calls have bounded timeouts and a short settlement window. A new run activates a new ID; late completed values from an older ID are ignored.

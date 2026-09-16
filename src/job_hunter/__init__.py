@@ -1,4 +1,4 @@
-"""Job Hunter v1.15.0."""
+"""Job Hunter v1.15.1."""
 
 __all__ = [
     "application_packet",

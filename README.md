@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.15.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.15.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
@@ -63,6 +63,8 @@ GEMINI_MODEL = "gemini-2.5-flash"
 `SERPAPI_API_KEY` enables dependable Google-backed source discovery and custom domains. Without it, the app uses a limited public-search fallback that may be blocked or incomplete. `GEMINI_API_KEY` enables Gemini matching. Without it, searches still work with a clearly labelled deterministic fallback. Never commit real keys or `.streamlit/secrets.toml`.
 
 Use **Check Gemini connection** on Search jobs to test the configured service with synthetic data only. It does not use your CV or SerpAPI. A configured key does not guarantee valid permissions, available model access, or quota; failures are shown with a sanitized reason in this check and in search logs.
+
+If the configured Gemini model returns not found, the app asks Google for available text-generation Flash models and retries once with a supported model, preferring stable versions. Results identify the model actually used. No model name is guessed; authentication and quota errors do not trigger model switching. Model discovery checks at most 100 entries.
 
 ## Run Locally
 
