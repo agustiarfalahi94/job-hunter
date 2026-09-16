@@ -185,6 +185,12 @@
 - Simplified the app to one criteria panel with a fixed 50-unique-job target and
   Actionable / All / Already applied queue views.
 
+## v1.15.3 - Current Flash Compatibility
+
+- Correct the thinking level against Google's current per-model support table.
+- Test the latest Flash configuration and expose sanitized HTTP 400 request failures.
+- Repeat feature/main CI and the production synthetic connection check.
+
 ## v1.15.2 - Flash Latency Follow-Up
 
 - Use officially supported minimal thinking on Gemini 3 Flash and a bounded 30-second timeout.

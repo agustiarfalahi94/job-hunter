@@ -132,7 +132,7 @@ class GoogleGeminiClient:
                     thinking_config=(
                         self._types.ThinkingConfig(thinking_budget=0)
                         if self._model.startswith("gemini-2.5-flash") else
-                        self._types.ThinkingConfig(thinking_level="minimal")
+                        self._types.ThinkingConfig(thinking_level="low")
                         if re.match(r"gemini-3(?:\.|-).*flash", self._model) else None
                     ),
                     response_mime_type="application/json",
@@ -312,6 +312,8 @@ def _classify_provider_error(exc: Exception) -> GeminiServiceError:
         return GeminiServiceError("authentication", "Gemini authentication failed", retryable=False)
     if status == 404:
         return GeminiServiceError("model", "Gemini model is unavailable", retryable=False)
+    if status == 400:
+        return GeminiServiceError("request", "Gemini rejected request settings", retryable=False)
     if "quota" in text:
         return GeminiServiceError("quota", "Gemini quota unavailable", retryable=False)
     if status == 429 or "rate" in text or "too many requests" in text:
@@ -332,4 +334,5 @@ def _safe_error_message(kind: str) -> str:
         "configuration": "Gemini SDK is unavailable; deterministic fallback was used.",
         "invalid_response": "Gemini returned incomplete or invalid JSON; deterministic fallback was used.",
         "model": "Gemini model is unavailable. Check GEMINI_MODEL in Streamlit secrets.",
+        "request": "Gemini rejected the model request settings (HTTP 400); deterministic fallback was used.",
     }.get(kind, "Gemini scoring was unavailable; deterministic fallback was used.")

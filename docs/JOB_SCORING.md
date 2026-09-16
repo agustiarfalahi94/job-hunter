@@ -30,7 +30,7 @@ Gemini returns structured JSON containing a 0-100 score, reasons, and remarks. T
 
 Weak results receive remarks. A result scored from a snippet or unavailable description is marked as limited evidence.
 
-Gemini 2.5 Flash scoring disables thinking; Gemini 3 Flash uses minimal thinking. Scoring allows 2048 output tokens for structured JSON and a bounded 30-second provider timeout. Malformed JSON is explicitly classified and retried at most once. An unavailable model can recover using Google's supported Flash model listing within the same two-attempt ceiling. The connection check sends only a synthetic criteria/job pair, never session CV text.
+Gemini 2.5 Flash scoring disables thinking; Gemini 3 Flash uses low thinking, including current models that reject minimal. Scoring allows 2048 output tokens for structured JSON and a bounded 30-second provider timeout. Malformed JSON is explicitly classified and retried at most once. An unavailable model can recover using Google's supported Flash model listing within the same two-attempt ceiling. The connection check sends only a synthetic criteria/job pair, never session CV text.
 
 ## Fallback And Cache
 

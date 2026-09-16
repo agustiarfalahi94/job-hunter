@@ -143,6 +143,18 @@ class MatchingTest(unittest.TestCase):
         error.code = 404
         self.assertEqual(_classify_provider_error(error).kind, "model")
 
+    def test_rejected_request_settings_are_sanitized_and_not_retried(self):
+        error = RuntimeError("secret provider detail")
+        error.code = 400
+        classified = _classify_provider_error(error)
+        self.assertEqual(classified.kind, "request")
+        self.assertFalse(classified.retryable)
+        result = score_match(JOB, MatchContext(mode="criteria", criteria=CRITERIA),
+                             MatchingConfig(api_key="test-key"), {},
+                             client=RecordingGeminiClient([classified]))
+        self.assertIn("HTTP 400", result.remarks[-1])
+        self.assertNotIn("secret provider detail", result.remarks[-1])
+
     def test_sdk_adapter_reserves_output_for_json_instead_of_thinking(self):
         with patch("google.genai.Client") as factory:
             factory.return_value.models.generate_content.return_value = SimpleNamespace(
@@ -156,15 +168,15 @@ class MatchingTest(unittest.TestCase):
         self.assertEqual(config.thinking_config.thinking_budget, 0)
         self.assertGreaterEqual(config.max_output_tokens, 2048)
 
-    def test_gemini_three_flash_uses_minimal_thinking(self):
+    def test_gemini_three_flash_uses_supported_low_thinking(self):
         with patch("google.genai.Client") as factory:
             factory.return_value.models.generate_content.return_value = SimpleNamespace(
                 text=json.dumps(gemini_result())
             )
-            client = GoogleGeminiClient(MatchingConfig(api_key="test-key", model="gemini-3-flash-preview"))
+            client = GoogleGeminiClient(MatchingConfig(api_key="test-key", model="gemini-3.8-flash"))
             client.generate({}, "Score this synthetic job")
             config = factory.return_value.models.generate_content.call_args.kwargs["config"]
-        self.assertEqual(config.thinking_config.thinking_level, "MINIMAL")
+        self.assertEqual(config.thinking_config.thinking_level, "LOW")
 
     def test_recovery_accepts_provider_listed_major_only_versions(self):
         error = RuntimeError("model not found")

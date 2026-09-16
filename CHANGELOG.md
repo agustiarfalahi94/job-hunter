@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.3 - 2026-09-16
+
+- Correct Gemini 3 Flash thinking to `low`: current Gemini 3.7/3.8 Flash models explicitly reject `minimal`.
+- Classify rejected request settings (HTTP 400) separately from generic service failures without exposing provider response text.
+- Verify the thinking setting against the latest model in regression tests.
+
 ## 1.15.2 - 2026-09-16
 
 - Set minimal thinking for Gemini 3 Flash scoring and allow 30-second provider requests to reduce hosted latency failures.
