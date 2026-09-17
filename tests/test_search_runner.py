@@ -72,6 +72,25 @@ class SearchRunnerTest(unittest.TestCase):
         metadata = extract_job_metadata('<script type="application/ld+json">' + json.dumps(data) + '</script>', "https://my.linkedin.com/jobs/view/123")
         self.assertEqual(metadata.locations, ("New York, US",))
 
+    def test_conflicting_vacancy_url_cannot_be_overridden_by_page_or_fragment_identity(self):
+        source = "https://my.linkedin.com/jobs/view/123"
+        for weak in ({"mainEntityOfPage": source}, {"@id": source + "#related-job-456"}):
+            with self.subTest(identity=weak):
+                data = {"@graph": [
+                    {"@type": "JobPosting", "url": source, "jobLocation": {"address": {"addressLocality": "New York", "addressCountry": "US"}}},
+                    {"@type": "JobPosting", "url": "https://my.linkedin.com/jobs/view/456", **weak, "jobLocation": {"address": {"addressLocality": "Kuala Lumpur", "addressCountry": "MY"}}}]}
+                page = '<script type="application/ld+json">' + json.dumps(data) + '</script>'
+                self.assertEqual(extract_job_metadata(page, source).locations, ("New York, US",))
+                from job_hunter.runtime_config import SearchProviderConfig
+                calls = []
+                def scorer(*args, **kwargs):
+                    calls.append(1)
+                    return _score(*args, **kwargs)
+                controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [{"title": "BI Analyst", "link": source}]}), page_fetcher=lambda _: page, scorer=scorer)
+                controller.start(replace(_request(), provider_config=SearchProviderConfig(serpapi_key="test")))
+                self.assertTrue(controller.wait(2))
+                self.assertEqual(calls, [])
+
     def test_structured_locations_support_graphs_multiple_addresses_and_null_types(self):
         data = {"@graph": [{"@type": None}, {"@type": ["JobPosting"], "jobLocation": [
             {"address": {"addressLocality": "New York", "addressCountry": "US"}},

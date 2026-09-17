@@ -896,14 +896,14 @@ def _find_job_records(value: object) -> list[dict]:
 
 def _select_job_records(records: list[dict], source_url: str) -> list[dict]:
     def urls(record):
-        values = []
         for field in ("url", "@id", "mainEntityOfPage"):
             value = record.get(field)
             if isinstance(value, dict):
                 value = value.get("@id", value.get("url"))
             if isinstance(value, str) and value.startswith(("https://", "http://", "/")):
-                values.append(canonicalize_job_url(urljoin(source_url, value)))
-        return values
+                # An explicit vacancy URL takes priority over page-level identities.
+                return [canonicalize_job_url(urljoin(source_url, value))]
+        return []
     target = canonicalize_job_url(source_url)
     matched = [record for record in records if target in urls(record)]
     if matched:
