@@ -47,6 +47,8 @@ Public repository data includes source code, tests, generic criteria templates, 
 
 SerpAPI is preferred for dependable discovery and required for custom domains. Public fallback coverage may be incomplete. Page requests accept supported platform domains, known ATS domains, and only the custom domains that passed validation. Redirects remain HTTPS and trusted.
 
+General search candidates have no observed location merely because the query includes a city. JobPosting addresses override platform card evidence, known mismatches are skipped before scoring, and missing locations remain empty with an explicit result remark. Multiple observed locations are accepted when at least one matches the selected city as a normalized whole phrase.
+
 Gemini receives one mode-specific candidate payload and one job payload. Criteria mode cannot carry CV text. Errors are classified into sanitized user-facing fallback reasons; raw API errors and keys are not logged.
 
 On model-not-found only, the adapter lists at most 100 provider model entries and selects a supported text-generation Flash model, preferring stable versions. Recovery consumes the existing second generation attempt, never an unbounded retry. Results carry the actual model name. Authentication/quota failures do not perform discovery.

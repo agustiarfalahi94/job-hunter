@@ -52,6 +52,8 @@ Stop prevents new discovery, page-fetch, and scoring work after cancellation is 
 
 Automatic lookup conservatively requires a brand-matching corporate domain, a company-owned careers host, live citations, an official careers link, and readable regional evidence on both referring and destination pages. Shared ATS hosts, differently branded corporate domains, and inaccessible pages require an explicit domain instead. These evidence checks reduce mistakes; they are not a legal ownership certification. Discovery searches the verified company-owned hostname rather than a landing-page path, and still applies the selected job location.
 
+The selected city is a search constraint, not evidence of a posting's actual location. Readable JobPosting addresses or platform location labels supply observed location; known mismatches are skipped before scoring. When a source exposes no location, the queue leaves it unverified and explains that limitation in remarks rather than assigning your selected city.
+
 ### 4. Review And Apply
 
 The queue defaults to **Actionable** jobs. Use **All** or **Already applied** to change the view, then filter by match decision. Each row shows the scoring engine, evidence limit, description quality, date source or limitation, reasons, remarks, and alternate sources.

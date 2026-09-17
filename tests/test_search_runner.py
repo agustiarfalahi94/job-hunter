@@ -1,9 +1,11 @@
 import threading
 import time
 import unittest
+import json
+from dataclasses import replace
 
 from job_hunter.matching import MatchContext, MatchResult, MatchingConfig
-from job_hunter.search import SearchCriteria
+from job_hunter.search import SearchCriteria, parse_serpapi_results
 from job_hunter.search_runner import SearchRequest, SearchRunController
 from job_hunter.session_workspace import SessionWorkspace
 
@@ -58,6 +60,26 @@ def _score(job, context, config, cache, *, cancel):
 
 
 class SearchRunnerTest(unittest.TestCase):
+    def test_search_query_location_is_not_reported_as_observed_job_location(self):
+        results = parse_serpapi_results(json.dumps({"organic_results": [{"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123", "snippet": "Collaborate with Kuala Lumpur"}]}), "LinkedIn", "Kuala Lumpur", 50)
+        self.assertEqual(results[0].location, "")
+
+    def test_wrong_structured_job_location_is_skipped_before_scoring(self):
+        from job_hunter.runtime_config import SearchProviderConfig
+        request = replace(_request(), provider_config=SearchProviderConfig(serpapi_key="test"))
+        page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {"@type": "Place", "address": {"addressLocality": "New York", "addressCountry": "US"}}, "description": "Power BI. Collaborate with Kuala Lumpur."}) + '</script>'
+        calls = []
+        def scorer(*args, **kwargs):
+            calls.append(1)
+            return _score(*args, **kwargs)
+        controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [{"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123", "snippet": "Collaborate with Kuala Lumpur"}]}), page_fetcher=lambda _: page, scorer=scorer)
+        controller.start(request)
+        self.assertTrue(controller.wait(2))
+        events, matches = controller.drain()
+        self.assertEqual(calls, [])
+        self.assertEqual(matches, ())
+        self.assertTrue(any("New York" in event.message and "location" in event.message for event in events))
+
     def test_cancel_stops_new_page_fetches_and_preserves_completed_results(self):
         first_completed = threading.Event()
         release_second = threading.Event()

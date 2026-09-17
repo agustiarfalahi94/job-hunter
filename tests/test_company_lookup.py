@@ -108,6 +108,13 @@ class CompanyLookupTest(unittest.TestCase):
         metadata.grounding_chunks = [SimpleNamespace(web=SimpleNamespace(uri=f"https://example.org/unrelated/{i}")) for i in range(6)] + metadata.grounding_chunks
         self.assertEqual(self.lookup(reply).hostname, "jobs.deloitte.com")
 
+    def test_grounding_supported_citation_precedes_brand_news_titles(self):
+        reply = response()
+        metadata = reply.candidates[0].grounding_metadata
+        metadata.grounding_chunks = [SimpleNamespace(web=SimpleNamespace(uri=f"https://example.org/news/{i}", title="Deloitte news")) for i in range(6)] + metadata.grounding_chunks
+        metadata.grounding_supports = [SimpleNamespace(segment=SimpleNamespace(text=OFFICIAL), grounding_chunk_indices=[6])]
+        self.assertEqual(self.lookup(reply).hostname, "jobs.deloitte.com")
+
     def test_differently_scoped_citation_is_not_same_evidence(self):
         reply = response()
         reply.candidates[0].grounding_metadata.grounding_chunks[0].web.uri = OFFICIAL + "?region=US"

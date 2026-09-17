@@ -103,6 +103,7 @@ class SearchCandidate:
 
 @dataclass(frozen=True)
 class JobPageMetadata:
+    locations: tuple[str, ...] = ()
     posted_date: str = ""
     apply_url: str = ""
     posted_date_verified: bool = False
@@ -266,7 +267,7 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
             SearchCandidate(
                 title=title,
                 company=company,
-                location=location,
+                location="",
                 description=snippet or title_text,
                 source_url=href,
                 platform=platform,
@@ -294,7 +295,7 @@ def parse_linkedin_jobs(html: str, location: str, limit: int) -> list[SearchCand
         source_url = str(link.get("href", "")).strip()
         title = title_node.get_text(" ", strip=True)
         company = company_node.get_text(" ", strip=True) if company_node else ""
-        card_location = location_node.get_text(" ", strip=True) if location_node else location
+        card_location = location_node.get_text(" ", strip=True) if location_node else ""
         posted_value = ""
         if date_node is not None:
             posted_value = str(date_node.get("datetime", "")).strip() or date_node.get_text(
@@ -310,7 +311,7 @@ def parse_linkedin_jobs(html: str, location: str, limit: int) -> list[SearchCand
             SearchCandidate(
                 title=title,
                 company=company,
-                location=card_location or location,
+                location=card_location,
                 description=description,
                 source_url=source_url,
                 platform="LinkedIn",
@@ -342,7 +343,7 @@ def parse_duckduckgo_results(html: str, platform: str, location: str, limit: int
             SearchCandidate(
                 title=title,
                 company=company,
-                location=location,
+                location="",
                 description=snippet or title_text,
                 source_url=href,
                 platform=platform,
@@ -535,6 +536,7 @@ def run_public_search(
                     )
                     candidate = replace(
                         candidate,
+                        location="; ".join(metadata.locations) if metadata.locations else candidate.location,
                         posted_date=metadata.posted_date or candidate.posted_date,
                         apply_url=metadata.apply_url or candidate.apply_url,
                         description=metadata.description.text or candidate.description,
@@ -615,6 +617,11 @@ def run_public_search(
                             ),
                         )
                         continue
+            if candidate.location and not _job_location_matches(candidate.location, criteria.location):
+                skipped += 1
+                _report_progress(logs, progress_callback, stage="skipped", checked=checked,
+                                 total=search_limit, message=f"Skipped {candidate.title}: job location {candidate.location} does not match {criteria.location}.")
+                continue
             result = queue.add_job(
                 JobInput(
                     title=candidate.title,
@@ -800,17 +807,18 @@ def extract_job_metadata(
     soup = BeautifulSoup(html, "html.parser")
     posted_date = ""
     posted_date_source = ""
+    locations: list[str] = []
     for script in soup.select('script[type="application/ld+json"]'):
         try:
             payload = json.loads(script.string or script.get_text() or "{}")
         except (json.JSONDecodeError, TypeError):
             continue
+        locations.extend(_find_job_locations(payload))
         date_posted = _find_date_posted(payload)
         if date_posted:
             posted_date = normalize_posted_date(date_posted, today=today)
             if posted_date:
                 posted_date_source = "JobPosting.datePosted"
-                break
 
     if not posted_date:
         posted_date = _date_from_meta(soup, today=today)
@@ -852,6 +860,7 @@ def extract_job_metadata(
             apply_url = candidate_url
             break
     return JobPageMetadata(
+        locations=tuple(dict.fromkeys(locations)),
         posted_date=posted_date,
         apply_url=apply_url,
         posted_date_verified=bool(posted_date),
@@ -859,6 +868,44 @@ def extract_job_metadata(
         posted_date_reason="" if posted_date else "No job-specific posting date found",
         description=extract_job_description(html, snippet=snippet),
     )
+
+
+def _find_job_locations(value: object) -> list[str]:
+    locations: list[str] = []
+    if isinstance(value, dict):
+        types = value.get("@type", [])
+        types = [types] if isinstance(types, str) else types
+        if "JobPosting" in types:
+            places = value.get("jobLocation", [])
+            places = [places] if isinstance(places, dict) else places
+            for place in places if isinstance(places, list) else []:
+                if not isinstance(place, dict):
+                    continue
+                address = place.get("address", {})
+                if not isinstance(address, dict):
+                    continue
+                parts = []
+                for field in ("addressLocality", "addressRegion", "addressCountry"):
+                    part = address.get(field, "")
+                    if isinstance(part, dict):
+                        part = part.get("name", "")
+                    if isinstance(part, str) and part.strip():
+                        parts.append(part.strip())
+                if parts:
+                    locations.append(", ".join(parts))
+        for child in value.values():
+            if isinstance(child, (dict, list)):
+                locations.extend(_find_job_locations(child))
+    elif isinstance(value, list):
+        for child in value:
+            locations.extend(_find_job_locations(child))
+    return locations
+
+
+def _job_location_matches(observed: str, requested: str) -> bool:
+    normalized = " ".join(re.sub(r"[^a-z0-9]+", " ", requested.casefold()).split())
+    location = " ".join(re.sub(r"[^a-z0-9]+", " ", observed.casefold()).split())
+    return not normalized or f" {normalized} " in f" {location} "
 
 
 def _find_date_posted(value: object) -> str:

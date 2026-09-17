@@ -26,6 +26,7 @@ from job_hunter.search import (
     _eligibility_skip_reason,
     _is_blocked_search_page,
     _posting_is_too_old,
+    _job_location_matches,
     build_direct_platform_queries,
     build_search_queries,
     build_serpapi_queries,
@@ -298,6 +299,7 @@ class SearchRunController:
         posted_date_source = "search provider" if posted_date else ""
         posted_date_reason = "" if posted_date else "Job page was not checked"
         apply_url = candidate.apply_url
+        job_location = candidate.location
         try:
             if self._uses_default_page_fetcher:
                 page = fetch_job_html(
@@ -313,6 +315,11 @@ class SearchRunController:
 
         if page and not _is_blocked_search_page(page):
             metadata = extract_job_metadata(page, candidate.source_url, snippet=candidate.description)
+            if metadata.locations:
+                matching_locations = [place for place in metadata.locations if _job_location_matches(place, request.criteria.location)]
+                if not matching_locations:
+                    return _ProcessedCandidate(None, None, f"Job location {', '.join(metadata.locations)} does not match {request.criteria.location}.")
+                job_location = "; ".join(matching_locations)
             description = metadata.description
             posted_date = metadata.posted_date or posted_date
             apply_url = metadata.apply_url or apply_url
@@ -342,10 +349,12 @@ class SearchRunController:
                 None,
                 _stale_reason(replace(candidate, posted_date=posted_date), request.criteria),
             )
+        if job_location and not _job_location_matches(job_location, request.criteria.location):
+            return _ProcessedCandidate(None, None, f"Job location {job_location} does not match {request.criteria.location}.")
         job = JobInput(
             title=candidate.title,
             company=candidate.company,
-            location=candidate.location,
+            location=job_location,
             description=description.text or candidate.description,
             source_url=candidate.source_url,
             posted_date=posted_date,
@@ -368,6 +377,9 @@ class SearchRunController:
             self._score_cache,
             cancel=lambda: self._should_stop(started),
         )
+        if not job_location:
+            result = replace(result, remarks=(*result.remarks,
+                "Job location was not exposed. The selected location is a search hint, not verified posting evidence."))
         return _ProcessedCandidate(job, result)
 
     def _publish_processed(

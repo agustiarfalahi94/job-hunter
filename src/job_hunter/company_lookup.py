@@ -148,7 +148,9 @@ def _verify_reply(reply, company: str, region: str, model: str, fetcher, resolve
         web = getattr(chunk, "web", None)
         uri = getattr(web, "uri", "") or ""
         title = getattr(web, "title", "") or ""
-        return not (index in supported or uri in {official, regional} or found_company.casefold() in title.casefold())
+        if uri in {official, regional} or index in supported:
+            return 0
+        return 1 if found_company.casefold() in title.casefold() else 2
     for _, chunk in sorted(enumerate(chunks), key=relevance)[:6]:
         web = getattr(chunk, "web", None)
         uri = getattr(web, "uri", "")
