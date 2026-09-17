@@ -247,8 +247,11 @@
 
 ## Next
 
-- Add authenticated durable accounts only with an explicit privacy and data
-  retention design.
+- Proposed personal-account release: Google sign-in and durable private CV,
+  criteria, queue, and manually recorded application history. See
+  [Account Saving Design](ACCOUNT_SAVING_DESIGN.md) for the proposed boundaries,
+  setup requirements and release tests. This is not implemented in v1.17.2.
 - Add more provider adapters where public APIs or platform terms permit them.
 - Improve full-description extraction with provider-specific fixtures.
-- Keep login, CAPTCHA, and final submission outside the hosted app.
+- Keep job-platform login, CAPTCHA, and final submission outside the hosted app;
+  Google login to Job Hunter would not authorize job-board account access.

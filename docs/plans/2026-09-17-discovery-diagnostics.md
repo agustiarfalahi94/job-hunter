@@ -18,6 +18,14 @@ The diagnostic release v1.17.1 passed 274 tests and feature/main CI. A fresh pro
 
 Follow-up v1.17.2 targets Indeed vacancy paths, shows exclusion-reason counts, and fixes the observed disabled Run button with a once-only full-page terminal refresh. Preserve all selected settings and accepted results across that rerun. Validate the query/rejection/refresh regressions and repeat a bounded production discovery test after deployment; do not claim the exact reference URL must appear.
 
+### Verified On 2026-09-18
+
+- Release commit `5ab2ab08321956da923bc17159e18b86e8396f74` passed 277 tests, independent review, feature CI and main CI (`35258714607`).
+- A fresh production session with Criteria-based search / Data Analyst / Power BI / Kuala Lumpur / Indeed / Any time returned zero results for the title query, then ten web results and ten eligible vacancy links for the description query. All ten candidates reached the queue using deterministic fallback scores. This is discovery success, not proof of complete descriptions, verified posting geography, or Gemini scoring success.
+- Completion filled the progress bar to 100%, re-enabled Run search, updated the session count to ten, and Review Job queue selected and rendered Job queue. Returning to Search jobs retained the selected criteria and results.
+- A separate synthetic production Gemini connection check reported `Gemini quota is unavailable; deterministic fallback was used.` No CV was uploaded or sent in either test. The provider quota/model allowance must be checked in the key's Google AI Studio project; application code cannot create provider allowance.
+- The exact reference vacancy was not established as a discovered result. Indeed page access, posting dates and geography remain subject to the documented limitations.
+
 ## Rollback
 
 Revert this hotfix release commit if imports/navigation fail. Do not alter secrets, CV/session storage, other projects, or existing worktrees.

@@ -133,6 +133,8 @@ Run the complete verification gate with `./tool/check.sh`.
 
 On Streamlit Community Cloud, select this repository, use `src/app.py` as the entry point, and add the secrets above. Anyone with the public app URL can open it, but each visitor receives separate session-only app data rather than an account with durable storage.
 
+Google sign-in and account-based saving are the proposed next release, not current features. The intended personal mode restores your CV, criteria, queue and manually recorded applications after a restart, with access restricted to your configured Google account. It requires both Google OAuth setup and a durable private backend; login cookies alone do not save these records. See [Account Saving Design](docs/ACCOUNT_SAVING_DESIGN.md) for setup requirements and privacy/testing boundaries. Do not paste credentials into chat or commit them.
+
 ## Privacy And Boundaries
 
 Never commit CVs, extracted CV text, contact details, platform credentials, cookies, identity documents, private form answers, application records, local databases, API keys, `config/preferences.local.yaml`, or `.streamlit/secrets.toml`.

@@ -6,6 +6,7 @@
 - Add rejection-reason counts without logging returned URLs or raw provider data. A controlled production reproduction of the previous query returned twenty web results but zero accepted vacancy links, before scoring.
 - Refresh the whole page once per terminal run after accepting events/results so Run search is enabled again rather than remaining disabled after fragment completion.
 - Add red/green vacancy-query, rejected-listing/source and once-only terminal-refresh regressions.
+- Production verification on September 18 found and queued ten Indeed vacancies, filled terminal progress, re-enabled search, opened the queue shortcut and preserved criteria on return. The separate synthetic Gemini check reported unavailable quota; the live scores were deterministic fallbacks, not verified Gemini scores.
 
 ## 1.17.1 - 2026-09-17
 
