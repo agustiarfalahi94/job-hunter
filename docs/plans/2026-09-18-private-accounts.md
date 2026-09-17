@@ -15,7 +15,9 @@
 - Tasks 1-3 implemented with test-first config, identity, encryption, snapshot, persistence, lifecycle and app regressions. Native identity/HTTP fixtures are synthetic; no private backend calls have been made.
 - Account mode is disabled by default. Owner OAuth/Supabase configuration and real sign-in/save/reboot checks remain external prerequisites.
 - Independent review found stale configuration authorization, failed-reload cancellation and empty plaintext handling. Regression tests reproduced all three before fixes; independent re-check found no remaining concrete findings in them.
-- Local full suite passes (338 tests; one PostgreSQL class skipped because server tools are absent). Initial feature CI passed 345 tests with no skips, including all eight real PostgreSQL migration tests. The upload-limit follow-up adds one test. Main CI and production browser results are recorded in the release handoff after they run.
+- Local full suite passes (338 tests; one PostgreSQL class skipped because server tools are absent). Initial feature CI passed 345 tests with no skips, including all eight real PostgreSQL migration tests. The upload-limit follow-up passes all 346 tests on both feature and main CI.
+- Verified code commit: `5d621539c51f3638d573a12f9713f001bade9738`. [Feature CI](https://github.com/agustiarfalahi94/job-hunter/actions/runs/35263450639) and [main CI](https://github.com/agustiarfalahi94/job-hunter/actions/runs/35263569793) passed. Documentation follow-ups do not change the gated account behavior.
+- Production guest-mode browser smoke passed on 2026-09-18: app imports, empty selected criteria, criteria/CV mode navigation and the new matching-mode help text loaded. Account mode remains off; no live OAuth/account-storage calls or search-provider quota were used for this smoke check. Local browser verification also passed; its temporary server was stopped afterwards.
 - Setup guide, blank credential template, SQL migration, dependency floors, v1.18.0 and changelog are prepared. Generate secrets only in the owner's terminal; nothing is printed in chat or committed.
 
 The detailed checklist below defines the planned acceptance criteria. Live-provider checks must not be marked complete by synthetic tests.
@@ -73,5 +75,5 @@ Files: update requirements.txt, pyproject.toml, init version, README, AGENTS, CH
 - [x] Add Authlib and cryptography dependency floors, bump to 1.18.0, and document backend encryption-key backup/retention limits and recovery.
 - [x] Provide exact Google callback, Supabase SQL migration, secret-key type and private enablement checklist. Provide local secret-generation commands for owner use; never run them into chat/logs or commit their output.
 - [x] Run the full check script, compileall, dependency consistency and diff checks; obtain independent security/correctness review and fix findings.
-- [ ] Push the feature branch, verify CI, fast-forward main, push and verify main CI.
-- [ ] Smoke-test production guest mode while credentials are absent. Report real Google login and durable save/reboot tests as blocked on owner setup, not passed.
+- [x] Push the feature branch, verify CI, fast-forward main, push and verify main CI.
+- [x] Smoke-test production guest mode while credentials are absent. Report real Google login and durable save/reboot tests as blocked on owner setup, not passed.
