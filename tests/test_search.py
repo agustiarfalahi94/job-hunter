@@ -291,6 +291,15 @@ class SearchTest(unittest.TestCase):
         self.assertNotIn("Power+BI", queries[0].url)
         self.assertIn("Power+BI", queries[1].url)
 
+    def test_direct_linkedin_uses_or_for_each_title_and_description_list(self):
+        from urllib.parse import parse_qs, urlparse
+        criteria = SearchCriteria(title_terms=("Data Analyst", "BI Developer"),
+                                  description_terms=("Power BI", "SSRS"), location="Kuala Lumpur",
+                                  platforms=("LinkedIn",))
+        queries = build_direct_platform_queries(criteria)
+        self.assertEqual(parse_qs(urlparse(queries[0].url).query)["keywords"], ['"Data Analyst" OR "BI Developer"'])
+        self.assertEqual(parse_qs(urlparse(queries[1].url).query)["keywords"], ['"Power BI" OR "SSRS"'])
+
     def test_posting_age_filters_reach_linkedin_and_serpapi_queries(self):
         criteria = SearchCriteria(
             title_terms=("BI Developer",),

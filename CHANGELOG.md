@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.1 - 2026-09-17
+
+- Fix direct LinkedIn fallback discovery to use quoted OR alternatives for both title and description lists, matching SerpAPI/public web query behavior.
+- Verify case-insensitive, any-value matching across all four title/keyword fields, and custom values outside the suggestion catalog surviving page navigation.
+- Verify that saving a CV does not change available suggestions or select criteria. Document the static suggestion catalog's origin and each field's OR meaning in the README and scoring specification.
+
 ## 1.16.0 - 2026-09-17
 
 - Preserve all edited search parameters, including custom hard skips, across page navigation, completed searches, and matching-mode switches using non-widget session storage.

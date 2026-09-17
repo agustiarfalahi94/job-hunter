@@ -227,6 +227,13 @@
 - Sort Apply choices by numeric job ID without changing ranked queue ordering.
 - Fix Gemini output allocation and add a non-sensitive Cloud connection check.
 
+## v1.16.1 Keyword Contract Verification
+
+- Keep persistence, case-insensitive comparison, and any-value alternatives consistent across all four title/keyword fields, including custom typed values.
+- Correct the direct LinkedIn fallback's multi-value OR query construction.
+- Explain that available suggestions come from the original static preferences catalog, not an uploaded CV, and do not restrict custom input.
+- Add field-by-field scoring, custom-value navigation, LinkedIn query, and CV/catalog independence regressions; release after review and feature/main CI.
+
 ## Next
 
 - Add authenticated durable accounts only with an explicit privacy and data

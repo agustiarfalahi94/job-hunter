@@ -12,6 +12,10 @@ A score estimates fit against supplied evidence. It is not a hiring prediction a
 
 Selected web criteria start empty and are never auto-filled from a saved CV or CLI defaults. All title/keyword text comparisons ignore case. Values within each list are alternatives, and bonuses are optional advantages found in the title or description, not discovery filters or mandatory qualifications. More bonus matches may earn more points. Any hard-skip match excludes a job. Location, sources and freshness are independent search constraints. The selected location is used for matching; no hidden Kuala Lumpur preference is applied to another location.
 
+Persistence, case-insensitive comparison, and OR alternatives apply to every one of Target job titles, Required description keywords, Bonus keywords, and Hard skip keywords, including custom typed values. Positive title/primary signals can discover or strengthen a match, any bonus can add points without being mandatory, and any hard skip overrides positive signals. Direct LinkedIn queries use the same quoted OR alternatives as web/SerpAPI queries. External sources may still limit or reinterpret queries; the app's deterministic matching and Gemini instructions preserve these rules.
+
+Available dropdown suggestions are a static catalog from the project's original preferences. They are intentionally unselected and do not change with CV content. All four fields accept custom terms; the catalog is not an allowed-values restriction.
+
 ## Criteria
 
 Default target roles include Data Analyst, Data Engineer, BI Developer, Reporting Analyst, Reporting Engineer, Business Intelligence Analyst, BI Analyst, and BI Engineer.

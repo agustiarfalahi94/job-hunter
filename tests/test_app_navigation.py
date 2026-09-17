@@ -6,7 +6,7 @@ import app
 from job_hunter.matching import MatchResult
 from job_hunter.queue import JobRecord
 from job_hunter.queue_types import JobInput
-from job_hunter.search_runner import RunSnapshot
+from job_hunter.search_runner import RunSnapshot, SearchRunController
 from job_hunter.session_workspace import SessionWorkspace, WORKSPACE_KEY
 from streamlit.testing.v1 import AppTest
 
@@ -57,10 +57,10 @@ class AppNavigationTest(unittest.TestCase):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
         app_test = AppTest.from_file(str(app_path)).run(timeout=10)
         values = {
-            "Target job titles": ["Data Analyst"],
-            "Required description keywords": ["Power BI"],
-            "Bonus keywords": ["Agile", "Scrum"],
-            "Hard skip keywords": ["azure", "local applicant only"],
+            "Target job titles": ["Custom Reporting Specialist", "CUSTOM ANALYTICS ENGINEER"],
+            "Required description keywords": ["custom reporting suite", "CUSTOM DATA PLATFORM"],
+            "Bonus keywords": ["custom workflow", "CUSTOM COLLABORATION"],
+            "Hard skip keywords": ["azure", "CUSTOM EXCLUSION"],
             "Platforms to search": ["LinkedIn"],
             "Company career sites": ["Razer"],
         }
@@ -68,6 +68,14 @@ class AppNavigationTest(unittest.TestCase):
             next(widget for widget in app_test.multiselect if widget.label == label).set_value(selected).run(timeout=10)
         next(widget for widget in app_test.selectbox if widget.label == "Location").set_value("Petaling Jaya").run(timeout=10)
         next(widget for widget in app_test.selectbox if widget.label == "Date posted").set_value("Past week").run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Company career sites").set_value([]).run(timeout=10)
+        controller = SearchRunController(discovery_fetcher=lambda _: "", page_fetcher=lambda _: "")
+        app_test.session_state["search_controller"] = controller
+        next(button for button in app_test.button if button.label == "Run search and score jobs").click().run(timeout=10)
+        self.assertTrue(controller.wait(2))
+        self.assertEqual(controller.snapshot().state, "completed")
+        app_test.run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Company career sites").set_value(values["Company career sites"]).run(timeout=10)
         app_test.segmented_control[0].set_value("Job queue").run(timeout=10)
         app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
         for label, selected in values.items():
@@ -75,6 +83,19 @@ class AppNavigationTest(unittest.TestCase):
         self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Location").value, "Petaling Jaya")
         self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Date posted").value, "Past week")
         self.assertEqual(len(app_test.exception), 0)
+
+    def test_criteria_suggestions_are_static_not_extracted_from_cv(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path)).run(timeout=10)
+        labels = ("Target job titles", "Required description keywords", "Bonus keywords", "Hard skip keywords")
+        before = {label: list(next(widget for widget in app_test.multiselect if widget.label == label).options) for label in labels}
+        workspace = app_test.session_state[WORKSPACE_KEY]
+        workspace.save_cv("synthetic.docx", b"synthetic", "Unique CV skill: CUSTOM-CV-ONLY-SKILL")
+        next(radio for radio in app_test.radio if radio.key == "search_mode").set_value("CV-based search").run(timeout=10)
+        for label in labels:
+            widget = next(widget for widget in app_test.multiselect if widget.label == label)
+            self.assertEqual(list(widget.options), before[label])
+            self.assertEqual(widget.value, [])
 
     def test_application_job_options_are_ordered_by_numeric_id(self):
         jobs = [JobRecord(id=number, title="BI Analyst", company="Acme", location="KL",

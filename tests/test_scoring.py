@@ -5,6 +5,20 @@ from job_hunter.scoring import DEFAULT_WEIGHTS, score_job
 
 
 class ScoringTest(unittest.TestCase):
+    def test_all_four_criteria_lists_ignore_case_and_match_any_value(self):
+        cases = (
+            ("target_roles", ["Architect", "data analyst"], {"title": "DATA ANALYST"}, "Role title matches"),
+            ("primary_keywords", ["Unmatched", "power bi"], {"description": "POWER BI"}, "Matched primary keywords"),
+            ("bonus_keywords", ["Unmatched", "scrum"], {"description": "SCRUM"}, "Matched bonus keywords"),
+            ("hard_skip_keywords", ["Unmatched", "azure"], {"description": "AZURE"}, "Hard skip keyword found"),
+        )
+        for field, values, job, reason in cases:
+            for selected in (values, list(reversed(values))):
+                with self.subTest(field=field, values=selected):
+                    result = score_job(job, {field: selected})
+                    self.assertTrue(any(reason in message for message in result.reasons))
+                    self.assertEqual(result.decision == "skip", field == "hard_skip_keywords")
+
     def test_azure_hard_skip_is_case_insensitive(self):
         for word in ("Azure", "azure", "AZURE"):
             result = score_job({"title": "Data Analyst", "description": f"Power BI on {word}"},

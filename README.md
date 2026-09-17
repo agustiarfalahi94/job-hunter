@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.16.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.16.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
@@ -45,6 +45,17 @@ CV bytes and extracted text are session-only in the hosted app. They are not wri
 Stop prevents new discovery, page-fetch, and scoring work after cancellation is observed. An in-flight network or Gemini request has its own timeout and may take a short time to settle; completed results are kept.
 
 **Matching rules:** Text matches ignore capitalization: `azure`, `Azure`, and `AZURE` are equivalent. Values within a title/keyword list are alternatives, not an AND checklist. Discovery uses title signals OR description signals. Bonus terms such as Agile OR Scrum can improve scoring when present in a title or description; they do not generate discovery queries or exclude jobs if absent, and more matches can earn more bonus points. Any matched hard-skip term excludes the job. The selected location, sources, and posting-date limit still constrain the search; they are not OR alternatives to keywords.
+
+All four fields share session persistence, case-insensitive matching, and OR alternatives within their own list:
+
+| Field | Meaning of OR |
+| --- | --- |
+| Target job titles | Any listed title can supply a role/discovery signal. |
+| Required description keywords | Any listed primary keyword can supply a primary/discovery signal; missing all reduces suitability, not an automatic hard skip. |
+| Bonus keywords | Any listed bonus can add points; bonuses are optional and do not drive discovery. |
+| Hard skip keywords | Any listed restriction match excludes the job; it overrides positive matches. |
+
+**Available suggestions:** These are a static catalog from the project's original search preferences, not terms extracted from a visitor's CV. They intentionally remain available but unselected. Every title/keyword field accepts custom values outside the catalog, and those custom selections persist across page changes just like suggested values. Saving, replacing, or removing a CV does not rewrite the catalog or automatically select criteria.
 
 **Persistence:** Parameters are session-only, just like CVs and the queue. Page navigation and completed searches do not reset them. App reboot, browser-session reset, or session expiry starts fresh, with no selected criteria. Date posted defaults to Past month and the session job cap remains 50.
 

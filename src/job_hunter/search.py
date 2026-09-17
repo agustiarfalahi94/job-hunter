@@ -200,7 +200,7 @@ def build_direct_platform_queries(criteria: SearchCriteria) -> list[PlatformQuer
         ("title", criteria.title_terms),
         ("description", criteria.description_terms),
     ):
-        keywords = " ".join(terms).strip()
+        keywords = _quoted_or(terms)
         if not keywords:
             continue
         query = f"{keywords} {criteria.location}".strip()
