@@ -185,6 +185,15 @@
 - Simplified the app to one criteria panel with a fixed 50-unique-job target and
   Actionable / All / Already applied queue views.
 
+## v1.16 - Persistent Criteria And Grounded Company Lookup
+
+- Reproduced and fixed Streamlit off-page widget cleanup using permanent session settings and temporary widget keys.
+- New web sessions start empty without changing CLI examples, CV data, or evidence catalogs.
+- Added explicit case-insensitive OR/optional bonus semantics and selected-location matching.
+- Added grounded company-name lookup with official regional evidence, HTTPS/public-address validation, session cache/retry, and consistent domain labels.
+- Added end-to-end navigation/default tests and lookup privacy, evidence, quota-boundary, cache, corporate scope, destination-region and query-sensitive citation regressions.
+- Release gate includes code review, full local verification, feature CI, main CI and production smoke checks.
+
 ## v1.15.3 - Current Flash Compatibility
 
 - Correct the thinking level against Google's current per-model support table.

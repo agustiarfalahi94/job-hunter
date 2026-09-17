@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.15.3 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.16.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
@@ -34,15 +34,23 @@ CV bytes and extracted text are session-only in the hosted app. They are not wri
 ### 3. Search Jobs
 
 1. Open **Search jobs**.
-2. Edit the title, required description, bonus, and hard-skip terms. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
+2. Select or type the title, description, bonus, and hard-skip terms. New sessions start empty: suggestions are not preselected, and saving a CV does not populate criteria. Edited parameters survive page/mode changes and completed searches in this session. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
 3. Type or select one city in **Location**.
 4. Select job platforms and a posting-age limit.
-5. In **Company career sites**, choose Accenture, HCLTech, Razer, Prudential Malaysia, or Accord Innovations. The selector is case-insensitive and also accepts a public HTTPS careers domain, up to five sites total. Company sites require SerpAPI.
+5. In **Company career sites**, select a preset (its domain is shown), enter a company name such as `Deloitte`, or enter a public HTTPS careers domain. Up to five sites are allowed; company-site job searches require SerpAPI. New company names additionally require Gemini and a selected location. The app searches the web, checks official careers/regional evidence, and shows the confirmed destination plus source links. If verification fails, it explains why rather than guessing; use **Retry company lookup** or enter the known careers domain.
 6. Click **Run search and score jobs**.
 7. Follow the progress bar and activity log. Fifty is the maximum, not a required result count; a completed search fills the bar even when sources return fewer jobs and reports the number actually checked.
 8. Use **Stop search** when needed, then click **Review Job queue**.
 
 Stop prevents new discovery, page-fetch, and scoring work after cancellation is observed. An in-flight network or Gemini request has its own timeout and may take a short time to settle; completed results are kept.
+
+**Matching rules:** Text matches ignore capitalization: `azure`, `Azure`, and `AZURE` are equivalent. Values within a title/keyword list are alternatives, not an AND checklist. Discovery uses title signals OR description signals. Bonus terms such as Agile OR Scrum can improve scoring when present in a title or description; they do not generate discovery queries or exclude jobs if absent, and more matches can earn more bonus points. Any matched hard-skip term excludes the job. The selected location, sources, and posting-date limit still constrain the search; they are not OR alternatives to keywords.
+
+**Persistence:** Parameters are session-only, just like CVs and the queue. Page navigation and completed searches do not reset them. App reboot, browser-session reset, or session expiry starts fresh, with no selected criteria. Date posted defaults to Past month and the session job cap remains 50.
+
+**Company presets and region:** Accenture, HCLTech, Razer, Prudential Malaysia, and Accord Innovations are hand-maintained examples originally requested by the project owner; they are not automatic CV recommendations or live-verified lookup results. New names use [Gemini Google Search grounding](https://ai.google.dev/gemini-api/docs/generate-content/google-search), not model memory. Malaysian city selections look up careers serving Malaysia; other typed locations require evidence for that location. Verification may fail on blocked/JavaScript-only sites or ambiguous company names. Explicit domains remain user-provided sources, not independently verified regional destinations. Successful and failed lookups are cached per session, so page changes do not repeatedly call Gemini. Grounded lookups have separate Google Search usage/quota and may incur charges under your Google plan; they do not consume SerpAPI discovery requests.
+
+Automatic lookup conservatively requires a brand-matching corporate domain, a company-owned careers host, live citations, an official careers link, and readable regional evidence on both referring and destination pages. Shared ATS hosts, differently branded corporate domains, and inaccessible pages require an explicit domain instead. These evidence checks reduce mistakes; they are not a legal ownership certification. Discovery searches the verified company-owned hostname rather than a landing-page path, and still applies the selected job location.
 
 ### 4. Review And Apply
 
@@ -97,6 +105,7 @@ Job Hunter does not bypass login, CAPTCHA, anti-bot controls, or platform terms,
 | `src/job_hunter/search_runner.py` | Bounded background search, cancellation, and immutable events |
 | `src/job_hunter/search.py` | Queries, provider parsing, descriptions, dates, availability, and safe URLs |
 | `src/job_hunter/matching.py` | Gemini matching, structured output, cache, retry, and fallback |
+| `src/job_hunter/company_lookup.py` | Grounded company-name lookup, official regional careers evidence, safe citation resolution |
 | `src/job_hunter/session_workspace.py` | Session-only CV, jobs, application records, and active run identity |
 | `src/job_hunter/job_identity.py` | Canonical links, provider IDs, fingerprints, and source consolidation |
 | `src/job_hunter/queue.py` | Backward-compatible local SQLite queue for CLI use |

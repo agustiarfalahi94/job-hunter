@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.15.3 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.16.0 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
@@ -16,6 +16,8 @@ Job Hunter v1.15.3 is a public Streamlit job-discovery and matching app. Read th
 8. Stop must prevent new work after cancellation is observed. Keep already completed results and use bounded timeouts for in-flight calls.
 9. Do not automate login, CAPTCHA, prohibited platform activity, or final application submission.
 10. Run `./tool/check.sh` before every commit. Report anything unverified instead of guessing.
+11. New web sessions start with no selected titles, keywords, locations, platforms, or companies. Suggestions and CLI defaults are not selected web criteria. Keep selected web settings separate from disposable widget keys.
+12. Company-name lookup sends only public company name and requested region to Gemini Google Search. Require grounded official/regional pages and an official careers link, validate HTTPS/public network destinations, and cache lookup successes/failures per session. Never guess a domain or send CV text for this lookup.
 
 ## Git Flow
 

@@ -10,6 +10,8 @@ A score estimates fit against supplied evidence. It is not a hiring prediction a
 
 **CV-based search** sends readable session CV text and the same editable criteria. The prompt permits only supplied evidence and treats missing qualifications as unknown.
 
+Selected web criteria start empty and are never auto-filled from a saved CV or CLI defaults. All title/keyword text comparisons ignore case. Values within each list are alternatives, and bonuses are optional advantages found in the title or description, not discovery filters or mandatory qualifications. More bonus matches may earn more points. Any hard-skip match excludes a job. Location, sources and freshness are independent search constraints. The selected location is used for matching; no hidden Kuala Lumpur preference is applied to another location.
+
 ## Criteria
 
 Default target roles include Data Analyst, Data Engineer, BI Developer, Reporting Analyst, Reporting Engineer, Business Intelligence Analyst, BI Analyst, and BI Engineer.

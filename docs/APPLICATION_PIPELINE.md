@@ -37,7 +37,7 @@ User login, review, submit, and manual status record
 
 - Discovery treats title and description as separate signals rather than requiring both.
 - Each run has at most 12 discovery requests, 50 unique candidates, 50 detail fetches, 50 scoring attempts, two job workers, and five minutes of new-work scheduling.
-- Company career sites are selected by friendly preset names or public domains, resolved case-insensitively, HTTPS-only, limited to five, and require SerpAPI.
+- Company career sites start unselected and show preset domains. User-entered company names use Gemini Google Search to verify official regional careers evidence; public HTTPS domains are also accepted as user-provided sources. Five sites maximum, with SerpAPI required for their job discovery. Gemini lookup successes/failures are cached per session, and verified regional careers paths are kept in discovery queries.
 - Detail fetches use trusted provider, known ATS, or validated custom domains with bounded redirects and timeouts.
 - Full descriptions come from `JobPosting.description` or recognized job-description containers. A snippet or unavailable state is retained honestly when full text cannot be read.
 - Job-specific date fields beat generic update metadata. Unknown dates remain `Unknown`.

@@ -76,6 +76,7 @@ class SearchCriteria:
     max_results: int = 50
     posted_within_days: int | None = 30
     custom_domains: tuple[str, ...] = ()
+    custom_site_filters: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -140,7 +141,10 @@ def build_search_queries(criteria: SearchCriteria) -> list[PlatformQuery]:
         if not site_filter:
             continue
         sources.append((platform, site_filter))
-    sources.extend((domain, f"site:{domain}") for domain in criteria.custom_domains)
+    sources.extend(
+        (domain, criteria.custom_site_filters[index] if index < len(criteria.custom_site_filters) else f"site:{domain}")
+        for index, domain in enumerate(criteria.custom_domains)
+    )
     return _bounded_signal_queries(
         criteria,
         sources,

@@ -9,6 +9,10 @@ Job Hunter turns editable preferences and, optionally, a session CV into a ranke
 1. Choose Criteria-based or CV-based search.
 2. Optionally save a PDF, DOCX, or best-effort DOC CV in the current session.
 3. Edit title, description, bonus, semantic hard-skip, location, source, and freshness criteria.
+
+New sessions have empty selected criteria and no selected location. The suggestion catalogs are not automatically applied after CV upload. User edits are kept in permanent session settings across page/mode changes and completed searches; an app restart or session loss starts fresh. Date posted retains Past month protection.
+
+Company source presets display their domains and start unselected. Unknown company names use Gemini Google Search plus verification of official regional pages and an official careers link; explicit domains remain supported as user-provided sources. Failed or ungrounded resolution does not guess a domain.
 4. Search title and description signals independently across selected sources.
 5. Enrich up to 50 unique jobs with descriptions, dates, and safe Apply destinations.
 6. Exclude restricted, known-stale, and visibly closed postings.

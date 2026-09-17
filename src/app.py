@@ -15,6 +15,7 @@ from job_hunter.application_links import (
 )
 from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
 from job_hunter.cv_store import format_size
+from job_hunter.company_lookup import CompanyLookupError, CompanySite, lookup_company_site
 from job_hunter.locations import city_options, fetch_malaysia_cities
 from job_hunter.matching import MatchContext, MatchingConfig
 from job_hunter.preferences import load_preferences
@@ -30,6 +31,7 @@ from job_hunter.search_runner import (
 from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
 from job_hunter.source_validation import (
     COMPANY_SOURCE_OPTIONS,
+    COMPANY_SOURCE_DOMAINS,
     resolve_company_sources,
 )
 
@@ -117,8 +119,7 @@ def _render_sidebar(
     provider_config: SearchProviderConfig,
     preferences: dict[str, object],
 ) -> None:
-    defaults = _criteria_defaults(preferences)
-    hard_skips = st.session_state.get("hard_skip_keywords", defaults["hard_skip_keywords"])
+    hard_skips = _search_settings()["hard_skip_keywords"]
     jobs = filter_jobs(
         workspace.list_jobs(),
         decision="all",
@@ -234,65 +235,71 @@ def _render_search_jobs(
         st.markdown("**Search and scoring criteria**")
         title_terms = st.multiselect(
             "Target job titles",
-            defaults["target_roles"],
-            default=defaults["target_roles"],
+            _setting_options("target_roles", defaults["target_roles"]),
             accept_new_options=True,
-            key="target_roles",
+            **_setting_widget("target_roles"),
             help="A title match can discover a job even when description keywords are absent.",
         )
         description_terms = st.multiselect(
             "Required description keywords",
-            defaults["primary_keywords"],
-            default=defaults["primary_keywords"],
+            _setting_options("primary_keywords", defaults["primary_keywords"]),
             accept_new_options=True,
-            key="primary_keywords",
+            **_setting_widget("primary_keywords"),
             help="A description match can discover a job even when its title is unfamiliar.",
         )
         st.multiselect(
             "Bonus keywords",
-            defaults["bonus_keywords"],
-            default=defaults["bonus_keywords"],
+            _setting_options("bonus_keywords", defaults["bonus_keywords"]),
             accept_new_options=True,
-            key="bonus_keywords",
+            **_setting_widget("bonus_keywords"),
         )
         st.multiselect(
             "Hard skip keywords",
-            defaults["hard_skip_keywords"],
-            default=defaults["hard_skip_keywords"],
+            _setting_options("hard_skip_keywords", defaults["hard_skip_keywords"]),
             accept_new_options=True,
-            key="hard_skip_keywords",
+            **_setting_widget("hard_skip_keywords"),
             help="Matching titles, descriptions, or page text are excluded before scoring.",
         )
         location = st.selectbox(
             "Location",
-            _location_options(_cached_malaysia_cities()),
-            index=0,
+            _setting_options("search_location", _location_options(_cached_malaysia_cities())),
+            index=None,
             accept_new_options=True,
-            key="search_location",
+            **_setting_widget("search_location"),
             help="Type a Malaysian city or choose a city suggestion.",
         )
         platforms = st.multiselect(
-            "Platforms to search", SOURCES, default=SOURCES, key="search_platforms"
+            "Platforms to search", SOURCES, **_setting_widget("search_platforms")
         )
         company_values = st.multiselect(
             "Company career sites",
-            COMPANY_SOURCE_OPTIONS,
-            default=COMPANY_SOURCE_OPTIONS if provider_config.has_api_search else (),
+            _setting_options("company_sources", COMPANY_SOURCE_OPTIONS),
             accept_new_options=True,
-            key="company_sources",
+            format_func=_company_source_label,
+            **_setting_widget("company_sources"),
             help=(
-                "Choose a company or type a public careers domain. Names are matched "
-                "without case sensitivity; up to five sites are searched through SerpAPI."
+                "Choose a listed company, type another company name, or enter a careers domain. "
+                "New names use Gemini web search to verify official careers for your selected "
+                "location. Up to five sites are searched through SerpAPI."
             ),
         )
         posting_age = st.selectbox(
-            "Date posted", tuple(POSTING_AGE_OPTIONS), index=2, key="posting_age"
+            "Date posted", tuple(POSTING_AGE_OPTIONS), **_setting_widget("posting_age")
         )
         custom_sources, source_errors = resolve_company_sources(
-            company_values, has_api_search=provider_config.has_api_search
+            company_values, has_api_search=provider_config.has_api_search,
+            lookup=lambda name: _lookup_company(name, str(location or ""), provider_config),
         )
         for error in source_errors:
             st.warning(error)
+        if source_errors and provider_config.has_gemini and company_values:
+            if st.button("Retry company lookup", icon=":material/refresh:"):
+                st.session_state["company_lookups"] = {
+                    key: result for key, result in st.session_state.get("company_lookups", {}).items()
+                    if not isinstance(result, str)
+                }
+                st.rerun()
+        _render_company_evidence(company_values, str(location or ""))
         st.caption(
             "Each run targets up to 50 unique jobs. It stops earlier when sources run out, "
             "the five-minute scheduling limit is reached, or you press Stop."
@@ -302,11 +309,12 @@ def _render_search_jobs(
         criteria = SearchCriteria(
             title_terms=tuple(str(value) for value in title_terms),
             description_terms=tuple(str(value) for value in description_terms),
-            location=str(location),
+            location=str(location or ""),
             platforms=tuple(str(value) for value in platforms),
             max_results=MAX_UNIQUE_RESULTS,
             posted_within_days=POSTING_AGE_OPTIONS[str(posting_age)],
             custom_domains=tuple(source.hostname for source in custom_sources),
+            custom_site_filters=tuple(source.site_filter for source in custom_sources),
         )
         ready, reason = _search_is_ready(mode, workspace, criteria)
         controller = _get_controller()
@@ -577,19 +585,102 @@ def _string_list(value: object) -> list[str]:
 
 
 def _active_preferences(preferences: dict[str, object]) -> dict[str, object]:
-    defaults = _criteria_defaults(preferences)
+    settings = _search_settings()
     active = dict(preferences)
-    active["target_roles"] = st.session_state.get("target_roles", defaults["target_roles"])
-    active["primary_keywords"] = st.session_state.get(
-        "primary_keywords", defaults["primary_keywords"]
-    )
-    active["bonus_keywords"] = st.session_state.get(
-        "bonus_keywords", defaults["bonus_keywords"]
-    )
-    active["hard_skip_keywords"] = st.session_state.get(
-        "hard_skip_keywords", defaults["hard_skip_keywords"]
-    )
+    for field in ("target_roles", "primary_keywords", "bonus_keywords", "hard_skip_keywords"):
+        active[field] = list(settings[field])
+    location = settings["search_location"]
+    active["target_locations"] = [location] if location else []
+    active["avoid_keywords"] = []
+    active["remote_policy"] = []
+    active.pop("preferred_keywords", None)
     return active
+
+
+def _search_settings() -> dict[str, object]:
+    settings = st.session_state.get("search_settings")
+    if not isinstance(settings, dict):
+        settings = {
+            "target_roles": [], "primary_keywords": [], "bonus_keywords": [],
+            "hard_skip_keywords": [], "search_platforms": [], "company_sources": [],
+            "search_location": None, "posting_age": "Past month",
+        }
+        st.session_state["search_settings"] = settings
+    return settings
+
+
+def _save_search_setting(field: str) -> None:
+    value = st.session_state[f"_{field}"]
+    _search_settings()[field] = list(value) if isinstance(value, list) else value
+
+
+def _setting_widget(field: str) -> dict[str, object]:
+    # Widget keys disappear off-page; permanent settings do not belong to a widget.
+    key = f"_{field}"
+    value = _search_settings()[field]
+    st.session_state[key] = list(value) if isinstance(value, list) else value
+    return {"key": key, "on_change": _save_search_setting, "args": (field,)}
+
+
+def _setting_options(field: str, suggestions) -> list[str]:
+    saved = _search_settings()[field]
+    values = saved if isinstance(saved, list) else [saved] if saved else []
+    return list(dict.fromkeys([*suggestions, *values]))
+
+
+def _company_source_label(value: str) -> str:
+    domain = COMPANY_SOURCE_DOMAINS.get(value)
+    return f"{value} ({domain})" if domain else value
+
+
+def _company_region(location: str) -> str:
+    cities = _cached_malaysia_cities()
+    return "Malaysia" if location.casefold() in {city.casefold() for city in cities} else location
+
+
+def _lookup_company(name: str, location: str, config: SearchProviderConfig) -> CompanySite:
+    if not location:
+        raise CompanyLookupError("Select a location before looking up company names.")
+    if not config.has_gemini:
+        raise CompanyLookupError("Company-name lookup needs GEMINI_API_KEY; enter a careers domain instead.")
+    region = _company_region(location)
+    key = (name.strip().casefold(), region.casefold(), config.gemini_model)
+    cache = st.session_state.setdefault("company_lookups", {})
+    if key not in cache:
+        with st.spinner(f"Verifying official {name} careers for {region}..."):
+            try:
+                cache[key] = lookup_company_site(name, region, MatchingConfig(
+                    api_key=config.gemini_api_key, model=config.gemini_model
+                ))
+            except CompanyLookupError as exc:
+                cache[key] = str(exc)
+    result = cache[key]
+    if isinstance(result, str):
+        raise CompanyLookupError(result)
+    return result
+
+
+def _render_company_evidence(values, location: str) -> None:
+    cache = st.session_state.get("company_lookups", {})
+    region = _company_region(location).casefold() if location else ""
+    for value in values:
+        matched = next((result for (name, scope, _), result in cache.items()
+                        if name == str(value).strip().casefold() and scope == region
+                        and isinstance(result, CompanySite)), None)
+        if matched:
+            st.link_button(f"{matched.company} ({matched.hostname}) - {matched.region}",
+                           matched.careers_url, icon=":material/verified:")
+            with st.expander(f"{matched.company} verification sources"):
+                for index, url in enumerate(matched.evidence_urls, start=1):
+                    st.link_button(f"Source {index}: {urlparse_hostname(url)}", url,
+                                   icon=":material/open_in_new:")
+                if matched.search_suggestions:
+                    st.html(matched.search_suggestions)
+
+
+def urlparse_hostname(url: str) -> str:
+    from urllib.parse import urlparse
+    return urlparse(url).hostname or "Official source"
 
 
 def _open_page(page: str) -> None:

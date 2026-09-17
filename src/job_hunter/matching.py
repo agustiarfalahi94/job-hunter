@@ -19,6 +19,10 @@ PROMPT = (
     "Score the job against only the supplied candidate evidence. Do not infer or "
     "invent experience. Treat missing qualifications as unknown. Return concise "
     "evidence-based reasons and remarks in the required JSON structure."
+    " Criteria text matching is case-insensitive. Values within each keyword/title list "
+    "are OR alternatives, not a requirement to match every value. Bonus keywords are "
+    "optional scoring advantages matched in the title or description; missing bonuses "
+    "must not exclude a job. Title and description discovery signals are alternatives."
 )
 RESPONSE_SCHEMA = {
     "type": "object",
@@ -49,7 +53,7 @@ class MatchContext:
 class MatchingConfig:
     api_key: str = ""
     model: str = "gemini-2.5-flash"
-    prompt_version: str = "v1.15"
+    prompt_version: str = "v1.16"
     max_attempts: int = 2
     timeout_ms: int = 30_000
 
@@ -121,24 +125,27 @@ class GoogleGeminiClient:
         self._model = max(candidates)[-1]
         return True
 
-    def generate(self, payload: dict[str, object], prompt: str) -> object:
+    def generate(self, payload: dict[str, object], prompt: str, *, grounded: bool = False) -> object:
         try:
             response = self._client.models.generate_content(
                 model=self._model,
                 contents=f"{prompt}\n\nINPUT JSON:\n{json.dumps(payload, ensure_ascii=True)}",
                 config=self._types.GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=2048,
+                    max_output_tokens=4096 if grounded else 2048,
                     thinking_config=(
                         self._types.ThinkingConfig(thinking_budget=0)
                         if self._model.startswith("gemini-2.5-flash") else
                         self._types.ThinkingConfig(thinking_level="low")
                         if re.match(r"gemini-3(?:\.|-).*flash", self._model) else None
                     ),
-                    response_mime_type="application/json",
-                    response_json_schema=RESPONSE_SCHEMA,
+                    tools=[self._types.Tool(google_search=self._types.GoogleSearch())] if grounded else None,
+                    response_mime_type=None if grounded else "application/json",
+                    response_json_schema=None if grounded else RESPONSE_SCHEMA,
                 ),
             )
+            if grounded:
+                return response
             try:
                 return json.loads(response.text or "{}")
             except (TypeError, ValueError) as exc:

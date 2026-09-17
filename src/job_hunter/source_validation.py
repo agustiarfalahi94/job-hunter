@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import ipaddress
 import re
-from typing import Iterable
+from typing import Callable, Iterable
 from urllib.parse import urlparse
 
 
@@ -28,15 +28,33 @@ class CustomSource:
 
 
 def resolve_company_sources(
-    values: Iterable[str], *, has_api_search: bool
+    values: Iterable[str], *, has_api_search: bool, lookup: Callable[[str], object] | None = None
 ) -> tuple[tuple[CustomSource, ...], tuple[str, ...]]:
     """Resolve friendly company names or user-entered public career domains."""
-    resolved = [
-        _resolve_company_value(str(value))
-        for value in values
-        if str(value).strip()
-    ]
-    return validate_custom_sources(resolved, has_api_search=has_api_search)
+    raw = list(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
+    if not has_api_search:
+        return validate_custom_sources(raw, has_api_search=False)
+    sources, errors = [], []
+    seen = set()
+    if len(raw) > MAX_CUSTOM_SOURCES:
+        return (), ("Select at most 5 company career sites.",)
+    for value in raw:
+        resolved = _resolve_company_value(value)
+        try:
+            if not _looks_like_domain(resolved) and lookup is not None:
+                found = lookup(value)
+                hostname = _validated_hostname(found.hostname)
+                source = CustomSource(hostname, found.site_filter)
+            else:
+                hostname = _validated_hostname(resolved)
+                source = CustomSource(hostname, f"site:{hostname}")
+        except ValueError as exc:
+            errors.append(f"{value}: {exc}")
+            continue
+        if source.site_filter not in seen:
+            seen.add(source.site_filter)
+            sources.append(source)
+    return tuple(sources), tuple(errors)
 
 
 def validate_custom_sources(
@@ -104,8 +122,12 @@ def _normalize_company_name(value: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()).split())
 
 
+def _looks_like_domain(value: str) -> bool:
+    return "://" in value or (not any(char.isspace() for char in value) and bool(re.search(r"\.[a-zA-Z]{2,}(?:[/:]|$)", value)))
+
+
 def _resolve_company_value(value: str) -> str:
-    if any(marker in value for marker in (".", "/", ":")):
+    if _looks_like_domain(value):
         return value.strip()
     normalized = _normalize_company_name(value)
     compact = normalized.replace(" ", "")

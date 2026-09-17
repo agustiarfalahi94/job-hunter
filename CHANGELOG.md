@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.16.0 - 2026-09-17
+
+- Preserve all edited search parameters, including custom hard skips, across page navigation, completed searches, and matching-mode switches using non-widget session storage.
+- Start new web sessions with empty selections and no selected location; retain Past month freshness protection and leave CLI defaults/CV evidence suggestions unchanged.
+- Apply the selected location to matching instead of hidden Kuala Lumpur defaults, and explicitly describe case-insensitive OR keyword semantics with optional bonus signals in Gemini prompts.
+- Show career-site presets with their domains. Presets are curated convenience choices from earlier user examples, not inferred from a CV or selected automatically.
+- Resolve new company names using Gemini Google Search and verify live official/regional sources, a careers link from the official company page, and readable careers content. Reject unsafe URLs, ungrounded guesses, and mismatched regions.
+- Cache company lookups by name/region/model in the current session, provide retries for failed lookups, and display evidence and Google Search suggestions. Restrict automatic lookup to brand-matching corporate/company-owned careers domains; reject ambiguous shared ATS scopes, retain query-sensitive evidence comparisons, and check destination region.
+- Prioritize relevant citations within the resolution budget, handle punctuated company names, and search company-owned hosts without excluding job details on sibling paths.
+- Add navigation, empty-default, case/OR, grounding, regional verification, source-limit, retry, privacy, cache, and path-scoping regression coverage.
+
 ## 1.15.3 - 2026-09-16
 
 - Correct Gemini 3 Flash thinking to `low`: current Gemini 3.7/3.8 Flash models explicitly reject `minimal`.

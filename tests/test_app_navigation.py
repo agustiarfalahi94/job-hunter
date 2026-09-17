@@ -12,6 +12,70 @@ from streamlit.testing.v1 import AppTest
 
 
 class AppNavigationTest(unittest.TestCase):
+    def test_new_session_starts_with_empty_selected_search_parameters(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path)).run(timeout=10)
+        for widget in app_test.multiselect:
+            self.assertEqual(widget.value, [], widget.label)
+        self.assertIsNone(next(widget for widget in app_test.selectbox if widget.label == "Location").value)
+
+    def test_saved_cv_does_not_populate_fresh_search_criteria(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path))
+        workspace = SessionWorkspace()
+        workspace.save_cv("test.docx", b"synthetic", "Power BI SQL Azure experience")
+        app_test.session_state[WORKSPACE_KEY] = workspace
+        app_test.session_state["search_mode"] = "CV-based search"
+        app_test.run(timeout=10)
+        app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+        for widget in app_test.multiselect:
+            self.assertEqual(widget.value, [], widget.label)
+        self.assertIsNotNone(workspace.cv)
+
+    def test_company_lookup_success_is_cached_by_company_and_region(self):
+        from job_hunter.company_lookup import CompanySite
+        from job_hunter.runtime_config import SearchProviderConfig
+        found = CompanySite("Deloitte", "jobs.deloitte.com", "https://jobs.deloitte.com/sea/", "Malaysia", (), "", "test")
+        state = {}
+        with patch.object(app.st, "session_state", state), patch.object(app, "_company_region", return_value="Malaysia"), patch.object(app, "lookup_company_site", return_value=found) as lookup:
+            first = app._lookup_company("Deloitte", "Kuala Lumpur", SearchProviderConfig(gemini_api_key="test"))
+            second = app._lookup_company("deloitte", "Petaling Jaya", SearchProviderConfig(gemini_api_key="test"))
+        self.assertEqual(first, second)
+        self.assertEqual(lookup.call_count, 1)
+
+    def test_company_lookup_failure_does_not_repeat_on_reruns(self):
+        from job_hunter.company_lookup import CompanyLookupError
+        from job_hunter.runtime_config import SearchProviderConfig
+        state = {}
+        with patch.object(app.st, "session_state", state), patch.object(app, "_company_region", return_value="Malaysia"), patch.object(app, "lookup_company_site", side_effect=CompanyLookupError("No grounded sources")) as lookup:
+            for _ in range(2):
+                with self.assertRaisesRegex(CompanyLookupError, "grounded"):
+                    app._lookup_company("Deloitte", "Kuala Lumpur", SearchProviderConfig(gemini_api_key="test"))
+        self.assertEqual(lookup.call_count, 1)
+
+    def test_custom_search_parameters_survive_queue_navigation(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path)).run(timeout=10)
+        values = {
+            "Target job titles": ["Data Analyst"],
+            "Required description keywords": ["Power BI"],
+            "Bonus keywords": ["Agile", "Scrum"],
+            "Hard skip keywords": ["azure", "local applicant only"],
+            "Platforms to search": ["LinkedIn"],
+            "Company career sites": ["Razer"],
+        }
+        for label, selected in values.items():
+            next(widget for widget in app_test.multiselect if widget.label == label).set_value(selected).run(timeout=10)
+        next(widget for widget in app_test.selectbox if widget.label == "Location").set_value("Petaling Jaya").run(timeout=10)
+        next(widget for widget in app_test.selectbox if widget.label == "Date posted").set_value("Past week").run(timeout=10)
+        app_test.segmented_control[0].set_value("Job queue").run(timeout=10)
+        app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+        for label, selected in values.items():
+            self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == label).value, selected, label)
+        self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Location").value, "Petaling Jaya")
+        self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Date posted").value, "Past week")
+        self.assertEqual(len(app_test.exception), 0)
+
     def test_application_job_options_are_ordered_by_numeric_id(self):
         jobs = [JobRecord(id=number, title="BI Analyst", company="Acme", location="KL",
                           description="Power BI", source_url="", score=90,
@@ -61,7 +125,11 @@ class AppNavigationTest(unittest.TestCase):
         search_button = next(
             button for button in app_test.button if button.label == "Run search and score jobs"
         )
-        self.assertFalse(search_button.disabled)
+        self.assertTrue(search_button.disabled)
+        next(widget for widget in app_test.multiselect if widget.label == "Target job titles").set_value(["Data Analyst"]).run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Platforms to search").set_value(["LinkedIn"]).run(timeout=10)
+        next(widget for widget in app_test.selectbox if widget.label == "Location").set_value("Kuala Lumpur").run(timeout=10)
+        self.assertFalse(next(button for button in app_test.button if button.label == "Run search and score jobs").disabled)
         stop_button = next(button for button in app_test.button if button.label == "Stop search")
         self.assertTrue(stop_button.disabled)
 

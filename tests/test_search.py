@@ -104,6 +104,12 @@ CLOSED_LINKEDIN_HTML = """
 
 
 class SearchTest(unittest.TestCase):
+    def test_verified_company_queries_preserve_regional_career_path(self):
+        criteria = SearchCriteria(title_terms=("Data Analyst",), description_terms=(), location="Kuala Lumpur", platforms=(),
+                                  custom_domains=("jobs.deloitte.com",), custom_site_filters=("site:jobs.deloitte.com/sea/go/Malaysia",))
+        query = build_serpapi_queries(criteria, "test-key")[0]
+        self.assertIn("site:jobs.deloitte.com/sea/go/Malaysia", query.query)
+
     def test_fetch_job_html_follows_safe_platform_redirect(self):
         redirect = MagicMock(
             is_redirect=True,
