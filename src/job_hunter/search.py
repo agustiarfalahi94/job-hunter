@@ -875,7 +875,7 @@ def _find_job_locations(value: object) -> list[str]:
     if isinstance(value, dict):
         types = value.get("@type", [])
         types = [types] if isinstance(types, str) else types
-        if "JobPosting" in types:
+        if isinstance(types, list) and "JobPosting" in types:
             places = value.get("jobLocation", [])
             places = [places] if isinstance(places, dict) else places
             for place in places if isinstance(places, list) else []:

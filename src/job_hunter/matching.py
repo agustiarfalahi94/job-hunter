@@ -23,6 +23,8 @@ PROMPT = (
     "are OR alternatives, not a requirement to match every value. Bonus keywords are "
     "optional scoring advantages matched in the title or description; missing bonuses "
     "must not exclude a job. Title and description discovery signals are alternatives."
+    " Target location is a search preference, never evidence of the actual job location. "
+    "An empty job.location is unverified and must not earn location-match credit."
 )
 RESPONSE_SCHEMA = {
     "type": "object",

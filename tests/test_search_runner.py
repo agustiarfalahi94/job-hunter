@@ -5,7 +5,7 @@ import json
 from dataclasses import replace
 
 from job_hunter.matching import MatchContext, MatchResult, MatchingConfig
-from job_hunter.search import SearchCriteria, parse_serpapi_results
+from job_hunter.search import SearchCriteria, parse_serpapi_results, extract_job_metadata
 from job_hunter.search_runner import SearchRequest, SearchRunController
 from job_hunter.session_workspace import SessionWorkspace
 
@@ -60,6 +60,23 @@ def _score(job, context, config, cache, *, cancel):
 
 
 class SearchRunnerTest(unittest.TestCase):
+    def test_structured_locations_support_graphs_multiple_addresses_and_null_types(self):
+        data = {"@graph": [{"@type": None}, {"@type": ["JobPosting"], "jobLocation": [
+            {"address": {"addressLocality": "New York", "addressCountry": "US"}},
+            {"address": {"addressLocality": "Kuala Lumpur", "addressCountry": {"name": "Malaysia"}}}]}]}
+        metadata = extract_job_metadata('<script type="application/ld+json">' + json.dumps(data) + '</script>', "https://my.linkedin.com/jobs/view/123")
+        self.assertEqual(metadata.locations, ("New York, US", "Kuala Lumpur, Malaysia"))
+
+    def test_unknown_location_stays_unknown_and_has_remark(self):
+        from job_hunter.runtime_config import SearchProviderConfig
+        request = replace(_request(), provider_config=SearchProviderConfig(serpapi_key="test"))
+        controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [{"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}), page_fetcher=lambda _: '<main>Power BI dashboards</main>', scorer=_score)
+        controller.start(request)
+        self.assertTrue(controller.wait(2))
+        _, matches = controller.drain()
+        self.assertEqual(matches[0].job.location, "")
+        self.assertIn("not verified", matches[0].result.remarks[-1])
+
     def test_search_query_location_is_not_reported_as_observed_job_location(self):
         results = parse_serpapi_results(json.dumps({"organic_results": [{"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123", "snippet": "Collaborate with Kuala Lumpur"}]}), "LinkedIn", "Kuala Lumpur", 50)
         self.assertEqual(results[0].location, "")
