@@ -47,7 +47,7 @@ Public repository data includes source code, tests, generic criteria templates, 
 
 SerpAPI is preferred for dependable discovery and required for custom domains. Public fallback coverage may be incomplete. Page requests accept supported platform domains, known ATS domains, and only the custom domains that passed validation. Redirects remain HTTPS and trusted.
 
-General search candidates have no observed location merely because the query includes a city. JobPosting addresses override platform card evidence, known mismatches are skipped before scoring, and missing locations remain empty with an explicit result remark. Multiple observed locations are accepted when at least one matches the selected city as a normalized whole phrase.
+General search candidates have no observed location merely because the query includes a city. Structured records are associated with the selected vacancy URL; unrelated vacancies are not merged, and multiple ambiguous records remain unverified. JobPosting addresses override platform card evidence, known mismatches are skipped before scoring, and missing or country-only city evidence remains empty with an explicit result remark. Common country codes are normalized. Multiple observed locations for the same vacancy are accepted when at least one matches the selected city as a normalized whole phrase.
 
 Gemini receives one mode-specific candidate payload and one job payload. Criteria mode cannot carry CV text. Errors are classified into sanitized user-facing fallback reasons; raw API errors and keys are not logged.
 

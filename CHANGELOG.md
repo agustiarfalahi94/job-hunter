@@ -10,6 +10,7 @@
 - Cache company lookups by name/region/model in the current session, provide retries for failed lookups, and display evidence and Google Search suggestions. Restrict automatic lookup to brand-matching corporate/company-owned careers domains; reject ambiguous shared ATS scopes, retain query-sensitive evidence comparisons, and check destination region.
 - Prioritize relevant citations within the resolution budget, handle punctuated company names, and search company-owned hosts without excluding job details on sibling paths.
 - Stop labelling general search results with the requested city as observed location. Extract JobPosting addresses, skip known location mismatches before scoring, and explain unverified locations in result remarks.
+- Associate structured addresses with the selected vacancy rather than merging related postings. Normalize common country codes and treat country-only city evidence as unverified, not a false city mismatch.
 - Add navigation, empty-default, case/OR, grounding, regional verification, source-limit, retry, privacy, cache, and path-scoping regression coverage.
 
 ## 1.15.3 - 2026-09-16

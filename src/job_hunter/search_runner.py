@@ -316,8 +316,9 @@ class SearchRunController:
         if page and not _is_blocked_search_page(page):
             metadata = extract_job_metadata(page, candidate.source_url, snippet=candidate.description)
             if metadata.locations:
-                matching_locations = [place for place in metadata.locations if _job_location_matches(place, request.criteria.location)]
-                if not matching_locations:
+                comparisons = [(place, _job_location_matches(place, request.criteria.location)) for place in metadata.locations]
+                matching_locations = [place for place, matches in comparisons if matches is True]
+                if not matching_locations and all(matches is False for _, matches in comparisons):
                     return _ProcessedCandidate(None, None, f"Job location {', '.join(metadata.locations)} does not match {request.criteria.location}.")
                 job_location = "; ".join(matching_locations)
             description = metadata.description
@@ -349,8 +350,10 @@ class SearchRunController:
                 None,
                 _stale_reason(replace(candidate, posted_date=posted_date), request.criteria),
             )
-        if job_location and not _job_location_matches(job_location, request.criteria.location):
+        if job_location and _job_location_matches(job_location, request.criteria.location) is False:
             return _ProcessedCandidate(None, None, f"Job location {job_location} does not match {request.criteria.location}.")
+        if job_location and _job_location_matches(job_location, request.criteria.location) is None:
+            job_location = ""
         job = JobInput(
             title=candidate.title,
             company=candidate.company,

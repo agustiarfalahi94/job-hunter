@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from job_hunter.application_links import KNOWN_ATS_DOMAINS, is_safe_application_url
 from job_hunter.descriptions import JobDescription, extract_job_description
 from job_hunter.eligibility import hard_skip_matches
+from job_hunter.job_identity import canonicalize_job_url
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
@@ -617,11 +618,13 @@ def run_public_search(
                             ),
                         )
                         continue
-            if candidate.location and not _job_location_matches(candidate.location, criteria.location):
+            if candidate.location and _job_location_matches(candidate.location, criteria.location) is False:
                 skipped += 1
                 _report_progress(logs, progress_callback, stage="skipped", checked=checked,
                                  total=search_limit, message=f"Skipped {candidate.title}: job location {candidate.location} does not match {criteria.location}.")
                 continue
+            if candidate.location and _job_location_matches(candidate.location, criteria.location) is None:
+                candidate = replace(candidate, location="")
             result = queue.add_job(
                 JobInput(
                     title=candidate.title,
@@ -808,11 +811,15 @@ def extract_job_metadata(
     posted_date = ""
     posted_date_source = ""
     locations: list[str] = []
+    records: list[dict] = []
     for script in soup.select('script[type="application/ld+json"]'):
         try:
             payload = json.loads(script.string or script.get_text() or "{}")
         except (json.JSONDecodeError, TypeError):
             continue
+        records.extend(_find_job_records(payload))
+    selected = _select_job_records(records, source_url)
+    for payload in selected:
         locations.extend(_find_job_locations(payload))
         date_posted = _find_date_posted(payload)
         if date_posted:
@@ -870,6 +877,40 @@ def extract_job_metadata(
     )
 
 
+def _find_job_records(value: object) -> list[dict]:
+    records = []
+    if isinstance(value, dict):
+        types = value.get("@type", [])
+        types = [types] if isinstance(types, str) else types
+        if isinstance(types, list) and "JobPosting" in types:
+            records.append(value)
+        else:
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    records.extend(_find_job_records(child))
+    elif isinstance(value, list):
+        for child in value:
+            records.extend(_find_job_records(child))
+    return records
+
+
+def _select_job_records(records: list[dict], source_url: str) -> list[dict]:
+    def urls(record):
+        values = []
+        for field in ("url", "@id", "mainEntityOfPage"):
+            value = record.get(field)
+            if isinstance(value, dict):
+                value = value.get("@id", value.get("url"))
+            if isinstance(value, str) and value.startswith(("https://", "http://", "/")):
+                values.append(canonicalize_job_url(urljoin(source_url, value)))
+        return values
+    target = canonicalize_job_url(source_url)
+    matched = [record for record in records if target in urls(record)]
+    if matched:
+        return matched
+    return records if len(records) == 1 and not urls(records[0]) else []
+
+
 def _find_job_locations(value: object) -> list[str]:
     locations: list[str] = []
     if isinstance(value, dict):
@@ -893,19 +934,20 @@ def _find_job_locations(value: object) -> list[str]:
                         parts.append(part.strip())
                 if parts:
                     locations.append(", ".join(parts))
-        for child in value.values():
-            if isinstance(child, (dict, list)):
-                locations.extend(_find_job_locations(child))
-    elif isinstance(value, list):
-        for child in value:
-            locations.extend(_find_job_locations(child))
     return locations
 
 
-def _job_location_matches(observed: str, requested: str) -> bool:
+def _job_location_matches(observed: str, requested: str) -> bool | None:
     normalized = " ".join(re.sub(r"[^a-z0-9]+", " ", requested.casefold()).split())
     location = " ".join(re.sub(r"[^a-z0-9]+", " ", observed.casefold()).split())
-    return not normalized or f" {normalized} " in f" {location} "
+    countries = {"my": "malaysia", "us": "united states", "usa": "united states", "id": "indonesia", "sg": "singapore", "uk": "united kingdom", "gb": "united kingdom"}
+    location = " ".join(countries.get(part, part) for part in location.split())
+    normalized = countries.get(normalized, normalized)
+    if not normalized or f" {normalized} " in f" {location} ":
+        return True
+    if location in countries.values() and normalized not in countries.values():
+        return None
+    return False
 
 
 def _find_date_posted(value: object) -> str:

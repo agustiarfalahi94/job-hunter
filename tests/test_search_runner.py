@@ -5,7 +5,7 @@ import json
 from dataclasses import replace
 
 from job_hunter.matching import MatchContext, MatchResult, MatchingConfig
-from job_hunter.search import SearchCriteria, parse_serpapi_results, extract_job_metadata
+from job_hunter.search import SearchCriteria, parse_serpapi_results, extract_job_metadata, _job_location_matches
 from job_hunter.search_runner import SearchRequest, SearchRunController
 from job_hunter.session_workspace import SessionWorkspace
 
@@ -60,6 +60,18 @@ def _score(job, context, config, cache, *, cancel):
 
 
 class SearchRunnerTest(unittest.TestCase):
+    def test_location_comparison_distinguishes_country_evidence_from_city_mismatch(self):
+        self.assertTrue(_job_location_matches("Kuala Lumpur, MY", "Malaysia"))
+        self.assertIsNone(_job_location_matches("Malaysia", "Kuala Lumpur"))
+        self.assertFalse(_job_location_matches("New York, US", "Kuala Lumpur"))
+
+    def test_selected_vacancy_location_is_not_merged_with_related_posting(self):
+        data = {"@graph": [
+            {"@type": "JobPosting", "url": "https://my.linkedin.com/jobs/view/123", "jobLocation": {"address": {"addressLocality": "New York", "addressCountry": "US"}}},
+            {"@type": "JobPosting", "url": "https://my.linkedin.com/jobs/view/456", "jobLocation": {"address": {"addressLocality": "Kuala Lumpur", "addressCountry": "MY"}}}]}
+        metadata = extract_job_metadata('<script type="application/ld+json">' + json.dumps(data) + '</script>', "https://my.linkedin.com/jobs/view/123")
+        self.assertEqual(metadata.locations, ("New York, US",))
+
     def test_structured_locations_support_graphs_multiple_addresses_and_null_types(self):
         data = {"@graph": [{"@type": None}, {"@type": ["JobPosting"], "jobLocation": [
             {"address": {"addressLocality": "New York", "addressCountry": "US"}},
@@ -84,7 +96,9 @@ class SearchRunnerTest(unittest.TestCase):
     def test_wrong_structured_job_location_is_skipped_before_scoring(self):
         from job_hunter.runtime_config import SearchProviderConfig
         request = replace(_request(), provider_config=SearchProviderConfig(serpapi_key="test"))
-        page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {"@type": "Place", "address": {"addressLocality": "New York", "addressCountry": "US"}}, "description": "Power BI. Collaborate with Kuala Lumpur."}) + '</script>'
+        page = '<script type="application/ld+json">' + json.dumps({"@graph": [
+            {"@type": "JobPosting", "url": "https://my.linkedin.com/jobs/view/123", "jobLocation": {"@type": "Place", "address": {"addressLocality": "New York", "addressCountry": "US"}}, "description": "Power BI. Collaborate with Kuala Lumpur."},
+            {"@type": "JobPosting", "url": "https://my.linkedin.com/jobs/view/456", "jobLocation": {"address": {"addressLocality": "Kuala Lumpur", "addressCountry": "MY"}}}]}) + '</script>'
         calls = []
         def scorer(*args, **kwargs):
             calls.append(1)
@@ -96,6 +110,15 @@ class SearchRunnerTest(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(matches, ())
         self.assertTrue(any("New York" in event.message and "location" in event.message for event in events))
+
+    def test_country_only_evidence_keeps_city_unverified_instead_of_skipping(self):
+        controller = SearchRunController(discovery_fetcher=lambda _: SEARCH_HTML.format(cards=CARD.format(job_id=1)),
+            page_fetcher=lambda _: '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {"address": {"addressCountry": "MY"}}}) + '</script>', scorer=_score)
+        controller.start(_request())
+        self.assertTrue(controller.wait(2))
+        _, matches = controller.drain()
+        self.assertEqual(matches[0].job.location, "")
+        self.assertIn("not verified", matches[0].result.remarks[-1])
 
     def test_cancel_stops_new_page_fetches_and_preserves_completed_results(self):
         first_completed = threading.Event()
