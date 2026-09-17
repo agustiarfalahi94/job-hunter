@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.16.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.17.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
@@ -11,7 +11,8 @@ Job Hunter v1.16.1 is a Streamlit app that discovers, scores, and organizes data
 - Verifies job-specific posting dates where possible, labels unknown dates honestly, and skips known stale or closed jobs.
 - Excludes semantic variants of local-only, Malaysian-only, and mandatory-Mandarin requirements before scoring.
 - Uses Gemini for evidence-based matching when configured and visibly labels deterministic fallback scores when Gemini is unavailable.
-- Consolidates confident duplicates while preserving alternate source links.
+- Skips confident duplicates while keeping one primary posting per vacancy, without alternate-source storage or display.
+- Supports platform quick-apply filters and user corrections for posting date/expiry.
 - Opens the safest application page in a new tab and lets the user record an application manually.
 
 ## Web App Tutorial
@@ -35,8 +36,8 @@ CV bytes and extracted text are session-only in the hosted app. They are not wri
 
 1. Open **Search jobs**.
 2. Select or type the title, description, bonus, and hard-skip terms. New sessions start empty: suggestions are not preselected, and saving a CV does not populate criteria. Edited parameters survive page/mode changes and completed searches in this session. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
-3. Type or select one city in **Location**.
-4. Select job platforms and a posting-age limit.
+3. Select one or more areas in **Location**, for example `Kuala Lumpur` OR `Jakarta`, or `Europe` OR `APAC`. Choose `Malaysia` for country-wide search, `ASEAN` for its members, or `Global` for no geographic restriction. Global overrides other areas. Selections persist just like keywords.
+4. Select job platforms and a posting-age limit. Optional **Platform application filters** restrict only their named platform: LinkedIn Easy Apply, Indeed Apply, or Foundit Quick Apply. Other platforms are unaffected. These strict filters require posting-level button/link evidence; inaccessible or unverified quick-apply jobs are skipped with a log reason. They do not submit applications. Leave them empty for widest discovery coverage.
 5. In **Company career sites**, select a preset (its domain is shown), enter a company name such as `Deloitte`, or enter a public HTTPS careers domain. Up to five sites are allowed; company-site job searches require SerpAPI. New company names additionally require Gemini and a selected location. The app searches the web, checks official careers/regional evidence, and shows the confirmed destination plus source links. If verification fails, it explains why rather than guessing; use **Retry company lookup** or enter the known careers domain.
 6. Click **Run search and score jobs**.
 7. Follow the progress bar and activity log. Fifty is the maximum, not a required result count; a completed search fills the bar even when sources return fewer jobs and reports the number actually checked.
@@ -63,13 +64,35 @@ All four fields share session persistence, case-insensitive matching, and OR alt
 
 Automatic lookup conservatively requires a brand-matching corporate domain, a company-owned careers host, live citations, an official careers link, and readable regional evidence on both referring and destination pages. Shared ATS hosts, differently branded corporate domains, and inaccessible pages require an explicit domain instead. These evidence checks reduce mistakes; they are not a legal ownership certification. Discovery searches the verified company-owned hostname rather than a landing-page path, and still applies the selected job location.
 
-The selected city is a search constraint, not evidence of a posting's actual location. Readable JobPosting addresses or platform location labels supply observed location; known mismatches are skipped before scoring. When a source exposes no location, the queue leaves it unverified and explains that limitation in remarks rather than assigning your selected city.
+Selected areas are OR alternatives, but geography still constrains title/description discovery. Country selections cover cities in that country; region presets expand into country alternatives inside existing search requests. Country names/codes and supported city names are matched case-insensitively using the same geographic checks before scoring and in deterministic scoring. Readable JobPosting addresses or platform location labels supply observed location; known mismatches are skipped. Missing or insufficient geography remains unverified with remarks, never invented from the search query.
+
+**Regional coverage:** ASEAN includes its eleven members, including Timor-Leste ([ASEAN admission announcement](https://asean.org/forging-a-new-era-timor-leste-admitted-into-asean/)). APAC has no universal hiring-market definition; this app uses the explicitly listed country/economy preset in [Geographic Scopes](docs/LOCATION_SCOPES.md). Country suggestions come from the ISO dataset packaged by [pycountry](https://github.com/pycountry/pycountry); Malaysian city suggestions still use CountriesNow with a fallback. JobStreet searches its regional subdomains; Foundit includes Malaysia, Indonesia, Singapore, and India. Other countries may have incomplete platform coverage. Public LinkedIn fallback uses separate country/city requests within the twelve-request ceiling, so broad-region coverage is partial, not an exhaustive scan. SerpAPI uses grouped country alternatives without increasing the request ceiling.
+
+**Why five company sites?** It is an app safeguard for the shared twelve-request discovery budget, runtime, and API usage, not a GitHub/Streamlit/platform restriction. New company-name verification also permits at most five company/region pairs per selection: Kuala Lumpur and Malaysia share one region, while Jakarta adds Indonesia. ASEAN/APAC each use one regional verification, not a separate Gemini call for every member country. Each verified region is cached and shown; an unverified region blocks search rather than being silently ignored. Use known careers domains or narrow locations when this budget is exceeded. Resolved domains are deduplicated and capped at five.
+
+**What fifty means:** The app collects up to fifty unique candidates in discovery order, then checks, filters, scores, and ranks them. It is not the fifty most suitable jobs across the internet and does not guarantee fifty strong matches. Skipped jobs still consume checking capacity; the queue contains the retained scored results and ranks those by suitability. Broadening locations does not increase this ceiling or allocate fifty jobs per area.
 
 If company lookup reports unavailable Gemini quota, check the API key's Google AI Studio project and its model/Google Search grounding limits. A working scoring connection does not establish available grounding quota. Wait for the applicable reset or use a known careers domain; the app cannot verify company names without an available grounded request and never guesses a replacement domain.
 
 ### 4. Review And Apply
 
-The queue defaults to **Actionable** jobs. Use **All** or **Already applied** to change the view, then filter by match decision. Each row shows the scoring engine, evidence limit, description quality, date source or limitation, reasons, remarks, and alternate sources.
+The queue defaults to **Actionable** jobs, excluding already-applied and marked-expired entries. Use **All** or **Already applied** to change the view, then filter by match decision. Rows show scoring engine/model, description/date evidence, expiry and its evidence, quick-apply evidence, reasons, and remarks, with one primary source.
+
+Select a job, expand **Posting date & expiry**, enter a date you can actually verify and choose Unknown / Not expired / Expired, then click **Save posting details**. Corrections persist in this session and are labelled user-entered, not platform-verified; they do not rescore jobs. Clear the date for Unknown; future dates are rejected. Expired jobs remain in All and Apply is disabled; choose All to correct/reopen one. Source `JobPosting.validThrough` expiry is checked before scoring. A stale posting date does not prove expiry, and Unknown is not expired.
+
+Location extraction tries selected-vacancy structured addresses, recognized platform header elements, public card labels, and recognized Indeed result-title location slots, never description mentions or your query city. Some platforms block server requests even when browser access works. If every visible result lacks verified location, Location is hidden; otherwise it stays and unknown rows say Unknown.
+
+### Gemini Model And Quota
+
+The default remains `gemini-2.5-flash`, unless Streamlit secrets `GEMINI_MODEL` overrides it. Unavailable-model recovery may select a newer supported stable Flash; it is not guaranteed to use 3.8. Search jobs shows the configured model; Check Gemini connection shows the actual model, and queue rows record their scoring model. To request current 3.8 explicitly, set `GEMINI_MODEL = "gemini-3.8-flash"` ([Google model catalog](https://ai.google.dev/gemini-api/docs/models)); runtime model/key availability still applies.
+
+AI Studio Usage charts show activity and error types, not remaining quota. Success rate 100% is not 100% quota remaining. 429 means a rate/resource limit was exceeded; 404 is an unavailable model/resource, and 503 is service unavailability. Check Rate Limit for your selected project/model: requests/minute, input tokens/minute, daily requests, and grounding capacity differ. Limits apply per project, not per key ([Google rate-limit documentation](https://ai.google.dev/gemini-api/docs/rate-limits)). A working scoring call does not establish grounding capacity.
+
+### Test Your Criteria
+
+For the [Indeed reference posting](https://malaysia.indeed.com/viewjob?jk=9e3ad6434cb74fde), try Criteria-based search; title `Data Analyst`; required `Power BI`; bonus `SQL`; location `Kuala Lumpur`; platform `Indeed`; empty hard skips, company sites, and application filters; Date posted `Any time` because the readable reference page has no posting date. To test a hard skip, keep those values but add `Power BI` to Hard skip keywords: matching discoveries must be skipped irrespective of capitalization. Use separate fresh sessions to avoid old queued results confusing independent runs.
+
+See [Positive And Negative Test Cases](docs/TEST_CASES.md) for expected outcomes, location/suitability negatives, and access/indexing limitations. Search cannot guarantee discovery of a specific URL within fifty candidates. Never invent a missing posting date.
 
 Select a job and click **Apply** to open the safest official destination. Login, CAPTCHA, required questions, review, and submission stay on that platform. Opening Apply never changes application status. After submitting, explicitly select **I have applied to this job**; the record is labelled as manually recorded, not platform-verified.
 

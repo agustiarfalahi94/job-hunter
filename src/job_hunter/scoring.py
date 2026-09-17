@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from job_hunter.eligibility import hard_skip_matches
+from job_hunter.locations import is_global, location_matches
 
 
 DEFAULT_WEIGHTS: dict[str, int] = {
@@ -65,7 +66,10 @@ def score_job(job: dict[str, Any], preferences: dict[str, Any]) -> ScoreResult:
         label = "bonus" if preferences.get("bonus_keywords") else "preferred"
         reasons.append(f"Matched {label} keywords: {', '.join(preferred_matches)}")
 
-    matched_location = _first_contains(location, preferences.get("target_locations", ()))
+    matched_location = next((str(scope) for scope in preferences.get("target_locations", ())
+                             if location_matches(location, (str(scope),)) is True), "")
+    if is_global(preferences.get("target_locations", ())):
+        matched_location = ""
     if matched_location:
         score += weights["location"]
         reasons.append(f"Location matches preference: {matched_location}")

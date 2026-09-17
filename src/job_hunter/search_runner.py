@@ -19,6 +19,7 @@ from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
 from job_hunter.search import (
     MAX_SEARCH_REQUESTS,
+    APPLICATION_FILTERS,
     PlatformQuery,
     SearchCandidate,
     SearchCriteria,
@@ -27,10 +28,10 @@ from job_hunter.search import (
     _is_blocked_search_page,
     _posting_is_too_old,
     _job_location_matches,
-    build_direct_platform_queries,
-    build_search_queries,
+    build_public_fallback_queries,
     build_serpapi_queries,
     extract_job_metadata,
+    match_job_locations,
     fetch_job_html,
     fetch_public_html,
     parse_duckduckgo_results,
@@ -167,7 +168,6 @@ class SearchRunController:
         started = self._clock()
         futures: dict[Future[_ProcessedCandidate], tuple[str, SearchCandidate]] = {}
         unique_candidates: list[tuple[str, SearchCandidate]] = []
-        aliases: dict[str, list[SearchCandidate]] = {}
         unique_keys: set[str] = set()
         executor = ThreadPoolExecutor(
             max_workers=self._max_workers,
@@ -202,10 +202,8 @@ class SearchRunController:
                         break
                     identity = _candidate_identity(candidate)
                     if identity in unique_keys:
-                        aliases.setdefault(identity, []).append(candidate)
                         continue
                     unique_keys.add(identity)
-                    aliases.setdefault(identity, [])
                     self._increment(discovered=1)
                     unique_candidates.append((identity, candidate))
                 if len(unique_keys) >= MAX_UNIQUE_RESULTS:
@@ -232,7 +230,7 @@ class SearchRunController:
                 for future in done_now:
                     pending.discard(future)
                     identity, original = futures[future]
-                    self._publish_processed(run_id, future, identity, original, aliases)
+                    self._publish_processed(run_id, future, original)
                 if self._should_stop(started):
                     for future in pending:
                         future.cancel()
@@ -240,7 +238,7 @@ class SearchRunController:
                     for future in settled:
                         identity, original = futures[future]
                         self._publish_processed(
-                            run_id, future, identity, original, aliases
+                            run_id, future, original
                         )
                     break
                 while (
@@ -300,6 +298,9 @@ class SearchRunController:
         posted_date_reason = "" if posted_date else "Job page was not checked"
         apply_url = candidate.apply_url
         job_location = candidate.location
+        quick_apply = ""
+        availability = "unknown"
+        availability_evidence = ""
         try:
             if self._uses_default_page_fetcher:
                 page = fetch_job_html(
@@ -315,12 +316,15 @@ class SearchRunController:
 
         if page and not _is_blocked_search_page(page):
             metadata = extract_job_metadata(page, candidate.source_url, snippet=candidate.description)
+            quick_apply = metadata.quick_apply
+            availability = metadata.availability
+            availability_evidence = metadata.availability_evidence
+            if availability == "expired":
+                return _ProcessedCandidate(None, None, availability_evidence)
             if metadata.locations:
-                comparisons = [(place, _job_location_matches(place, request.criteria.location)) for place in metadata.locations]
-                matching_locations = [place for place, matches in comparisons if matches is True]
-                if not matching_locations and all(matches is False for _, matches in comparisons):
-                    return _ProcessedCandidate(None, None, f"Job location {', '.join(metadata.locations)} does not match {request.criteria.location}.")
-                job_location = "; ".join(matching_locations)
+                job_location, geographic_match = match_job_locations(metadata, request.criteria.location_targets)
+                if geographic_match is False:
+                    return _ProcessedCandidate(None, None, f"Job location {', '.join(metadata.locations)} does not match {request.criteria.location_label}.")
             description = metadata.description
             posted_date = metadata.posted_date or posted_date
             apply_url = metadata.apply_url or apply_url
@@ -350,10 +354,13 @@ class SearchRunController:
                 None,
                 _stale_reason(replace(candidate, posted_date=posted_date), request.criteria),
             )
-        if job_location and _job_location_matches(job_location, request.criteria.location) is False:
-            return _ProcessedCandidate(None, None, f"Job location {job_location} does not match {request.criteria.location}.")
-        if job_location and _job_location_matches(job_location, request.criteria.location) is None:
+        if job_location and _job_location_matches(job_location, request.criteria.location_targets) is False:
+            return _ProcessedCandidate(None, None, f"Job location {job_location} does not match {request.criteria.location_label}.")
+        if job_location and _job_location_matches(job_location, request.criteria.location_targets) is None:
             job_location = ""
+        required_apply = APPLICATION_FILTERS.get(candidate.platform)
+        if required_apply in request.criteria.application_filters and quick_apply != required_apply:
+            return _ProcessedCandidate(None, None, f"{required_apply} could not be verified on this posting; strict platform filter.")
         job = JobInput(
             title=candidate.title,
             company=candidate.company,
@@ -369,6 +376,9 @@ class SearchRunController:
             posted_date_source=posted_date_source,
             posted_date_reason=posted_date_reason,
             platform=candidate.platform,
+            quick_apply=quick_apply,
+            availability=availability,
+            availability_evidence=availability_evidence,
         )
         if self._should_stop(started):
             return _ProcessedCandidate(None, None, "Search was cancelled.")
@@ -389,9 +399,7 @@ class SearchRunController:
         self,
         run_id: str,
         future: Future[_ProcessedCandidate],
-        identity: str,
         original: SearchCandidate,
-        aliases: dict[str, list[SearchCandidate]],
     ) -> None:
         try:
             processed = future.result()
@@ -408,14 +416,6 @@ class SearchRunController:
                 )
             return
         self._matches.put(CompletedMatch(run_id, processed.job, processed.result))
-        for alias in aliases.get(identity, ()):
-            alias_job = replace(
-                processed.job,
-                source_url=alias.source_url,
-                platform=alias.platform,
-                apply_url=alias.apply_url,
-            )
-            self._matches.put(CompletedMatch(run_id, alias_job, processed.result))
         self._increment(completed=1, checked=1)
         self._emit(
             run_id,
@@ -469,12 +469,7 @@ def _planned_queries(
     bounded = replace(criteria, max_results=MAX_UNIQUE_RESULTS)
     if provider.has_api_search:
         return build_serpapi_queries(bounded, provider.serpapi_key)[:MAX_SEARCH_REQUESTS]
-    queries = build_direct_platform_queries(bounded)
-    direct_platforms = {query.platform for query in queries}
-    queries.extend(
-        query for query in build_search_queries(bounded) if query.platform not in direct_platforms
-    )
-    return queries[:MAX_SEARCH_REQUESTS]
+    return build_public_fallback_queries(bounded)
 
 
 def _parse_results(

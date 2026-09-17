@@ -21,3 +21,6 @@ class JobInput:
     posted_date_source: str = ""
     posted_date_reason: str = ""
     platform: str = ""
+    quick_apply: str = ""
+    availability: str = "unknown"
+    availability_evidence: str = ""

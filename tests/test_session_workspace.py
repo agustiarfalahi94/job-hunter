@@ -62,7 +62,7 @@ class SessionWorkspaceTest(unittest.TestCase):
         self.assertIs(first, again)
         self.assertIsNot(first, second)
 
-    def test_confident_cross_source_duplicate_keeps_both_sources(self):
+    def test_confident_cross_source_duplicate_retains_only_primary_url(self):
         workspace = SessionWorkspace()
         score = MatchResult(
             91,
@@ -96,7 +96,8 @@ class SessionWorkspaceTest(unittest.TestCase):
         self.assertTrue(first.created)
         self.assertFalse(second.created)
         job = workspace.list_jobs()[0]
-        self.assertEqual({source.platform for source in job.sources}, {"Foundit", "LinkedIn"})
+        self.assertEqual(job.source_url, foundit.source_url)
+        self.assertFalse(hasattr(job, "sources"))
 
     def test_apply_redirect_alone_does_not_merge_distinct_vacancies(self):
         workspace = SessionWorkspace()
@@ -157,7 +158,7 @@ class SessionWorkspaceTest(unittest.TestCase):
             job.application_evidence,
             "Marked manually by the user; not verified with the job platform.",
         )
-        self.assertEqual(len(job.sources), 2)
+        self.assertEqual(job.source_url, first.source_url)
 
 
 if __name__ == "__main__":

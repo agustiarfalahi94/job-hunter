@@ -27,7 +27,7 @@ The hosted app never creates `JobQueue` or `CVStore`. SQLite and disk-backed CV 
 | `search.py` | Query planning, provider parsers, safe page loading, dates, descriptions, availability |
 | `matching.py` | Mode validation, Gemini adapter, structured output, retry, cache, fallback |
 | `company_lookup.py` | Live grounded company discovery, official regional evidence verification, safe citation redirects |
-| `job_identity.py` | Tracking cleanup, provider IDs, fingerprints, alternate source identity |
+| `job_identity.py` | Tracking cleanup, provider IDs, primary URL/fingerprint identity |
 | `source_validation.py` | Friendly company-name resolution and public HTTPS custom-domain validation |
 | `eligibility.py` | Shared normalized and conservative semantic hard-skip matching |
 | `app_ui.py` | Queue filtering, row presentation, and application destinations |
@@ -47,7 +47,9 @@ Public repository data includes source code, tests, generic criteria templates, 
 
 SerpAPI is preferred for dependable discovery and required for custom domains. Public fallback coverage may be incomplete. Page requests accept supported platform domains, known ATS domains, and only the custom domains that passed validation. Redirects remain HTTPS and trusted.
 
-General search candidates have no observed location merely because the query includes a city. Structured records are associated with the selected vacancy URL; unrelated vacancies are not merged, and multiple ambiguous records remain unverified. JobPosting addresses override platform card evidence, known mismatches are skipped before scoring, and missing or country-only city evidence remains empty with an explicit result remark. Common country codes are normalized. Multiple observed locations for the same vacancy are accepted when at least one matches the selected city as a normalized whole phrase.
+General search candidates have no observed location merely because the query includes an area. Structured records are associated with the selected vacancy URL; unrelated vacancies are not merged, and multiple ambiguous records remain unverified. JobPosting addresses override platform card evidence. Shared geographic matching uses pycountry ISO aliases and explicit regional membership for OR city/country/ASEAN/APAC selections; confirmed mismatches skip before scoring, and missing or country-only city evidence remains empty with a remark. Multiple addresses are accepted when at least one verifies a selected scope. See [Geographic Scopes](LOCATION_SCOPES.md).
+
+Multi-location company lookup deduplicates selected cities into verification regions, caches each region independently, and resolves all verified regional hosts through source validation. Source validation checks the five company/region pair ceiling before provider calls and the five resolved-site ceiling before search. Broad presets use one regional grounded verification rather than one call per member country. Web queries group source, keyword, and location OR clauses; regional alternatives do not multiply SerpAPI requests. Direct LinkedIn fallback expands country requests and interleaves other platform queries inside the twelve-request ceiling.
 
 Gemini receives one mode-specific candidate payload and one job payload. Criteria mode cannot carry CV text. Errors are classified into sanitized user-facing fallback reasons; raw API errors and keys are not logged.
 
@@ -58,6 +60,14 @@ On model-not-found only, the adapter lists at most 100 provider model entries an
 The controller schedules at most two jobs at a time and checks cancellation before every new discovery, fetch, and scoring stage. It cannot forcibly interrupt an already executing third-party request, so those calls have bounded timeouts and a short settlement window. A new run activates a new ID; late completed values from an older ID are ignored.
 
 The progress fragment does not mutate the already-rendered page widget. It writes a pending page request and triggers a full app rerun; the request is consumed before the page control is created. Completed searches render as terminally full even when the source pool contains fewer than 50 unique candidates.
+
+## Posting Evidence And Application Filters
+
+Europe/ASEAN/APAC use explicit country/economy presets; Global removes location constraints and location-score bonuses. Explicit countries override city inference, and structured locality roles are retained for tri-state city checks. Associated records missing addresses can use recognized header fallback; ambiguous/unrelated structured records cannot.
+
+Optional quick-apply filters are own-platform and strict. LinkedIn discovery includes f_AL and web signals; Indeed/Foundit use their method signals. Actual eligibility requires observed button/link evidence, with conflicting vacancy IDs rejected and description/related-job nodes excluded. Missing evidence skips with a reason. These are discovery filters, not login or submission automation.
+
+Hosted JobInput/JobRecord carry quick_apply, availability, and availability_evidence. Source validThrough dates determine known expiry before scoring; unknown expiry is not inferred from posting age. User edits to date/expiry are session-only and explicitly unverified, while unchanged source evidence is preserved. Duplicate date/provenance merges are atomic. Expired jobs are retained in All with Apply disabled. Location columns are omitted only when all visible records lack observed location. Alternate source fields/storage/runner alias publication are removed; primary URL/provider/fingerprint checks remain.
 
 ## Local SQLite Compatibility
 

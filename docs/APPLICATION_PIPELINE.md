@@ -2,6 +2,8 @@
 
 ## v1.15 Flow
 
+v1.17 retains this pipeline but allows OR city/country/regional Location selections. Geography is checked from posting evidence before scoring and with the shared matcher during fallback scoring. Regional discovery remains inside existing budgets; fifty candidates are collected before suitability is known, not selected as the best fifty. See [Geographic Scopes](LOCATION_SCOPES.md).
+
 ```text
 Criteria only OR session CV + criteria
                 |
@@ -21,7 +23,7 @@ Hard skips, known-stale, and closed checks
 Gemini match or labelled deterministic fallback
                 |
                 v
-Session-only queue + alternate source consolidation
+Session-only queue + primary-posting duplicate checks
                 |
                 v
 Actionable / All / Already applied review
@@ -37,12 +39,12 @@ User login, review, submit, and manual status record
 
 - Discovery treats title and description as separate signals rather than requiring both.
 - Each run has at most 12 discovery requests, 50 unique candidates, 50 detail fetches, 50 scoring attempts, two job workers, and five minutes of new-work scheduling.
-- Company career sites start unselected and show preset domains. User-entered company names use Gemini Google Search to verify official regional careers evidence; public HTTPS domains are also accepted as user-provided sources. Five sites maximum, with SerpAPI required for their job discovery. Gemini lookup successes/failures are cached per session, and verified regional careers paths are kept in discovery queries.
+- Company career sites start unselected and show preset domains. User-entered company names use Gemini Google Search to verify official regional careers evidence; public HTTPS domains are user-provided sources. Five sites maximum, with SerpAPI required for discovery. Lookups are cached per region; verified company-owned hostnames are used in queries, not landing-page paths.
 - Detail fetches use trusted provider, known ATS, or validated custom domains with bounded redirects and timeouts.
 - Full descriptions come from `JobPosting.description` or recognized job-description containers. A snippet or unavailable state is retained honestly when full text cannot be read.
 - Job-specific date fields beat generic update metadata. Unknown dates remain `Unknown`.
 - Known stale jobs, closed jobs, and semantic hard-skip requirements are excluded before matching.
-- Confident duplicate identities share one queue record while retaining alternate source links. Generic Apply redirects are never vacancy identity.
+- Confident duplicate identities share one primary record; alternate sources are not stored/displayed. Generic Apply redirects are never vacancy identity.
 
 ## Progress And Stop
 

@@ -60,6 +60,57 @@ def _score(job, context, config, cache, *, cancel):
 
 
 class SearchRunnerTest(unittest.TestCase):
+    def test_quick_apply_filter_skips_unverified_own_platform_only(self):
+        from job_hunter.runtime_config import SearchProviderConfig
+        source = "https://my.linkedin.com/jobs/view/123"
+        for filters, label, expected in ((("LinkedIn Easy Apply",), "Easy Apply", True),
+                                        (("LinkedIn Easy Apply",), "Apply", False),
+                                        (("Indeed Apply",), "Apply", True)):
+            with self.subTest(filters=filters, label=label):
+                request = replace(_request(), criteria=replace(_request().criteria, application_filters=filters),
+                                  provider_config=SearchProviderConfig(serpapi_key="test"))
+                page = f'<main><span class="topcard__flavor--bullet">Kuala Lumpur</span><button class="jobs-apply-button">{label}</button></main>'
+                controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [{"title": "BI Analyst", "link": source}]}),
+                                                 page_fetcher=lambda _: page, scorer=_score)
+                controller.start(request)
+                self.assertTrue(controller.wait(2))
+                _, matches = controller.drain()
+                self.assertEqual(bool(matches), expected)
+
+    def test_multi_location_and_region_checks_happen_before_scoring(self):
+        from job_hunter.runtime_config import SearchProviderConfig
+        source = "https://my.linkedin.com/jobs/view/123"
+        for targets, city, country, expected in (
+            (("Kuala Lumpur", "Jakarta"), "Jakarta", "ID", True),
+            (("Malaysia",), "Johor Bahru", "MY", True),
+            (("ASEAN",), "Dili", "TL", True),
+            (("APAC",), "Tokyo", "JP", True),
+            (("Kuala Lumpur", "Jakarta"), "New York", "US", False),
+            (("APAC",), "Paris", "FR", False),
+        ):
+            with self.subTest(targets=targets, city=city):
+                request = replace(_request(), criteria=replace(_request().criteria, location="", locations=targets),
+                                  provider_config=SearchProviderConfig(serpapi_key="test"))
+                page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "url": source,
+                    "jobLocation": {"address": {"addressLocality": city, "addressCountry": country}},
+                    "description": "Power BI dashboard development"}) + '</script>'
+                controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [{"title": "BI Analyst", "link": source}]}),
+                                                 page_fetcher=lambda _: page, scorer=_score)
+                controller.start(request)
+                self.assertTrue(controller.wait(2))
+                _, matches = controller.drain()
+                self.assertEqual(bool(matches), expected)
+                if expected:
+                    self.assertIn(city, matches[0].job.location)
+
+    def test_region_fallback_keeps_other_platforms_in_bounded_plan(self):
+        from job_hunter.runtime_config import SearchProviderConfig
+        from job_hunter.search_runner import _planned_queries
+        criteria = replace(_request().criteria, location="", locations=("APAC",), platforms=("LinkedIn", "Indeed"))
+        queries = _planned_queries(criteria, SearchProviderConfig())
+        self.assertLessEqual(len(queries), 12)
+        self.assertIn("Indeed", {query.platform for query in queries})
+
     def test_location_comparison_distinguishes_country_evidence_from_city_mismatch(self):
         self.assertTrue(_job_location_matches("Kuala Lumpur, MY", "Malaysia"))
         self.assertIsNone(_job_location_matches("Malaysia", "Kuala Lumpur"))

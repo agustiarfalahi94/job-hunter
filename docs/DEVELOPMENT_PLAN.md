@@ -1,5 +1,16 @@
 # Development Plan
 
+## v1.17 - Multi-Area Search
+
+- Replace single-city web input with persistent OR city/country/ASEAN/APAC scopes; preserve legacy CLI input and migrate existing single-city session settings.
+- Share country/region evidence checks across queries, background filtering, and scoring; never infer observed geography from a query.
+- Keep discovery/site ceilings unchanged, fairly plan bounded regional fallback requests, and validate multi-region company lookup budgets before Gemini calls.
+- Verify navigation, parsing, geography, runner skips, scoring, company caches/limits, version consistency, feature/main CI, and production controls.
+- Ship documentation for explicit regional membership, incomplete broad coverage, the five-site safeguard, and fifty being checked candidates rather than best matches.
+- Extend to Europe OR APAC and Global; show configured/actual Gemini models and clarify rate/error charts.
+- Add strict own-platform quick-apply evidence, user posting-date/expiry corrections, visible header/Indeed title location extraction, conditional location columns, and primary-only deduplication without alternate-source tracking.
+- Document deterministic and live reference-job positive/negative checks, including direct Indeed access failure and unverified date limitations.
+
 ## v0.1 - Foundation
 
 - Create public-safe repository structure.

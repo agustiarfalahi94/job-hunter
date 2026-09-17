@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.16.1 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.17.0 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
@@ -18,6 +18,9 @@ Job Hunter v1.16.1 is a public Streamlit job-discovery and matching app. Read th
 10. Run `./tool/check.sh` before every commit. Report anything unverified instead of guessing.
 11. New web sessions start with no selected titles, keywords, locations, platforms, or companies. Suggestions and CLI defaults are not selected web criteria. Keep selected web settings separate from disposable widget keys.
 12. Company-name lookup sends only public company name and requested region to Gemini Google Search. Require grounded official/regional pages and an official careers link, validate HTTPS/public network destinations, and cache lookup successes/failures per session. Never guess a domain or send CV text for this lookup.
+13. Locations are OR scopes: cities, ISO countries, or documented regional presets. Apply identical geographic membership to discovery, pre-scoring checks, and deterministic scoring. Missing geography remains unverified. Preserve legacy single-location CLI input.
+14. Keep at most five selected/resolved company sites and five company/region lookup pairs per selection. Validate lookup budgets before contacting Gemini; regional presets count as one company-verification region rather than dozens of country calls.
+15. Optional quick-apply filters apply only to their named platform and require vacancy-associated controls, never description words. Manual date/expiry corrections retain user provenance; merge dates and verification atomically. No alternate-source storage/display; retain primary-identity duplicate checks.
 
 ## Git Flow
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import date
 from pathlib import Path
 from typing import MutableMapping
 
@@ -16,7 +17,7 @@ from job_hunter.application_links import (
 from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
 from job_hunter.cv_store import format_size
 from job_hunter.company_lookup import CompanyLookupError, CompanySite, lookup_company_site
-from job_hunter.locations import city_options, fetch_malaysia_cities
+from job_hunter.locations import company_region, fetch_malaysia_cities, is_global, location_options
 from job_hunter.matching import MatchContext, MatchingConfig
 from job_hunter.preferences import load_preferences
 from job_hunter.provider_check import check_gemini_connection
@@ -34,6 +35,7 @@ from job_hunter.source_validation import (
     COMPANY_SOURCE_DOMAINS,
     resolve_company_sources,
 )
+from job_hunter.search import APPLICATION_FILTERS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -201,17 +203,18 @@ def _render_search_jobs(
 ) -> None:
     st.subheader("Search jobs")
     if provider_config.has_gemini:
+        st.caption(f"Configured Gemini model: {provider_config.gemini_model}")
         if st.button("Check Gemini connection", icon=":material/health_and_safety:"):
             with st.spinner("Checking Gemini with synthetic data..."):
                 result = check_gemini_connection(MatchingConfig(
                     api_key=provider_config.gemini_api_key, model=provider_config.gemini_model
                 ))
             st.session_state["gemini_check_result"] = (
-                "Gemini connection succeeded." if result.engine == "Gemini"
+                f"Gemini connection succeeded. Model: {result.model}" if result.engine == "Gemini"
                 else result.remarks[-1]
             )
         if message := st.session_state.get("gemini_check_result"):
-            if message == "Gemini connection succeeded.":
+            if message.startswith("Gemini connection succeeded."):
                 st.success(message)
             else:
                 st.warning(message)
@@ -260,16 +263,21 @@ def _render_search_jobs(
             **_setting_widget("hard_skip_keywords"),
             help="Matching titles, descriptions, or page text are excluded before scoring.",
         )
-        location = st.selectbox(
+        locations = st.multiselect(
             "Location",
             _setting_options("search_location", _location_options(_cached_malaysia_cities())),
-            index=None,
             accept_new_options=True,
             **_setting_widget("search_location"),
-            help="Type a Malaysian city or choose a city suggestion.",
+            help="Choose cities, countries, Europe, ASEAN, APAC, or Global. Any selected area can match (OR). Global removes the geographic restriction.",
         )
         platforms = st.multiselect(
             "Platforms to search", SOURCES, **_setting_widget("search_platforms")
+        )
+        application_filters = st.multiselect(
+            "Platform application filters",
+            _setting_options("application_filters", tuple(APPLICATION_FILTERS.values())),
+            **_setting_widget("application_filters"),
+            help="Optional, strict filters for their own platform only. Unverified quick-apply postings are skipped. This does not submit applications.",
         )
         company_values = st.multiselect(
             "Company career sites",
@@ -288,7 +296,8 @@ def _render_search_jobs(
         )
         custom_sources, source_errors = resolve_company_sources(
             company_values, has_api_search=provider_config.has_api_search,
-            lookup=lambda name: _lookup_company(name, str(location or ""), provider_config),
+            lookup=lambda name: _lookup_company_for_locations(name, locations, provider_config),
+            lookup_regions=len(_company_regions(locations)),
         )
         for error in source_errors:
             st.warning(error)
@@ -299,9 +308,10 @@ def _render_search_jobs(
                     if not isinstance(result, str)
                 }
                 st.rerun()
-        _render_company_evidence(company_values, str(location or ""))
+        _render_company_evidence(company_values, locations)
         st.caption(
-            "Each run targets up to 50 unique jobs. It stops earlier when sources run out, "
+            "Each run checks up to 50 unique candidates, then ranks the scored results. "
+            "This is not a guarantee of the 50 best jobs. It stops earlier when sources run out, "
             "the five-minute scheduling limit is reached, or you press Stop."
         )
         st.caption(provider_status_label(provider_config.has_api_search))
@@ -309,12 +319,14 @@ def _render_search_jobs(
         criteria = SearchCriteria(
             title_terms=tuple(str(value) for value in title_terms),
             description_terms=tuple(str(value) for value in description_terms),
-            location=str(location or ""),
+            location="",
+            locations=tuple(str(value) for value in locations),
             platforms=tuple(str(value) for value in platforms),
             max_results=MAX_UNIQUE_RESULTS,
             posted_within_days=POSTING_AGE_OPTIONS[str(posting_age)],
             custom_domains=tuple(source.hostname for source in custom_sources),
             custom_site_filters=tuple(source.site_filter for source in custom_sources),
+            application_filters=tuple(application_filters),
         )
         ready, reason = _search_is_ready(mode, workspace, criteria)
         controller = _get_controller()
@@ -438,15 +450,18 @@ def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -
         st.info("No jobs match the current filters.")
         return
 
+    rows = jobs_to_rows(filtered)
+    if rows and "Location" not in rows[0]:
+        st.caption("Posting locations could not be verified for these results.")
     st.dataframe(
-        jobs_to_rows(filtered),
+        rows,
         column_config={
             "Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100),
             "Source URL": st.column_config.LinkColumn("Primary source"),
             **{
                 column: st.column_config.TextColumn(column, width=width)
                 for column, width in _queue_column_widths().items()
-                if column != "Source URL"
+                if column != "Source URL" and column in rows[0]
             },
         },
         hide_index=True,
@@ -464,6 +479,7 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
     options = _application_job_options(jobs)
     selected = st.selectbox("Job", list(options))
     job = options[selected]
+    _render_posting_editor(workspace, job)
     applied = st.checkbox(
         "I have applied to this job",
         value=job.application_status == "applied",
@@ -489,21 +505,35 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
         destination or "https://jobs-hunter.streamlit.app/",
         icon=":material/open_in_new:",
         type="primary",
-        disabled=not destination,
+        disabled=not destination or job.availability == "expired",
         help="Opens the application page in a new browser tab.",
     )
-    alternate_sources = [
-        source for source in job.sources if source.original_url != job.source_url
-    ]
-    if alternate_sources:
-        st.markdown("**Alternate sources**")
-        for index, source in enumerate(alternate_sources, start=1):
-            label = source.platform or f"Source {index}"
-            st.link_button(f"Open {label}", source.original_url, icon=":material/open_in_new:")
     st.info(
         "Review the destination before submitting. Login, CAPTCHA, and required questions "
         "remain in the platform page. Opening Apply does not mark the job as applied."
     )
+
+
+def _render_posting_editor(workspace: SessionWorkspace, job) -> None:
+    with st.expander("Posting date & expiry"):
+        st.caption(job.availability_evidence or "Expiry has not been verified.")
+        with st.form(f"posting_evidence_{job.id}"):
+            try:
+                current_date = date.fromisoformat(job.posted_date) if job.posted_date else None
+            except ValueError:
+                current_date = None
+            if current_date and current_date > date.today():
+                current_date = None
+            posted = st.date_input("Posting date", value=current_date, max_value=date.today(),
+                                   key=f"posting_date_{job.id}", format="YYYY-MM-DD")
+            labels = {"unknown": "Unknown", "not_expired": "Not expired", "expired": "Expired"}
+            expiry = st.selectbox("Expiry", tuple(labels),
+                                  index=tuple(labels).index(job.availability),
+                                  format_func=labels.get, key=f"posting_expiry_{job.id}")
+            if st.form_submit_button("Save posting details", icon=":material/save:"):
+                workspace.update_posting_evidence(job.id, posted.isoformat() if posted else "", str(expiry))
+                st.toast("Posting details saved. User corrections are not platform-verified.")
+                st.rerun()
 
 
 def _search_is_ready(
@@ -513,7 +543,7 @@ def _search_is_ready(
         return False, "Upload a readable CV before using CV-based search."
     if not criteria.title_terms and not criteria.description_terms:
         return False, "Add at least one title or description keyword."
-    if not criteria.location.strip():
+    if not criteria.location_targets:
         return False, "Choose or type a location."
     if not criteria.platforms and not criteria.custom_domains:
         return False, "Select at least one platform or valid custom source."
@@ -571,7 +601,9 @@ def _queue_column_widths() -> dict[str, str]:
         "Remarks": "large",
         "Description": "large",
         "Source URL": "medium",
-        "Alternate sources": "large",
+        "Expiry": "medium",
+        "Expiry evidence": "large",
+        "Quick apply": "medium",
         "Scoring": "medium",
         "Description quality": "large",
         "Date details": "large",
@@ -589,8 +621,7 @@ def _active_preferences(preferences: dict[str, object]) -> dict[str, object]:
     active = dict(preferences)
     for field in ("target_roles", "primary_keywords", "bonus_keywords", "hard_skip_keywords"):
         active[field] = list(settings[field])
-    location = settings["search_location"]
-    active["target_locations"] = [location] if location else []
+    active["target_locations"] = list(settings["search_location"])
     active["avoid_keywords"] = []
     active["remote_policy"] = []
     active.pop("preferred_keywords", None)
@@ -603,9 +634,13 @@ def _search_settings() -> dict[str, object]:
         settings = {
             "target_roles": [], "primary_keywords": [], "bonus_keywords": [],
             "hard_skip_keywords": [], "search_platforms": [], "company_sources": [],
-            "search_location": None, "posting_age": "Past month",
+            "search_location": [], "posting_age": "Past month", "application_filters": [],
         }
         st.session_state["search_settings"] = settings
+    settings.setdefault("application_filters", [])
+    location = settings.get("search_location")
+    if not isinstance(location, list):
+        settings["search_location"] = [location] if isinstance(location, str) and location else []
     return settings
 
 
@@ -635,7 +670,20 @@ def _company_source_label(value: str) -> str:
 
 def _company_region(location: str) -> str:
     cities = _cached_malaysia_cities()
-    return "Malaysia" if location.casefold() in {city.casefold() for city in cities} else location
+    return "Malaysia" if location.casefold() in {city.casefold() for city in cities} else company_region(location)
+
+
+def _company_regions(locations) -> tuple[str, ...]:
+    if is_global(locations):
+        return ("Global",)
+    return tuple(dict.fromkeys(_company_region(str(value)) for value in locations if str(value).strip()))
+
+
+def _lookup_company_for_locations(name: str, locations, config: SearchProviderConfig) -> tuple[CompanySite, ...]:
+    regions = _company_regions(locations)
+    if not regions:
+        raise CompanyLookupError("Select a location before looking up company names.")
+    return tuple(_lookup_company(name, region, config) for region in regions)
 
 
 def _lookup_company(name: str, location: str, config: SearchProviderConfig) -> CompanySite:
@@ -660,14 +708,14 @@ def _lookup_company(name: str, location: str, config: SearchProviderConfig) -> C
     return result
 
 
-def _render_company_evidence(values, location: str) -> None:
+def _render_company_evidence(values, locations) -> None:
     cache = st.session_state.get("company_lookups", {})
-    region = _company_region(location).casefold() if location else ""
+    regions = {region.casefold() for region in _company_regions(locations)}
     for value in values:
-        matched = next((result for (name, scope, _), result in cache.items()
-                        if name == str(value).strip().casefold() and scope == region
-                        and isinstance(result, CompanySite)), None)
-        if matched:
+        matches = [result for (name, scope, _), result in cache.items()
+                   if name == str(value).strip().casefold() and scope in regions
+                   and isinstance(result, CompanySite)]
+        for matched in matches:
             st.link_button(f"{matched.company} ({matched.hostname}) - {matched.region}",
                            matched.careers_url, icon=":material/verified:")
             with st.expander(f"{matched.company} verification sources"):
@@ -732,8 +780,7 @@ def _run_progress(snapshot: RunSnapshot) -> tuple[int, str]:
 
 
 def _location_options(cities: tuple[str, ...]) -> tuple[str, ...]:
-    options = city_options("", cities=cities, limit=300)
-    return ("Kuala Lumpur",) + tuple(city for city in options if city != "Kuala Lumpur")
+    return location_options(cities)
 
 
 if __name__ == "__main__":

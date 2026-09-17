@@ -28,7 +28,8 @@ class CustomSource:
 
 
 def resolve_company_sources(
-    values: Iterable[str], *, has_api_search: bool, lookup: Callable[[str], object] | None = None
+    values: Iterable[str], *, has_api_search: bool, lookup: Callable[[str], object] | None = None,
+    lookup_regions: int = 1,
 ) -> tuple[tuple[CustomSource, ...], tuple[str, ...]]:
     """Resolve friendly company names or user-entered public career domains."""
     raw = list(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
@@ -38,22 +39,29 @@ def resolve_company_sources(
     seen = set()
     if len(raw) > MAX_CUSTOM_SOURCES:
         return (), ("Select at most 5 company career sites.",)
+    names = sum(not _looks_like_domain(_resolve_company_value(value)) for value in raw)
+    if names * lookup_regions > MAX_CUSTOM_SOURCES:
+        return (), ("Select at most 5 company/region verification pairs, or enter known careers domains.",)
     for value in raw:
         resolved = _resolve_company_value(value)
         try:
             if not _looks_like_domain(resolved) and lookup is not None:
                 found = lookup(value)
-                hostname = _validated_hostname(found.hostname)
-                source = CustomSource(hostname, found.site_filter)
+                results = found if isinstance(found, (tuple, list)) else (found,)
+                resolved_sources = [CustomSource(_validated_hostname(result.hostname), result.site_filter)
+                                    for result in results]
             else:
                 hostname = _validated_hostname(resolved)
-                source = CustomSource(hostname, f"site:{hostname}")
+                resolved_sources = [CustomSource(hostname, f"site:{hostname}")]
         except ValueError as exc:
             errors.append(f"{value}: {exc}")
             continue
-        if source.site_filter not in seen:
-            seen.add(source.site_filter)
-            sources.append(source)
+        for source in resolved_sources:
+            if source.site_filter not in seen:
+                seen.add(source.site_filter)
+                sources.append(source)
+    if len(sources) > MAX_CUSTOM_SOURCES:
+        return (), ("Verified regions resolved to more than 5 sites; narrow the selection or enter careers domains.",)
     return tuple(sources), tuple(errors)
 
 

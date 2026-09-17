@@ -12,7 +12,6 @@ from typing import Any, Iterator
 
 from job_hunter.application_packet import build_application_packet
 from job_hunter.drafts import build_application_draft, draft_to_markdown
-from job_hunter.job_identity import JobSource, job_source
 from job_hunter.queue_types import JobInput
 from job_hunter.scoring import score_job
 
@@ -33,7 +32,6 @@ class JobRecord:
     posted_date: str = ""
     apply_url: str = ""
     application_status: str = "not_applied"
-    sources: tuple[JobSource, ...] = ()
     description_kind: str = "snippet"
     description_source: str = "search result"
     description_limitation: str = ""
@@ -46,6 +44,10 @@ class JobRecord:
     cache_hit: bool = False
     application_recorded_at: str = ""
     application_evidence: str = ""
+    quick_apply: str = ""
+    availability: str = "unknown"
+    availability_evidence: str = ""
+    platform: str = ""
 
 
 @dataclass(frozen=True)
@@ -332,7 +334,6 @@ def _record_from_row(row: sqlite3.Row) -> JobRecord:
         posted_date=str(row["posted_date"]),
         apply_url=str(row["apply_url"]),
         application_status=str(row["application_status"]),
-        sources=(job_source("", str(row["source_url"])),) if row["source_url"] else (),
         application_recorded_at=str(row["application_recorded_at"]),
         application_evidence=str(row["application_evidence"]),
     )

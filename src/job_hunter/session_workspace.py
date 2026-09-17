@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, MutableMapping
 
-from job_hunter.job_identity import JobSource, job_source, vacancy_fingerprint
+from job_hunter.job_identity import job_source, vacancy_fingerprint
 from job_hunter.matching import MatchResult
 from job_hunter.queue import AddResult, JobRecord
 from job_hunter.queue_types import JobInput
@@ -79,7 +79,6 @@ class SessionWorkspace:
                 score=existing.score,
                 decision=existing.decision,
             )
-        source = job_source(job.platform, job.source_url)
         record = JobRecord(
             id=self._next_job_id,
             title=job.title.strip(),
@@ -94,7 +93,6 @@ class SessionWorkspace:
             remarks="\n".join(score.remarks),
             posted_date=job.posted_date.strip(),
             apply_url=job.apply_url.strip(),
-            sources=(source,) if source.original_url else (),
             description_kind=job.description_kind,
             description_source=job.description_source,
             description_limitation=job.description_limitation,
@@ -105,6 +103,10 @@ class SessionWorkspace:
             scoring_model=getattr(score, "model", ""),
             score_limited=bool(getattr(score, "limited", False)),
             cache_hit=bool(getattr(score, "cache_hit", False)),
+            quick_apply=job.quick_apply,
+            availability=job.availability,
+            availability_evidence=job.availability_evidence,
+            platform=job.platform,
         )
         self._jobs.append(record)
         self._next_job_id += 1
@@ -146,6 +148,27 @@ class SessionWorkspace:
     def activate_run(self, run_id: str) -> None:
         self._active_run_id = run_id
 
+    def update_posting_evidence(self, job_id: int, posted_date: str, availability: str) -> None:
+        """Record user corrections without claiming platform verification or rescoring."""
+        if posted_date and date.fromisoformat(posted_date) > date.today():
+            raise ValueError("Posting date cannot be in the future.")
+        if availability not in {"unknown", "not_expired", "expired"}:
+            raise ValueError("Unsupported expiry state.")
+        for index, job in enumerate(self._jobs):
+            if job.id == job_id:
+                date_changed = posted_date != job.posted_date
+                expiry_changed = availability != job.availability
+                self._jobs[index] = replace(job, posted_date=posted_date,
+                    posted_date_verified=False if date_changed else job.posted_date_verified,
+                    posted_date_source="User-entered (not platform verified)" if date_changed and posted_date else
+                                       "" if date_changed else job.posted_date_source,
+                    posted_date_reason="No user-provided date" if date_changed and not posted_date else
+                                       "" if date_changed else job.posted_date_reason,
+                    availability=availability,
+                    availability_evidence="User-entered (not platform verified)" if expiry_changed else job.availability_evidence)
+                return
+        raise ValueError(f"Job not found: {job_id}")
+
     def accept_completed(self, match: object) -> bool:
         if getattr(match, "run_id", "") != self._active_run_id:
             return False
@@ -160,17 +183,11 @@ class SessionWorkspace:
         candidate_source = job_source(job.platform, job.source_url)
         fingerprint = vacancy_fingerprint(job.title, job.company, job.location)
         for existing in self._jobs:
-            existing_sources = existing.sources or _legacy_sources(existing)
-            if candidate_source.stable_id and any(
-                source.platform.casefold() == candidate_source.platform.casefold()
-                and source.stable_id == candidate_source.stable_id
-                for source in existing_sources
-            ):
+            source = job_source(existing.platform, existing.source_url)
+            if (candidate_source.stable_id and source.platform.casefold() == candidate_source.platform.casefold()
+                    and source.stable_id == candidate_source.stable_id):
                 return existing
-            if candidate_source.canonical_url and any(
-                source.canonical_url == candidate_source.canonical_url
-                for source in existing_sources
-            ):
+            if candidate_source.canonical_url and source.canonical_url == candidate_source.canonical_url:
                 return existing
             if fingerprint and fingerprint == vacancy_fingerprint(
                 existing.title, existing.company, existing.location
@@ -179,24 +196,15 @@ class SessionWorkspace:
         return None
 
     def _merge_duplicate(self, job_id: int, incoming: JobInput) -> None:
-        incoming_source = job_source(incoming.platform, incoming.source_url)
         for index, existing in enumerate(self._jobs):
             if existing.id != job_id:
                 continue
-            sources = list(existing.sources or _legacy_sources(existing))
-            if incoming_source.original_url and not any(
-                source.canonical_url == incoming_source.canonical_url
-                and source.platform.casefold() == incoming_source.platform.casefold()
-                for source in sources
-            ):
-                sources.append(incoming_source)
             use_incoming_description = (
                 incoming.description_kind == "full"
                 and existing.description_kind != "full"
             )
             self._jobs[index] = replace(
                 existing,
-                sources=tuple(sources),
                 description=(
                     incoming.description if use_incoming_description else existing.description
                 ),
@@ -217,10 +225,10 @@ class SessionWorkspace:
                 ),
                 posted_date=existing.posted_date or incoming.posted_date,
                 posted_date_verified=(
-                    existing.posted_date_verified or incoming.posted_date_verified
+                    existing.posted_date_verified if existing.posted_date else incoming.posted_date_verified
                 ),
                 posted_date_source=(
-                    existing.posted_date_source or incoming.posted_date_source
+                    existing.posted_date_source if existing.posted_date else incoming.posted_date_source
                 ),
                 posted_date_reason=(
                     ""
@@ -247,8 +255,3 @@ def get_session_workspace(state: MutableMapping[str, object]) -> SessionWorkspac
 
 def _normalize(value: str) -> str:
     return " ".join(value.casefold().strip().split())
-
-
-def _legacy_sources(job: JobRecord) -> tuple[JobSource, ...]:
-    source = job_source("", job.source_url)
-    return (source,) if source.original_url else ()

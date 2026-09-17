@@ -12,12 +12,14 @@ Job Hunter turns editable preferences and, optionally, a session CV into a ranke
 
 New sessions have empty selected criteria and no selected location. The suggestion catalogs are not automatically applied after CV upload. User edits are kept in permanent session settings across page/mode changes and completed searches; an app restart or session loss starts fresh. Date posted retains Past month protection.
 
+Location supports persistent OR selections across cities, countries, ASEAN, and an explicitly documented APAC country/economy preset. Country/region membership uses observed posting geography, not query hints. Regional searches remain bounded and are not exhaustive. Company-name verification has a five company/region pair ceiling in addition to five resolved sites. Fifty unique candidates is a pre-scoring ceiling, not the fifty most suitable jobs online. See [Geographic Scopes](LOCATION_SCOPES.md).
+
 Company source presets display their domains and start unselected. Unknown company names use Gemini Google Search plus verification of official regional pages and an official careers link; explicit domains remain supported as user-provided sources. Failed or ungrounded resolution does not guess a domain.
 4. Search title and description signals independently across selected sources.
 5. Enrich up to 50 unique jobs with descriptions, dates, and safe Apply destinations.
 6. Exclude restricted, known-stale, and visibly closed postings.
 7. Score with Gemini or a visibly labelled deterministic fallback.
-8. Review actionable or already-applied jobs and alternate source links.
+8. Review actionable, applied, or marked-expired jobs via their primary source; optionally correct posting dates/expiry with user provenance.
 9. Apply externally and record status manually.
 
 ## Included
@@ -32,7 +34,7 @@ Company source presets display their domains and start unselected. Unknown compa
 - Full/snippet/unavailable description provenance.
 - Job-specific date provenance and user-selected age filtering.
 - Conservative intent matching for local-only/Malaysian-only and mandatory-Mandarin requirements, including non-literal wording without treating optional language skills as mandatory.
-- Conservative identity matching and alternate source preservation.
+- Conservative primary URL/provider/fingerprint identity matching, without alternate-source storage.
 - Gemini structured scoring, session cache, bounded retry, sanitized errors, and fallback.
 - Explicit manual application evidence and safe external Apply links.
 - Backward-compatible local SQLite/CLI modules.

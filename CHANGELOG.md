@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.17.0 - 2026-09-17
+
+- Replace the single Location selector with persistent OR selections for cities, countries, ASEAN, and a documented APAC country/economy preset; retain empty defaults and migrate saved single-city settings.
+- Expand regional search signals within the existing twelve-request ceiling, group OR clauses so location/source constraints cannot escape keyword matching, and fairly include other platforms in broad LinkedIn fallback planning.
+- Use observed ISO country/address evidence for country and region eligibility and deterministic location scoring. Keep missing geography unverified and preserve legacy CLI location input.
+- Include regional JobStreet domains and Foundit Indonesia, Singapore, and India in discovery and safe result-domain handling.
+- Verify and cache new company names for each distinct selected region; deduplicate resolved hosts and enforce five company/region lookup pairs before provider calls, without increasing the five-site cap.
+- Document regional membership/coverage, company limits, and the fifty-candidate ceiling being a pre-scoring budget rather than the best fifty matches.
+- Add multi-location navigation, regional query/parser, geographic scoring, runner filtering, company budget, migration, and cache regression coverage.
+- Add Europe OR APAC and Global unrestricted geography without expanding discovery/checking budgets.
+- Display configured Gemini model and actual connection-check model; document usage/error charts versus project/model/grounding limits.
+- Add strict own-platform LinkedIn Easy Apply, Indeed Apply, and Foundit Quick Apply filters; bind observed apply IDs to the selected vacancy and never infer methods from descriptions.
+- Extract recognized platform header locations and Indeed result-title location slots when structured addresses are missing. Hide Location only when all visible results are unverified.
+- Add session-only posting-date/expiry corrections with user provenance, future-date rejection, atomic date/provenance deduplication, structured validThrough checks, and disabled Apply for marked-expired jobs.
+- Remove alternate-source rows/buttons, queue storage, and duplicate-alias publication; retain primary URL/provider/fingerprint identity and application records.
+- Preserve explicit country evidence over ambiguous city inference and structured address locality roles; insufficient city evidence stays unverified.
+- Share the twelve-request fallback planner with the legacy public search path and document reference-job positive/negative tests plus the observed Indeed direct-fetch access limitation.
+- Associate known-provider vacancy metadata by stable job ID when tracking parameters differ, without accepting unrelated job IDs or overriding explicit conflicting vacancy URLs.
+
 ## 1.16.1 - 2026-09-17
 
 - Fix direct LinkedIn fallback discovery to use quoted OR alternatives for both title and description lists, matching SerpAPI/public web query behavior.

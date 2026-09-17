@@ -17,7 +17,7 @@ class AppNavigationTest(unittest.TestCase):
         app_test = AppTest.from_file(str(app_path)).run(timeout=10)
         for widget in app_test.multiselect:
             self.assertEqual(widget.value, [], widget.label)
-        self.assertIsNone(next(widget for widget in app_test.selectbox if widget.label == "Location").value)
+        self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location").value, [])
 
     def test_saved_cv_does_not_populate_fresh_search_criteria(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
@@ -63,10 +63,11 @@ class AppNavigationTest(unittest.TestCase):
             "Hard skip keywords": ["azure", "CUSTOM EXCLUSION"],
             "Platforms to search": ["LinkedIn"],
             "Company career sites": ["Razer"],
+            "Location": ["Petaling Jaya", "Jakarta"],
+            "Platform application filters": ["Indeed Apply"],
         }
         for label, selected in values.items():
             next(widget for widget in app_test.multiselect if widget.label == label).set_value(selected).run(timeout=10)
-        next(widget for widget in app_test.selectbox if widget.label == "Location").set_value("Petaling Jaya").run(timeout=10)
         next(widget for widget in app_test.selectbox if widget.label == "Date posted").set_value("Past week").run(timeout=10)
         next(widget for widget in app_test.multiselect if widget.label == "Company career sites").set_value([]).run(timeout=10)
         controller = SearchRunController(discovery_fetcher=lambda _: "", page_fetcher=lambda _: "")
@@ -80,7 +81,7 @@ class AppNavigationTest(unittest.TestCase):
         app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
         for label, selected in values.items():
             self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == label).value, selected, label)
-        self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Location").value, "Petaling Jaya")
+        self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location").value, ["Petaling Jaya", "Jakarta"])
         self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Date posted").value, "Past week")
         self.assertEqual(len(app_test.exception), 0)
 
@@ -125,6 +126,29 @@ class AppNavigationTest(unittest.TestCase):
 
         self.assertEqual(session_state["page"], "Job queue")
 
+    def test_posting_editor_saves_date_and_expiry_without_navigation_errors(self):
+        from datetime import date
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path))
+        workspace = SessionWorkspace()
+        workspace.add_scored_job(JobInput("BI Analyst", location="Kuala Lumpur", source_url="https://malaysia.indeed.com/viewjob?jk=123"),
+                                 MatchResult(95, "shortlist", ("Relevant",), (), "Gemini", "test", False))
+        app_test.session_state[WORKSPACE_KEY] = workspace
+        app_test.session_state["page"] = "Job queue"
+        app_test.run(timeout=10)
+        app_test.date_input[0].set_value(date(2026, 9, 2))
+        next(widget for widget in app_test.selectbox if widget.label == "Expiry").set_value("expired")
+        next(button for button in app_test.button if button.label == "Save posting details").click().run(timeout=10)
+        self.assertEqual(len(app_test.exception), 0)
+        self.assertEqual(workspace.list_jobs()[0].posted_date, "2026-09-02")
+        self.assertEqual(workspace.list_jobs()[0].availability, "expired")
+        next(widget for widget in app_test.segmented_control if widget.label == "Applications").set_value("All").run(timeout=10)
+        self.assertEqual(len(app_test.date_input), 1)
+        app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+        app_test.segmented_control[0].set_value("Job queue").run(timeout=10)
+        self.assertEqual(workspace.list_jobs()[0].posted_date, "2026-09-02")
+        self.assertEqual(len(app_test.exception), 0)
+
     def test_streamlit_app_has_one_optional_cv_search_workflow(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
         app_test = AppTest.from_file(str(app_path))
@@ -149,7 +173,7 @@ class AppNavigationTest(unittest.TestCase):
         self.assertTrue(search_button.disabled)
         next(widget for widget in app_test.multiselect if widget.label == "Target job titles").set_value(["Data Analyst"]).run(timeout=10)
         next(widget for widget in app_test.multiselect if widget.label == "Platforms to search").set_value(["LinkedIn"]).run(timeout=10)
-        next(widget for widget in app_test.selectbox if widget.label == "Location").set_value("Kuala Lumpur").run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Location").set_value(["Kuala Lumpur"]).run(timeout=10)
         self.assertFalse(next(button for button in app_test.button if button.label == "Run search and score jobs").disabled)
         stop_button = next(button for button in app_test.button if button.label == "Stop search")
         self.assertTrue(stop_button.disabled)
@@ -313,6 +337,7 @@ class AppNavigationTest(unittest.TestCase):
         selected_label = "#7 - BI Developer - Acme"
 
         with (
+            patch.object(app, "_render_posting_editor"),
             patch.object(app.st, "subheader"),
             patch.object(app.st, "selectbox", return_value=selected_label),
             patch.object(app.st, "checkbox", return_value=True),

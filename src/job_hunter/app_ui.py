@@ -20,6 +20,8 @@ DEFAULT_SESSION_CAP = 50
 
 
 def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
+    jobs = list(jobs)
+    show_location = any(job.location.strip() for job in jobs)
     rows = []
     for job in jobs:
         remarks = "\n".join(
@@ -34,7 +36,6 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
         if job.description_limitation:
             description_quality = f"{description_quality}: {job.description_limitation}"
         date_details = job.posted_date_source or job.posted_date_reason or "Date unavailable"
-        source_urls = [source.original_url for source in job.sources if source.original_url]
         rows.append({
             "ID": job.id,
             "Score": job.score,
@@ -42,15 +43,17 @@ def jobs_to_rows(jobs: Iterable[JobRecord]) -> list[dict[str, object]]:
                 "Already applied" if job.application_status == "applied" else job.decision
             ),
             "Posted": job.posted_date or "Unknown",
+            "Expiry": {"unknown": "Unknown", "not_expired": "Not expired", "expired": "Expired"}.get(job.availability, "Unknown"),
+            "Expiry evidence": job.availability_evidence or "Not verified",
+            "Quick apply": job.quick_apply or "Unverified",
             "Application status": (
                 "Applied" if job.application_status == "applied" else "Not applied"
             ),
             "Title": job.title,
             "Company": job.company,
-            "Location": job.location,
+            **({"Location": job.location or "Unknown"} if show_location else {}),
             "Description": job.description,
             "Source URL": job.source_url,
-            "Alternate sources": "\n".join(source_urls[1:]),
             "Scoring": scoring,
             "Description quality": description_quality,
             "Date details": date_details,
@@ -74,7 +77,7 @@ def filter_jobs(
     if status != "all":
         filtered = [job for job in filtered if job.status == status]
     if application_view == "actionable":
-        filtered = [job for job in filtered if job.application_status != "applied"]
+        filtered = [job for job in filtered if job.application_status != "applied" and job.availability != "expired"]
     elif application_view == "applied":
         filtered = [job for job in filtered if job.application_status == "applied"]
     elif application_view != "all":
@@ -150,7 +153,9 @@ def queue_column_widths() -> dict[str, str]:
         "Remarks": "large",
         "Description": "large",
         "Source URL": "medium",
-        "Alternate sources": "large",
+        "Expiry": "medium",
+        "Expiry evidence": "large",
+        "Quick apply": "medium",
         "Scoring": "medium",
         "Description quality": "large",
         "Date details": "large",

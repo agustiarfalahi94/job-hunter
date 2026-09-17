@@ -16,7 +16,8 @@ from bs4 import BeautifulSoup
 from job_hunter.application_links import KNOWN_ATS_DOMAINS, is_safe_application_url
 from job_hunter.descriptions import JobDescription, extract_job_description
 from job_hunter.eligibility import hard_skip_matches
-from job_hunter.job_identity import canonicalize_job_url
+from job_hunter.job_identity import canonicalize_job_url, stable_job_id
+from job_hunter.locations import is_known_area, location_matches, location_search_terms
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
@@ -27,9 +28,9 @@ LINKEDIN_SEARCH_URL = "https://www.linkedin.com/jobs/search/?keywords={keywords}
 SERPAPI_URL = "https://serpapi.com/search.json?{params}"
 PLATFORM_SITE_FILTERS = {
     "LinkedIn": "site:linkedin.com/jobs",
-    "JobStreet": "site:my.jobstreet.com",
+    "JobStreet": "site:jobstreet.com OR site:jobstreet.com.my",
     "Indeed": "site:my.indeed.com OR site:indeed.com",
-    "Foundit": "site:foundit.my OR site:foundit.com.my",
+    "Foundit": "site:foundit.my OR site:foundit.com.my OR site:foundit.id OR site:foundit.sg OR site:foundit.in",
     "Company career pages": (
         "site:careers.accenture.com OR site:hcltech.com/careers OR "
         "site:razer.com/careers OR site:prudential.com.my/careers OR site:accordinnovations.com"
@@ -46,7 +47,7 @@ PLATFORM_DOMAINS = {
     "LinkedIn": ("linkedin.com",),
     "JobStreet": ("jobstreet.com", "jobstreet.com.my"),
     "Indeed": ("indeed.com", "indeed.com.my"),
-    "Foundit": ("foundit.my", "foundit.com.my"),
+    "Foundit": ("foundit.my", "foundit.com.my", "foundit.id", "foundit.sg", "foundit.in"),
     "Company career pages": (
         "accenture.com",
         "hcltech.com",
@@ -66,6 +67,11 @@ CLOSED_JOB_MARKERS = (
     "job has expired",
 )
 MAX_SEARCH_REQUESTS = 12
+APPLICATION_FILTERS = {
+    "LinkedIn": "LinkedIn Easy Apply",
+    "Indeed": "Indeed Apply",
+    "Foundit": "Foundit Quick Apply",
+}
 
 
 @dataclass(frozen=True)
@@ -78,6 +84,16 @@ class SearchCriteria:
     posted_within_days: int | None = 30
     custom_domains: tuple[str, ...] = ()
     custom_site_filters: tuple[str, ...] = ()
+    locations: tuple[str, ...] = ()
+    application_filters: tuple[str, ...] = ()
+
+    @property
+    def location_targets(self) -> tuple[str, ...]:
+        return self.locations or ((self.location,) if self.location.strip() else ())
+
+    @property
+    def location_label(self) -> str:
+        return " OR ".join(self.location_targets)
 
 
 @dataclass(frozen=True)
@@ -105,11 +121,15 @@ class SearchCandidate:
 @dataclass(frozen=True)
 class JobPageMetadata:
     locations: tuple[str, ...] = ()
+    locality_locations: tuple[tuple[str, str], ...] = ()
     posted_date: str = ""
     apply_url: str = ""
     posted_date_verified: bool = False
     posted_date_source: str = ""
     posted_date_reason: str = ""
+    quick_apply: str = ""
+    availability: str = "unknown"
+    availability_evidence: str = ""
     description: JobDescription = JobDescription(
         text="",
         kind="unavailable",
@@ -136,7 +156,7 @@ class SearchProgress:
 
 
 def build_search_queries(criteria: SearchCriteria) -> list[PlatformQuery]:
-    location_part = f'"{criteria.location}"' if criteria.location else ""
+    location_part = _group_or(_quoted_or(location_search_terms(criteria.location_targets)))
     sources: list[tuple[str, str]] = []
     for platform in criteria.platforms:
         site_filter = PLATFORM_SITE_FILTERS.get(platform)
@@ -174,8 +194,12 @@ def _bounded_signal_queries(
         destination = first_pass if signal_index == 0 else second_pass
         for platform, site_filter in sources:
             query = " ".join(
-                part for part in (site_filter, terms, location_part) if part
+                part for part in (_group_or(site_filter), _group_or(terms), location_part) if part
             )
+            requested_apply = APPLICATION_FILTERS.get(platform)
+            if requested_apply in criteria.application_filters:
+                query += {"LinkedIn": ' "Easy Apply"', "Indeed": ' ("Easily apply" OR "Indeed Apply")',
+                          "Foundit": ' "Quick Apply"'}[platform]
             url = DUCKDUCKGO_HTML_URL.format(query=quote_plus(query))
             date_filter = _duckduckgo_date_filter(criteria.posted_within_days)
             if date_filter:
@@ -196,30 +220,32 @@ def build_direct_platform_queries(criteria: SearchCriteria) -> list[PlatformQuer
     queries = []
     if "LinkedIn" not in criteria.platforms:
         return queries
-    for signal, terms in (
-        ("title", criteria.title_terms),
-        ("description", criteria.description_terms),
-    ):
-        keywords = _quoted_or(terms)
-        if not keywords:
-            continue
-        query = f"{keywords} {criteria.location}".strip()
-        queries.append(
-            PlatformQuery(
-                platform="LinkedIn",
-                query=query,
-                url=_with_linkedin_date_filter(
-                    LINKEDIN_SEARCH_URL.format(
-                        keywords=quote_plus(keywords),
-                        location=quote_plus(criteria.location),
+    for location in location_search_terms(criteria.location_targets) or ("",):
+        for signal, terms in (
+            ("title", criteria.title_terms),
+            ("description", criteria.description_terms),
+        ):
+            keywords = _quoted_or(terms)
+            if not keywords:
+                continue
+            queries.append(
+                PlatformQuery(
+                    platform="LinkedIn",
+                    query=f"{_group_or(keywords)} {location}".strip(),
+                    url=_with_linkedin_date_filter(
+                        LINKEDIN_SEARCH_URL.format(
+                            keywords=quote_plus(keywords),
+                            location=quote_plus(location),
+                        ),
+                        criteria.posted_within_days,
                     ),
-                    criteria.posted_within_days,
-                ),
-                parser="linkedin",
-                signal=signal,
+                    parser="linkedin",
+                    signal=signal,
+                )
             )
-        )
-    return queries
+    if "LinkedIn Easy Apply" in criteria.application_filters:
+        queries = [replace(query, url=f"{query.url}&f_AL=true") for query in queries]
+    return queries[:MAX_SEARCH_REQUESTS]
 
 
 def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[PlatformQuery]:
@@ -248,6 +274,28 @@ def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[Platfo
     return queries[:MAX_SEARCH_REQUESTS]
 
 
+def build_public_fallback_queries(criteria: SearchCriteria) -> list[PlatformQuery]:
+    direct = build_direct_platform_queries(criteria)
+    direct_platforms = {query.platform for query in direct}
+    public = [query for query in build_search_queries(criteria) if query.platform not in direct_platforms]
+    planned = []
+    for index in range(max(len(direct), len(public))):
+        if index < len(direct):
+            planned.append(direct[index])
+        if index < len(public):
+            planned.append(public[index])
+    return planned[:MAX_SEARCH_REQUESTS]
+
+
+def match_job_locations(metadata: JobPageMetadata, targets: tuple[str, ...]) -> tuple[str, bool | None]:
+    localities = dict(metadata.locality_locations)
+    comparisons = [(place, _job_location_matches(place, targets, locality=localities.get(place)))
+                   for place in metadata.locations]
+    matching = [place for place, matches in comparisons if matches is True]
+    state = True if matching else None if not comparisons or any(result is None for _, result in comparisons) else False
+    return "; ".join(matching), state
+
+
 def parse_serpapi_results(payload: str, platform: str, location: str, limit: int) -> list[SearchCandidate]:
     data = json.loads(payload or "{}")
     candidates: list[SearchCandidate] = []
@@ -259,6 +307,11 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
         snippet = str(item.get("snippet", "")).strip()
         posted_date = normalize_posted_date(_find_provider_posted_value(item))
         title, company = _split_title_company(title_text)
+        observed_location = ""
+        if platform == "Indeed":
+            pieces = re.split(r"\s+[-|]\s+", title_text)
+            if len(pieces) == 3 and re.fullmatch(r"indeed(?:\.com)?", pieces[-1], re.I) and is_known_area(pieces[-2]):
+                title, company, observed_location = pieces[0], "", pieces[-2]
         if not title or not href:
             continue
         if not _looks_like_job_result(href, title_text, platform):
@@ -268,7 +321,7 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
             SearchCandidate(
                 title=title,
                 company=company,
-                location="",
+                location=observed_location,
                 description=snippet or title_text,
                 source_url=href,
                 platform=platform,
@@ -376,9 +429,7 @@ def run_public_search(
     if provider.has_api_search:
         platform_queries = build_serpapi_queries(criteria, provider.serpapi_key)
     else:
-        platform_queries = build_direct_platform_queries(criteria)
-        direct_platforms = {query.platform for query in platform_queries}
-        platform_queries.extend(query for query in build_search_queries(criteria) if query.platform not in direct_platforms)
+        platform_queries = build_public_fallback_queries(criteria)
     for platform_query in platform_queries:
         if remaining <= 0:
             break
@@ -535,9 +586,17 @@ def run_public_search(
                         candidate.source_url,
                         snippet=candidate.description,
                     )
+                    selected_location = candidate.location
+                    if metadata.locations:
+                        selected_location, geographic_match = match_job_locations(metadata, criteria.location_targets)
+                        if geographic_match is False:
+                            skipped += 1
+                            _report_progress(logs, progress_callback, stage="skipped", checked=checked,
+                                total=search_limit, message=f"Skipped {candidate.title}: job location {', '.join(metadata.locations)} does not match {criteria.location_label}.")
+                            continue
                     candidate = replace(
                         candidate,
-                        location="; ".join(metadata.locations) if metadata.locations else candidate.location,
+                        location=selected_location,
                         posted_date=metadata.posted_date or candidate.posted_date,
                         apply_url=metadata.apply_url or candidate.apply_url,
                         description=metadata.description.text or candidate.description,
@@ -618,12 +677,12 @@ def run_public_search(
                             ),
                         )
                         continue
-            if candidate.location and _job_location_matches(candidate.location, criteria.location) is False:
+            if candidate.location and _job_location_matches(candidate.location, criteria.location_targets) is False:
                 skipped += 1
                 _report_progress(logs, progress_callback, stage="skipped", checked=checked,
-                                 total=search_limit, message=f"Skipped {candidate.title}: job location {candidate.location} does not match {criteria.location}.")
+                                 total=search_limit, message=f"Skipped {candidate.title}: job location {candidate.location} does not match {criteria.location_label}.")
                 continue
-            if candidate.location and _job_location_matches(candidate.location, criteria.location) is None:
+            if candidate.location and _job_location_matches(candidate.location, criteria.location_targets) is None:
                 candidate = replace(candidate, location="")
             result = queue.add_job(
                 JobInput(
@@ -811,6 +870,7 @@ def extract_job_metadata(
     posted_date = ""
     posted_date_source = ""
     locations: list[str] = []
+    locality_locations: list[tuple[str, str]] = []
     records: list[dict] = []
     for script in soup.select('script[type="application/ld+json"]'):
         try:
@@ -819,8 +879,15 @@ def extract_job_metadata(
             continue
         records.extend(_find_job_records(payload))
     selected = _select_job_records(records, source_url)
+    availability = "unknown"
+    availability_evidence = ""
     for payload in selected:
         locations.extend(_find_job_locations(payload))
+        locality_locations.extend(_find_job_location_evidence(payload))
+        valid_through = normalize_posted_date(str(payload.get("validThrough") or ""), today=today)
+        if valid_through:
+            availability = "expired" if date.fromisoformat(valid_through) < (today or date.today()) else "not_expired"
+            availability_evidence = f"JobPosting.validThrough: {valid_through}; not a live submission check"
         date_posted = _find_date_posted(payload)
         if date_posted:
             posted_date = normalize_posted_date(date_posted, today=today)
@@ -851,6 +918,9 @@ def extract_job_metadata(
         if posted_date:
             posted_date_source = "labelled job page text"
 
+    if not locations and (not records or selected):
+        locations.extend(_visible_job_locations(soup, source_url))
+
     apply_url = ""
     for link in soup.find_all("a", href=True):
         label = " ".join(
@@ -868,13 +938,72 @@ def extract_job_metadata(
             break
     return JobPageMetadata(
         locations=tuple(dict.fromkeys(locations)),
+        locality_locations=tuple(dict.fromkeys(locality_locations)),
         posted_date=posted_date,
         apply_url=apply_url,
         posted_date_verified=bool(posted_date),
         posted_date_source=posted_date_source,
         posted_date_reason="" if posted_date else "No job-specific posting date found",
+        quick_apply=_quick_apply_evidence(soup, source_url),
+        availability=availability,
+        availability_evidence=availability_evidence,
         description=extract_job_description(html, snippet=snippet),
     )
+
+
+def _visible_job_locations(soup: BeautifulSoup, source_url: str) -> list[str]:
+    host = (urlparse(source_url).hostname or "").casefold()
+    root = soup.find("main") or soup
+    selectors = ()
+    if host == "indeed.com" or host.endswith(".indeed.com"):
+        selectors = ('[data-testid="job-location"]', '#jobLocationText',
+                     '[data-testid="inlineHeader-companyLocation"]', '.jobsearch-JobInfoHeader-subtitle [data-testid="company-location"]')
+    elif host == "linkedin.com" or host.endswith(".linkedin.com"):
+        selectors = ('.topcard__flavor--bullet', '.jobsearch-card__location',
+                     '.jobs-unified-top-card__bullet', '.top-card-layout .topcard__flavor--bullet')
+    elif any(host == domain or host.endswith(f".{domain}") for domain in PLATFORM_DOMAINS["JobStreet"]):
+        selectors = ('[data-automation="job-detail-location"]', '[data-automation="jobDetailLocation"]')
+    elif any(host == domain or host.endswith(f".{domain}") for domain in PLATFORM_DOMAINS["Foundit"]):
+        selectors = ('.job-location', '[data-testid="job-location"]')
+    for selector in selectors:
+        node = root.select_one(selector)
+        if node:
+            value = node.get_text(" ", strip=True)
+            if value and len(value) <= 200 and not node.find_parent("aside"):
+                return [value]
+    return []
+
+
+def _quick_apply_evidence(soup: BeautifulSoup, source_url: str) -> str:
+    host = (urlparse(source_url).hostname or "").casefold()
+    platform = next((name for name, domains in PLATFORM_DOMAINS.items()
+                     if any(host == domain or host.endswith(f".{domain}") for domain in domains)), "")
+    root = soup.find("main") or soup
+    source_id = stable_job_id(platform, source_url)
+    for node in root.select('button, a[href], [data-indeed-apply-jobid]'):
+        if node.find_parent("aside") or node.find_parent(id="jobDescriptionText"):
+            continue
+        if node.find_parent(class_=re.compile(r"description|similar|related|recommend|base-search-card", re.I)):
+            continue
+        containers = [node, *node.parents]
+        node_ids = [str(container.get(field, "")).strip() for container in containers for field in
+                    ("data-indeed-apply-jobid", "data-job-id", "data-job-key") if container.get(field)]
+        link_url = urljoin(source_url, str(node.get("href", "")))
+        linked_id = stable_job_id(platform, link_url)
+        if linked_id:
+            node_ids.append(linked_id)
+        if source_id and any(job_id != source_id for job_id in node_ids):
+            continue
+        label = " ".join((node.get_text(" ", strip=True), str(node.get("aria-label", "")))).casefold().strip()
+        if platform == "LinkedIn" and label == "easy apply":
+            return APPLICATION_FILTERS[platform]
+        if platform == "Foundit" and label == "quick apply":
+            return APPLICATION_FILTERS[platform]
+        if platform == "Indeed":
+            link_host = (urlparse(urljoin(source_url, str(node.get("href", "")))).hostname or "").casefold()
+            if label in {"easily apply", "indeed apply"} or link_host == "smartapply.indeed.com" or node.has_attr("data-indeed-apply-jobid"):
+                return APPLICATION_FILTERS[platform]
+    return ""
 
 
 def _find_job_records(value: object) -> list[dict]:
@@ -905,14 +1034,31 @@ def _select_job_records(records: list[dict], source_url: str) -> list[dict]:
                 return [canonicalize_job_url(urljoin(source_url, value))]
         return []
     target = canonicalize_job_url(source_url)
-    matched = [record for record in records if target in urls(record)]
+    target_host = (urlparse(source_url).hostname or "").casefold()
+    platform = next((name for name, domains in PLATFORM_DOMAINS.items()
+                     if any(target_host == domain or target_host.endswith(f".{domain}") for domain in domains)), "")
+    provider_id = stable_job_id(platform, source_url)
+
+    def same_vacancy(candidate_url: str) -> bool:
+        if candidate_url == target:
+            return True
+        host = (urlparse(candidate_url).hostname or "").casefold()
+        return bool(provider_id and any(host == domain or host.endswith(f".{domain}")
+                    for domain in PLATFORM_DOMAINS.get(platform, ()))
+                    and stable_job_id(platform, candidate_url) == provider_id)
+
+    matched = [record for record in records if any(same_vacancy(url) for url in urls(record))]
     if matched:
         return matched
     return records if len(records) == 1 and not urls(records[0]) else []
 
 
 def _find_job_locations(value: object) -> list[str]:
-    locations: list[str] = []
+    return [place for place, _ in _find_job_location_evidence(value)]
+
+
+def _find_job_location_evidence(value: object) -> list[tuple[str, str]]:
+    locations: list[tuple[str, str]] = []
     if isinstance(value, dict):
         types = value.get("@type", [])
         types = [types] if isinstance(types, str) else types
@@ -933,21 +1079,17 @@ def _find_job_locations(value: object) -> list[str]:
                     if isinstance(part, str) and part.strip():
                         parts.append(part.strip())
                 if parts:
-                    locations.append(", ".join(parts))
+                    locality = address.get("addressLocality", "")
+                    locations.append((", ".join(parts), locality.strip() if isinstance(locality, str) else ""))
     return locations
 
 
-def _job_location_matches(observed: str, requested: str) -> bool | None:
-    normalized = " ".join(re.sub(r"[^a-z0-9]+", " ", requested.casefold()).split())
-    location = " ".join(re.sub(r"[^a-z0-9]+", " ", observed.casefold()).split())
-    countries = {"my": "malaysia", "us": "united states", "usa": "united states", "id": "indonesia", "sg": "singapore", "uk": "united kingdom", "gb": "united kingdom"}
-    location = " ".join(countries.get(part, part) for part in location.split())
-    normalized = countries.get(normalized, normalized)
-    if not normalized or f" {normalized} " in f" {location} ":
-        return True
-    if location in countries.values() and normalized not in countries.values():
-        return None
-    return False
+def _job_location_matches(observed: str, requested: tuple[str, ...] | str, *, locality: str | None = None) -> bool | None:
+    return location_matches(observed, requested, locality=locality)
+
+
+def _group_or(value: str) -> str:
+    return f"({value})" if " OR " in value else value
 
 
 def _find_date_posted(value: object) -> str:
