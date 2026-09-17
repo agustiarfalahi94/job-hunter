@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.17.0 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.17.1 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
@@ -21,6 +21,7 @@ Job Hunter v1.17.0 is a public Streamlit job-discovery and matching app. Read th
 13. Locations are OR scopes: cities, ISO countries, or documented regional presets. Apply identical geographic membership to discovery, pre-scoring checks, and deterministic scoring. Missing geography remains unverified. Preserve legacy single-location CLI input.
 14. Keep at most five selected/resolved company sites and five company/region lookup pairs per selection. Validate lookup budgets before contacting Gemini; regional presets count as one company-verification region rather than dozens of country calls.
 15. Optional quick-apply filters apply only to their named platform and require vacancy-associated controls, never description words. Manual date/expiry corrections retain user provenance; merge dates and verification atomically. No alternate-source storage/display; retain primary-identity duplicate checks.
+16. Discovery errors must never be reported as empty success. Report API web-result/eligible-link counts and safe error classifications; never expose query URLs with keys or raw provider errors. Zero scored jobs require a warning, not a queue-success claim.
 
 ## Git Flow
 

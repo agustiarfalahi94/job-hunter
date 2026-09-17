@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.17.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.17.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
 
 ## What It Does
 
@@ -84,7 +84,9 @@ Location extraction tries selected-vacancy structured addresses, recognized plat
 
 ### Gemini Model And Quota
 
-The default remains `gemini-2.5-flash`, unless Streamlit secrets `GEMINI_MODEL` overrides it. Unavailable-model recovery may select a newer supported stable Flash; it is not guaranteed to use 3.8. Search jobs shows the configured model; Check Gemini connection shows the actual model, and queue rows record their scoring model. To request current 3.8 explicitly, set `GEMINI_MODEL = "gemini-3.8-flash"` ([Google model catalog](https://ai.google.dev/gemini-api/docs/models)); runtime model/key availability still applies.
+The default is `gemini-3.8-flash`, unless Streamlit secrets `GEMINI_MODEL` overrides it ([Google model catalog](https://ai.google.dev/gemini-api/docs/models)). Earlier releases inherited a 2.5 default; it was not a requirement of this app or discovery provider. Search jobs shows the configured model; Check Gemini connection shows the actual model, and queue rows record their scoring model. Unavailable-model recovery may use another supported Flash model; runtime model/key availability still applies.
+
+Discovery happens before Gemini scoring. The activity log shows each API query's web-result count, accepted job-link count, and excluded link count. Zero discoveries show a warning rather than claiming scored jobs exist. Authentication, allowance/rate-limit, malformed-response, and failed-search errors have sanitized messages without API keys or raw provider responses. If every discovery request fails, the run is Failed, not an empty success. Some indexed pages are search/category pages rather than individual vacancies, so web-result counts can exceed accepted links.
 
 AI Studio Usage charts show activity and error types, not remaining quota. Success rate 100% is not 100% quota remaining. 429 means a rate/resource limit was exceeded; 404 is an unavailable model/resource, and 503 is service unavailability. Check Rate Limit for your selected project/model: requests/minute, input tokens/minute, daily requests, and grounding capacity differ. Limits apply per project, not per key ([Google rate-limit documentation](https://ai.google.dev/gemini-api/docs/rate-limits)). A working scoring call does not establish grounding capacity.
 
@@ -103,7 +105,7 @@ Create `.streamlit/secrets.toml` locally or add these values in Streamlit Commun
 ```toml
 SERPAPI_API_KEY = "your-serpapi-key"
 GEMINI_API_KEY = "your-gemini-api-key"
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 ```
 
 `SERPAPI_API_KEY` enables dependable Google-backed source discovery and custom domains. Without it, the app uses a limited public-search fallback that may be blocked or incomplete. `GEMINI_API_KEY` enables Gemini matching. Without it, searches still work with a clearly labelled deterministic fallback. Never commit real keys or `.streamlit/secrets.toml`.

@@ -296,7 +296,33 @@ def match_job_locations(metadata: JobPageMetadata, targets: tuple[str, ...]) -> 
     return "; ".join(matching), state
 
 
+class SearchProviderError(RuntimeError):
+    """Safe provider failure details that never contain a URL, key, or raw response."""
+
+
+def serpapi_web_result_count(payload: str) -> int:
+    data = json.loads(payload or "{}")
+    error = str(data.get("error", "")).casefold()
+    empty = data.get("search_information", {}).get("organic_results_state") == "Fully empty"
+    no_results_error = error == "google hasn't returned any results for this query."
+    if error and not (no_results_error and empty and data.get("search_metadata", {}).get("status") == "Success"):
+        if "run out of searches" in error or "limit" in error or "quota" in error:
+            reason = "SerpAPI search allowance or rate limit reached. Check the SerpAPI dashboard."
+        elif "api key" in error or "unauthorized" in error:
+            reason = "SerpAPI authentication failed. Check SERPAPI_API_KEY in Streamlit secrets."
+        else:
+            reason = "SerpAPI could not complete this query. Check its dashboard search history."
+        raise SearchProviderError(reason)
+    if data.get("search_metadata", {}).get("status") == "Error":
+        raise SearchProviderError("SerpAPI reported a failed search. Check its dashboard search history.")
+    results = data.get("organic_results", [])
+    if not isinstance(results, list):
+        raise SearchProviderError("SerpAPI returned an invalid web-results response.")
+    return len(results)
+
+
 def parse_serpapi_results(payload: str, platform: str, location: str, limit: int) -> list[SearchCandidate]:
+    serpapi_web_result_count(payload)
     data = json.loads(payload or "{}")
     candidates: list[SearchCandidate] = []
     for item in data.get("organic_results", []):
@@ -469,7 +495,13 @@ def run_public_search(
         if platform_query.parser == "linkedin":
             candidates = parse_linkedin_jobs(html, criteria.location, remaining)
         elif platform_query.parser == "serpapi":
-            candidates = parse_serpapi_results(html, platform_query.platform, criteria.location, remaining)
+            try:
+                candidates = parse_serpapi_results(html, platform_query.platform, criteria.location, remaining)
+            except SearchProviderError as exc:
+                skipped += 1
+                _report_progress(logs, progress_callback, stage="skipped", checked=checked,
+                                 total=search_limit, message=f"Skipped {platform_query.platform}: {exc}")
+                continue
         else:
             candidates = parse_duckduckgo_results(html, platform_query.platform, criteria.location, remaining)
         if not candidates:

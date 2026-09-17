@@ -7,12 +7,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+
 
 @dataclass(frozen=True)
 class SearchProviderConfig:
     serpapi_key: str = ""
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = DEFAULT_GEMINI_MODEL
 
     @property
     def has_api_search(self) -> bool:
@@ -38,7 +40,7 @@ def load_search_provider_config(
         gemini_model=_secret_value(secrets, "GEMINI_MODEL")
         or _nested_secret_value(secrets, "matching", "gemini_model")
         or env.get("GEMINI_MODEL", "")
-        or "gemini-2.5-flash",
+        or DEFAULT_GEMINI_MODEL,
     )
 
 

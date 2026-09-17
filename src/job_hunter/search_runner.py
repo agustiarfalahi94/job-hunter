@@ -37,6 +37,8 @@ from job_hunter.search import (
     parse_duckduckgo_results,
     parse_linkedin_jobs,
     parse_serpapi_results,
+    serpapi_web_result_count,
+    SearchProviderError,
 )
 
 
@@ -80,6 +82,7 @@ class RunSnapshot:
     completed: int = 0
     skipped: int = 0
     discovery_requests: int = 0
+    discovery_failures: int = 0
     page_fetches: int = 0
     scoring_attempts: int = 0
     message: str = "Ready"
@@ -182,21 +185,44 @@ class SearchRunController:
                 self._emit(run_id, "searching", f"Searching {query.platform}: {query.query}")
                 try:
                     payload = self._discovery_fetcher(query.url)
-                except Exception:
-                    self._increment(skipped=1)
-                    self._emit(run_id, "skipped", f"Skipped {query.platform}: search request failed.")
+                except Exception as exc:
+                    self._increment(skipped=1, discovery_failures=1)
+                    status = getattr(getattr(exc, "response", None), "status_code", None)
+                    detail = {401: "Provider authentication failed; check the search API key.",
+                              403: "Provider denied access; check its dashboard.",
+                              429: "Provider allowance or rate limit reached; check its dashboard."}.get(
+                                  status, "Search request failed or timed out.")
+                    self._emit(run_id, "skipped", f"Skipped {query.platform}: {detail}")
                     continue
                 if self._should_stop(started):
                     break
                 if _is_blocked_search_page(payload):
-                    self._increment(skipped=1)
+                    self._increment(skipped=1, discovery_failures=1)
                     self._emit(
                         run_id,
                         "skipped",
                         f"Skipped {query.platform}: search provider returned a challenge page.",
                     )
                     continue
-                candidates = _parse_results(query, payload, request.criteria.location)
+                try:
+                    candidates = _parse_results(query, payload, request.criteria.location)
+                    if query.parser == "serpapi":
+                        count = serpapi_web_result_count(payload)
+                        self._emit(run_id, "discovered", f"{query.platform}: {count} web results; "
+                                   f"{len(candidates)} eligible job links; {max(0, count - len(candidates))} "
+                                   "links excluded by source/path/content checks.")
+                except (SearchProviderError, ValueError, TypeError, AttributeError):
+                    self._increment(skipped=1, discovery_failures=1)
+                    try:
+                        serpapi_web_result_count(payload)
+                    except SearchProviderError as exc:
+                        detail = str(exc)
+                    except (ValueError, TypeError, AttributeError):
+                        detail = "Search provider returned an unreadable response."
+                    else:
+                        detail = "Search provider returned invalid result records."
+                    self._emit(run_id, "skipped", f"Skipped {query.platform}: {detail}")
+                    continue
                 for candidate in candidates:
                     if self._should_stop(started) or len(unique_keys) >= MAX_UNIQUE_RESULTS:
                         break
@@ -259,9 +285,19 @@ class SearchRunController:
                 message = "Search cancelled. Completed results were kept."
                 stage = "cancelled"
             else:
-                state = "completed"
-                message = "Search complete. Review the scored jobs in the queue."
-                stage = "complete"
+                snapshot = self.snapshot()
+                if not snapshot.discovered and snapshot.discovery_failures == snapshot.discovery_requests:
+                    state, stage = "failed", "failed"
+                    message = "No jobs discovered: every discovery request failed. Check the activity log for provider errors."
+                elif not snapshot.discovered:
+                    state, stage = "completed", "complete"
+                    message = "No jobs discovered. Check the web-result counts in the activity log; no jobs were scored."
+                elif not snapshot.completed:
+                    state, stage = "completed", "complete"
+                    message = "Search finished with no scored jobs. Check the activity log for skipped candidates."
+                else:
+                    state, stage = "completed", "complete"
+                    message = "Search complete. Review the scored jobs in the queue."
             self._set_state(state, message)
             self._emit(run_id, stage, message)
         except Exception:

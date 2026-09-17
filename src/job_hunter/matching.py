@@ -54,7 +54,7 @@ class MatchContext:
 @dataclass(frozen=True)
 class MatchingConfig:
     api_key: str = ""
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.8-flash"
     prompt_version: str = "v1.16"
     max_attempts: int = 2
     timeout_ms: int = 30_000

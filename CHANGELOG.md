@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.17.1 - 2026-09-17
+
+- Update runtime/scoring and example-secret defaults from inherited Gemini 2.5 Flash to current stable 3.8 Flash; preserve explicit model settings and observed-model reporting.
+- Distinguish provider response errors from legitimate empty Google results, with sanitized authentication/allowance/error classifications and per-query web-result versus accepted-job counts.
+- Show warnings for runs with no discovered/scored jobs; fail runs where every discovery request fails instead of claiming queue results exist.
+- Add mocked discovery-error, empty-result, rejected-link, secret-redaction and model-default regressions. Live discovery remains dependent on indexing, provider allowance, and job-page access.
+
 ## 1.17.0 - 2026-09-17
 
 - Replace the single Location selector with persistent OR selections for cities, countries, ASEAN, and a documented APAC country/economy preset; retain empty defaults and migrate saved single-city settings.

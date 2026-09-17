@@ -160,7 +160,7 @@ class MatchingTest(unittest.TestCase):
             factory.return_value.models.generate_content.return_value = SimpleNamespace(
                 text=json.dumps(gemini_result()), candidates=[]
             )
-            client = GoogleGeminiClient(MatchingConfig(api_key="test-key"))
+            client = GoogleGeminiClient(MatchingConfig(api_key="test-key", model="gemini-2.5-flash"))
             value = client.generate({}, "Score this synthetic job")
             config = factory.return_value.models.generate_content.call_args.kwargs["config"]
 

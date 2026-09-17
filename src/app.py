@@ -394,7 +394,10 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
     if logs:
         st.code("\n".join(logs[-12:]), language="text")
     if snapshot.state == "completed":
-        st.success(snapshot.message)
+        if snapshot.completed:
+            st.success(snapshot.message)
+        else:
+            st.warning(snapshot.message)
     elif snapshot.state == "cancelled":
         st.warning(snapshot.message)
     elif snapshot.state == "failed":

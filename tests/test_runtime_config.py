@@ -38,7 +38,7 @@ class RuntimeConfigTest(unittest.TestCase):
     def test_load_search_provider_config_uses_safe_default_gemini_model(self):
         config = load_search_provider_config(secrets={}, environ={})
 
-        self.assertEqual(config.gemini_model, "gemini-2.5-flash")
+        self.assertEqual(config.gemini_model, "gemini-3.8-flash")
         self.assertFalse(config.has_gemini)
 
 
