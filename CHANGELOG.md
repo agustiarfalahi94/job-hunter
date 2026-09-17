@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.18.0 - 2026-09-18
+
+- Add optional native Google sign-in with verified-email allowlisting and stable issuer/subject ownership. Accounts stay off by default; incomplete enabled configuration fails closed.
+- Restore and automatically save encrypted CV bytes/text, all search criteria, matching mode, queue, posting corrections and manually recorded application history in a server-only Supabase database.
+- Add bounded authenticated storage RPCs, atomic revision checks and deletion tombstones so stale tabs cannot overwrite newer history or recreate cleared data.
+- Clear private state and cancel search work on sign-out/account change; never persist provider credentials, cookies, controllers or caches. Criteria-based matching still receives no CV text.
+- Show real save status, outages and conflicts; require explicit reload/delete confirmation. Add CV/storage limits, safe secrets template, SQL migration, owner setup and recovery documentation.
+- Add mocked account/UI/restart regressions and mandatory disposable-PostgreSQL migration/concurrency/grant tests in CI. Live Google sign-in and cloud save/reboot verification require owner credentials and are not claimed by mocked tests.
+
 ## 1.17.2 - 2026-09-17
 
 - Target individual Indeed viewjob URLs instead of broad listing discovery, retaining regional-domain validation and the existing request budget.

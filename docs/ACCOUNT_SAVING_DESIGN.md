@@ -1,6 +1,6 @@
 # Account Saving Design
 
-Status: proposed next release. No Google login, backend migration, or durable account saving is implemented in v1.17.2. Existing hosted sessions remain session-only. This document does not configure or transmit any private data.
+Status: approved design implemented in v1.18.0, gated off until owner setup. The implementation includes native Google login, encrypted Supabase snapshots and a service-only database migration. Live OAuth/backend persistence remains unverified until the owner supplies credentials and completes [Account Setup](ACCOUNT_SETUP.md). Existing guest sessions remain session-only; this document does not configure or transmit private data.
 
 ## Intended Experience
 
@@ -12,7 +12,7 @@ Personal mode should allow only a configured, verified Google account. Job Hunte
 
 - Use Streamlit's native Google OIDC login, rather than collecting passwords or writing a custom login protocol.
 - Keep `SessionWorkspace` as the live UI/background-event boundary. Add an account-storage adapter to load and save only after authentication and access checks.
-- Use durable private Supabase storage rather than hosted local files or the CLI SQLite database. Restrict all account data and CV access. A public GitHub repository must never contain records, CVs or credentials.
+- Use a durable private Supabase database rather than hosted local files or the CLI SQLite database. CV bytes/text live inside a Fernet-encrypted account snapshot, not an object bucket. Restrict all account data and CV access. A public GitHub repository must never contain records, CVs or credentials.
 - Derive ownership from the validated Google issuer and stable subject claim, never a widget, URL parameter, or unverified email. A verified-email allowlist can gate personal access but must not replace stable ownership.
 - Native Streamlit identity is not a Supabase Auth session. Do not assume Google's subject is Supabase `auth.uid()`. If using server-side database credentials, deny browser/anonymous table and bucket access, keep credentials server-only, and enforce owner-scoped operations in the adapter. Supabase service credentials bypass RLS, so RLS alone does not isolate this server path.
 - Detect conflicting writes from multiple tabs instead of overwriting newer account data. Never overwrite an account after a failed load. Save failures must remain visible and must not be labelled Saved.
@@ -22,7 +22,7 @@ Personal mode should allow only a configured, verified Google account. Job Hunte
 
 1. Create/configure a Google OAuth web client and consent screen in the owner's Google Cloud project. Register `https://jobs-hunter.streamlit.app/oauth2callback` as the authorized redirect URI and configure the intended personal test user/access.
 2. Create a private durable backend project, recommended Supabase. Select a region appropriate for the CV and application data. Review its current plan, retention and backup arrangements before uploading private data.
-3. Configure the OAuth client ID/client secret, strong cookie secret, backend credentials and allowed Google account in Streamlit Secrets, using the implementation's eventual template. These are not Gemini or SerpAPI keys. No account secrets template is active yet.
+3. Apply [supabase_accounts.sql](../config/supabase_accounts.sql), then configure the OAuth client ID/client secret, cookie secret, backend credentials, backed-up encryption key and allowed Google account in Streamlit Secrets using [accounts.secrets.example.toml](../.streamlit/accounts.secrets.example.toml). These are not Gemini or SerpAPI keys. Enable accounts only when setup is complete.
 
 Creating credentials and agreeing to provider account terms remain owner actions. App code and mocked tests can be built before credentials exist; actual Google sign-in and restart persistence cannot be verified until the services are configured. Existing session data is not automatically recoverable after a restart; any session-to-account import must be explicit and must never replace an existing account silently.
 
@@ -37,4 +37,5 @@ Test allowed/denied and signed-out accounts; stable ownership and cross-account 
 - [Streamlit authentication](https://docs.streamlit.io/develop/concepts/connections/authentication)
 - [Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect)
 - [Supabase database access and RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Supabase private buckets](https://supabase.com/docs/guides/storage/buckets/fundamentals)
+- [Supabase server-only API keys](https://supabase.com/docs/guides/getting-started/api-keys)
+- [Fernet encryption](https://cryptography.io/en/latest/fernet/)

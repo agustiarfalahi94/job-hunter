@@ -1,13 +1,25 @@
 import re
+import tomllib
 import unittest
 from pathlib import Path
 
 
 class ReleaseDocumentationTest(unittest.TestCase):
+    def test_account_template_is_disabled_and_credentials_are_empty(self):
+        raw = tomllib.loads(Path(".streamlit/accounts.secrets.example.toml").read_text())
+        self.assertIs(raw["accounts"]["enabled"], False)
+        for key in ("supabase_url", "supabase_secret_key", "encryption_key"):
+            self.assertEqual(raw["accounts"][key], "")
+        self.assertEqual(raw["auth"]["cookie_secret"], "")
+        for key in ("client_id", "client_secret"):
+            self.assertEqual(raw["auth"]["google"][key], "")
+        self.assertEqual(raw["auth"]["redirect_uri"], "https://jobs-hunter.streamlit.app/oauth2callback")
+        self.assertTrue(Path("docs/ACCOUNT_SETUP.md").is_file())
+
     def test_release_version_is_consistent(self):
-        self.assertIn('version = "1.17.2"', Path("pyproject.toml").read_text())
-        self.assertIn("v1.17.2", Path("README.md").read_text())
-        self.assertIn("v1.17.2", Path("src/job_hunter/__init__.py").read_text())
+        self.assertIn('version = "1.18.0"', Path("pyproject.toml").read_text())
+        self.assertIn("v1.18.0", Path("README.md").read_text())
+        self.assertIn("v1.18.0", Path("src/job_hunter/__init__.py").read_text())
 
     def test_readme_documents_modes_privacy_and_stop_limit(self):
         readme = Path("README.md").read_text()

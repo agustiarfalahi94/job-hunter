@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.17.2 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/).
+Job Hunter v1.18.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
 
 ## What It Does
 
@@ -17,20 +17,28 @@ Job Hunter v1.17.2 is a Streamlit app that discovers, scores, and organizes data
 
 ## Web App Tutorial
 
+### Private Account Or Guest Session
+
+When the owner enables private accounts, sign in with the permitted Google account. Your saved workspace loads before you edit it. Changes save automatically; check the account save status. A **Not saved** warning means changes can be lost after sign-out or restart. Retry saving after an outage. A conflicting tab must reload saved data with explicit confirmation, discarding its unsaved edits; it cannot overwrite a newer tab silently.
+
+Mark submitted jobs using **I have applied to this job**. This saves the manual record and its timestamp, not a platform-confirmed submission. In **Account > Saved data**, you can reload or explicitly delete your saved CV, criteria, queue and history. Sign-out clears the browser's app state and cancels search work, but keeps saved account data. Deletion clears the current encrypted payload, not provider backups, and retains an opaque revision tombstone to prevent stale tabs recreating it.
+
+Without account setup, guest mode remains session-only. Switching to private mode does not automatically import a guest session. See [Account Setup](docs/ACCOUNT_SETUP.md) for the owner checklist and limits.
+
 ### 1. Choose A Matching Mode
 
 Use **Matching mode** in the sidebar:
 
-- **Criteria-based search** uses only the editable titles, primary keywords, bonus keywords, hard skips, and location. It never reads or sends CV text.
+- **Criteria-based search** uses only the editable titles, primary keywords, bonus keywords, hard skips, and location. Discovery and matching never read or send CV text; private account restore/save can retain the CV separately.
 - **CV-based search** compares each job with both the editable criteria and readable text from the CV saved in the current session.
 
-Profile & CV is hidden in Criteria-based mode. Switching modes does not clear a saved CV; it remains available when you switch back to CV-based mode, within the same session.
+Profile & CV is hidden in Criteria-based mode. Switching modes does not clear a saved CV; it remains available when you switch back. Private accounts restore it across sessions; guests retain it only within the same session.
 
 ### 2. Optional CV
 
 Open **Profile & CV** to upload PDF, DOCX, or best-effort legacy DOC. Click **Save CV**, then **Continue to Search jobs**. A CV can be replaced or removed at any time. Removing it also clears the visible upload selection.
 
-CV bytes and extracted text are session-only in the hosted app. They are not written to the repository or a shared server database. They disappear when the Streamlit session resets, the app restarts, or the session expires.
+In guest mode, CV bytes and extracted text are session-only and disappear when the session resets or the app restarts. In private account mode, Save CV stores both encrypted in the owner's Supabase database; a notice appears before upload. Account CVs must be 5 MB or smaller. Removing a saved CV also removes it from the next saved account snapshot without deleting application history. CVs are never written to the public repository. In CV-based matching, readable CV text is sent to the configured Gemini provider.
 
 ### 3. Search Jobs
 
@@ -58,7 +66,7 @@ All four fields share session persistence, case-insensitive matching, and OR alt
 
 **Available suggestions:** These are a static catalog from the project's original search preferences, not terms extracted from a visitor's CV. They intentionally remain available but unselected. Every title/keyword field accepts custom values outside the catalog, and those custom selections persist across page changes just like suggested values. Saving, replacing, or removing a CV does not rewrite the catalog or automatically select criteria.
 
-**Persistence:** Parameters are session-only, just like CVs and the queue. Page navigation and completed searches do not reset them. App reboot, browser-session reset, or session expiry starts fresh, with no selected criteria. Date posted defaults to Past month and the session job cap remains 50.
+**Persistence:** Page navigation and completed searches do not reset parameters. Private accounts save and restore parameters, matching mode, CV and job history. Guest parameters are session-only and start empty after session loss or reboot. A new account also starts empty. Date posted defaults to Past month and the session job cap remains 50.
 
 **Company presets and region:** Accenture, HCLTech, Razer, Prudential Malaysia, and Accord Innovations are hand-maintained examples originally requested by the project owner; they are not automatic CV recommendations or live-verified lookup results. New names use [Gemini Google Search grounding](https://ai.google.dev/gemini-api/docs/generate-content/google-search), not model memory. Malaysian city selections look up careers serving Malaysia; other typed locations require evidence for that location. Verification may fail on blocked/JavaScript-only sites or ambiguous company names. Explicit domains remain user-provided sources, not independently verified regional destinations. Successful and failed lookups are cached per session, so page changes do not repeatedly call Gemini. Grounded lookups have separate Google Search usage/quota and may incur charges under your Google plan; they do not consume SerpAPI discovery requests.
 
@@ -78,7 +86,7 @@ If company lookup reports unavailable Gemini quota, check the API key's Google A
 
 The queue defaults to **Actionable** jobs, excluding already-applied and marked-expired entries. Use **All** or **Already applied** to change the view, then filter by match decision. Rows show scoring engine/model, description/date evidence, expiry and its evidence, quick-apply evidence, reasons, and remarks, with one primary source.
 
-Select a job, expand **Posting date & expiry**, enter a date you can actually verify and choose Unknown / Not expired / Expired, then click **Save posting details**. Corrections persist in this session and are labelled user-entered, not platform-verified; they do not rescore jobs. Clear the date for Unknown; future dates are rejected. Expired jobs remain in All and Apply is disabled; choose All to correct/reopen one. Source `JobPosting.validThrough` expiry is checked before scoring. A stale posting date does not prove expiry, and Unknown is not expired.
+Select a job, expand **Posting date & expiry**, enter a date you can actually verify and choose Unknown / Not expired / Expired, then click **Save posting details**. Corrections persist in this session, and across sessions for configured private accounts. They are labelled user-entered, not platform-verified, and do not rescore jobs. Clear the date for Unknown; future dates are rejected. Expired jobs remain in All and Apply is disabled; choose All to correct/reopen one. Source `JobPosting.validThrough` expiry is checked before scoring. A stale posting date does not prove expiry, and Unknown is not expired.
 
 Location extraction tries selected-vacancy structured addresses, recognized platform header elements, public card labels, and recognized Indeed result-title location slots, never description mentions or your query city. Some platforms block server requests even when browser access works. If every visible result lacks verified location, Location is hidden; otherwise it stays and unknown rows say Unknown.
 
@@ -131,9 +139,9 @@ Run the complete verification gate with `./tool/check.sh`.
 
 ## Deploy
 
-On Streamlit Community Cloud, select this repository, use `src/app.py` as the entry point, and add the secrets above. Anyone with the public app URL can open it, but each visitor receives separate session-only app data rather than an account with durable storage.
+On Streamlit Community Cloud, select this repository, use `src/app.py` as the entry point, and add the secrets above. Anyone with the public app URL can open guest mode, but each visitor receives separate session-only data. Private mode instead requires Google sign-in and a configured verified-email allowlist; signed-out or denied visitors cannot access search or stored data.
 
-Google sign-in and account-based saving are the proposed next release, not current features. The intended personal mode restores your CV, criteria, queue and manually recorded applications after a restart, with access restricted to your configured Google account. It requires both Google OAuth setup and a durable private backend; login cookies alone do not save these records. See [Account Saving Design](docs/ACCOUNT_SAVING_DESIGN.md) for setup requirements and privacy/testing boundaries. Do not paste credentials into chat or commit them.
+Account code is included in v1.18.0 but is **off by default**. Follow [Account Setup](docs/ACCOUNT_SETUP.md), using [.streamlit/accounts.secrets.example.toml](.streamlit/accounts.secrets.example.toml) and [config/supabase_accounts.sql](config/supabase_accounts.sql). Enable accounts only after OAuth, server-only backend credentials and encryption-key backup are ready. Incomplete enabled setup fails closed. Mocked tests do not establish live Google login or persistence; the owner must complete the production checklist. Do not paste credentials into chat or commit them.
 
 ## Privacy And Boundaries
 
@@ -151,10 +159,12 @@ Job Hunter does not bypass login, CAPTCHA, anti-bot controls, or platform terms,
 | `src/job_hunter/matching.py` | Gemini matching, structured output, cache, retry, and fallback |
 | `src/job_hunter/company_lookup.py` | Grounded company-name lookup, official regional careers evidence, safe citation resolution |
 | `src/job_hunter/session_workspace.py` | Session-only CV, jobs, application records, and active run identity |
+| `src/job_hunter/account_*.py` | Native identity gate, private snapshots, encrypted owner-scoped storage and save status |
+| `config/supabase_accounts.sql` | Service-only database RPCs with atomic revisions and deletion tombstones |
 | `src/job_hunter/job_identity.py` | Canonical links, provider IDs, fingerprints, and source consolidation |
 | `src/job_hunter/queue.py` | Backward-compatible local SQLite queue for CLI use |
 | `config/preferences.example.yaml` | Public criteria template |
 | `docs/` | Product, architecture, scoring, pipeline, and release documentation |
 | `tests/` | Unit, integration, cancellation, privacy, and Streamlit regression tests |
 
-The Streamlit app uses session memory. The SQLite queue and older command-line helpers remain for local backward compatibility.
+The Streamlit app uses session memory as its live workspace; configured private accounts also persist encrypted snapshots to Supabase. The SQLite queue and older command-line helpers remain for local backward compatibility.

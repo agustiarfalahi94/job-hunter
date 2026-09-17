@@ -14,5 +14,11 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
+      - name: Install disposable database test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql
       - name: Run tests
+        env:
+          REQUIRE_ACCOUNT_SQL_TESTS: "1"
         run: ./tool/check.sh

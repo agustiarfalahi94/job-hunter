@@ -37,6 +37,8 @@ User login, review, submit, and manual status record
 
 ## Search Rules
 
+v1.18.0 optionally authenticates the owner with Google and restores encrypted account CV/settings/history before this flow. Save accepted results and manual posting/application edits on the Streamlit thread. Guest sessions remain session-only. Job Hunter login does not authenticate the user to a job platform; see [Account Setup](ACCOUNT_SETUP.md).
+
 - Discovery treats title and description as separate signals rather than requiring both.
 - Each run has at most 12 discovery requests, 50 unique candidates, 50 detail fetches, 50 scoring attempts, two job workers, and five minutes of new-work scheduling.
 - Company career sites start unselected and show preset domains. User-entered company names use Gemini Google Search to verify official regional careers evidence; public HTTPS domains are user-provided sources. Five sites maximum, with SerpAPI required for discovery. Lookups are cached per region; verified company-owned hostnames are used in queries, not landing-page paths.

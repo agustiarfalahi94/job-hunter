@@ -9,6 +9,8 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from job_hunter import account_ui
+from job_hunter.account_snapshot import MAX_CV_BYTES
 from job_hunter.app_ui import filter_jobs, jobs_to_rows, provider_status_label
 from job_hunter.application_links import (
     application_destination_hostname,
@@ -68,12 +70,13 @@ POSTING_AGE_OPTIONS = {
 
 def main() -> None:
     st.set_page_config(page_title="Job Hunter", page_icon=":material/work:", layout="wide")
+    private_account = account_ui.prepare_account(st.session_state, st.secrets)
     workspace = get_session_workspace(st.session_state)
     preferences = load_preferences(PREFERENCES_PATH)
     provider_config = load_search_provider_config(st.secrets)
 
     _inject_table_styles()
-    _render_header()
+    _render_header(private_account)
     _render_sidebar(workspace, provider_config, preferences)
     _consume_page_request()
     visible_pages = PAGES if st.session_state.get("search_mode") == SEARCH_MODES[1] else PAGES[1:]
@@ -86,9 +89,11 @@ def main() -> None:
         _render_search_jobs(workspace, preferences, provider_config)
     else:
         _render_queue(workspace, preferences)
+    account_ui.persist_account(st.session_state)
+    account_ui.render_save_status(st.session_state)
 
 
-def _render_header() -> None:
+def _render_header(private_account: bool = False) -> None:
     left, right = st.columns([1.7, 1], vertical_alignment="center")
     with left:
         st.title("Job Hunter")
@@ -96,7 +101,7 @@ def _render_header() -> None:
         with st.container(horizontal=True, wrap=True):
             st.badge("Automated discovery", icon=":material/search:", color="green")
             st.badge("Gemini matching", icon=":material/auto_awesome:", color="blue")
-            st.badge("Session-only privacy", icon=":material/lock:", color="gray")
+            st.badge("Private account" if private_account else "Session-only privacy", icon=":material/lock:", color="gray")
     with right:
         st.image(HERO_IMAGE_URL)
 
@@ -130,15 +135,17 @@ def _render_sidebar(
     )
     with st.sidebar:
         st.header("Today")
-        st.metric("Jobs in this session", len(jobs))
+        st.metric("Jobs in your account" if account_ui.ACCOUNT_KEY in st.session_state else "Jobs in this session", len(jobs))
         st.radio(
             "Matching mode",
             SEARCH_MODES,
             key="search_mode",
-            help="Criteria mode never reads or sends CV text.",
+            help="Criteria-mode discovery and matching never read or send CV text.",
+            on_change=account_ui.persist_account,
+            args=(st.session_state,),
         )
         if workspace.cv is not None:
-            st.success(f"CV Saved ({format_size(workspace.cv.size_bytes)})")
+            st.success(f"CV ready ({format_size(workspace.cv.size_bytes)})")
         else:
             st.caption("No CV saved in this session.")
         st.caption(provider_status_label(provider_config.has_api_search))
@@ -147,14 +154,21 @@ def _render_sidebar(
 
 def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object]) -> None:
     st.subheader("Profile & CV")
-    st.write(
-        "Your CV stays only in this app session. It is not written to the public repository "
-        "or shared with other visitors, and it can disappear when the session resets."
-    )
+    private_account = account_ui.ACCOUNT_KEY in st.session_state
+    if private_account:
+        st.write("Saving a CV stores its file and readable text encrypted in your private account. "
+                 "It can be restored after a restart, replaced or removed. It is never written to the public repository. "
+                 "CV-based matching sends readable CV text to Gemini; criteria-based matching does not.")
+        st.caption("Account CV size limit: 5 MB. Check the account save status before closing or signing out.")
+    else:
+        st.write(
+            "Your CV stays only in this app session. It is not written to the public repository "
+            "or shared with other visitors, and it can disappear when the session resets."
+        )
     with st.container(border=True):
         if workspace.cv is not None:
             st.success(
-                f"CV Saved: `{workspace.cv.filename}` - {format_size(workspace.cv.size_bytes)}"
+                f"CV ready: `{workspace.cv.filename}` - {format_size(workspace.cv.size_bytes)}"
             )
             if st.button("Remove saved CV", icon=":material/delete:"):
                 _remove_saved_cv(workspace)
@@ -171,12 +185,15 @@ def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object])
         if uploaded is not None and st.button("Save CV", icon=":material/save:"):
             try:
                 content = uploaded.getvalue()
+                if private_account and len(content) > MAX_CV_BYTES:
+                    raise ValueError("Account CVs must be 5 MB or smaller.")
                 workspace.save_cv(uploaded.name, content, extract_cv_text(content, uploaded.name))
             except Exception as exc:
                 st.warning(f"CV could not be saved because readable text was not extracted: {exc}")
             else:
-                st.toast("CV Saved")
-            st.rerun()
+                account_ui.persist_account(st.session_state)
+                st.toast("CV loaded. Check the account save status." if private_account else "CV Saved")
+                st.rerun()
 
     if workspace.cv is not None:
         st.button(
@@ -370,6 +387,7 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
     logs = list(st.session_state.get("run_logs", []))
     for match in matches:
         workspace.accept_completed(match)
+    account_ui.persist_account(st.session_state)
     logs.extend(event.message for event in events)
     st.session_state["run_logs"] = logs[-30:]
     snapshot = controller.snapshot()
@@ -413,6 +431,7 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
         )
     else:
         st.caption("Ready to search. Progress and current activity will appear here.")
+    account_ui.render_save_status(st.session_state)
 
     if snapshot.completed or workspace.list_jobs():
         if st.button(
@@ -495,6 +514,7 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
     desired_status = "applied" if applied else "not_applied"
     if desired_status != job.application_status:
         workspace.update_application_status(job.id, desired_status)
+        account_ui.persist_account(st.session_state)
         st.toast("Application status updated.")
         st.rerun()
 
@@ -539,7 +559,8 @@ def _render_posting_editor(workspace: SessionWorkspace, job) -> None:
                                   format_func=labels.get, key=f"posting_expiry_{job.id}")
             if st.form_submit_button("Save posting details", icon=":material/save:"):
                 workspace.update_posting_evidence(job.id, posted.isoformat() if posted else "", str(expiry))
-                st.toast("Posting details saved. User corrections are not platform-verified.")
+                account_ui.persist_account(st.session_state)
+                st.toast("Posting details updated. User corrections are not platform-verified.")
                 st.rerun()
 
 
@@ -654,6 +675,7 @@ def _search_settings() -> dict[str, object]:
 def _save_search_setting(field: str) -> None:
     value = st.session_state[f"_{field}"]
     _search_settings()[field] = list(value) if isinstance(value, list) else value
+    account_ui.persist_account(st.session_state)
 
 
 def _setting_widget(field: str) -> dict[str, object]:
@@ -768,6 +790,7 @@ def _cv_upload_key(state: MutableMapping[str, object]) -> str:
 def _remove_saved_cv(workspace: SessionWorkspace) -> None:
     current_key = _cv_upload_key(st.session_state)
     workspace.remove_cv()
+    account_ui.persist_account(st.session_state)
     st.session_state.pop(current_key, None)
     revision = st.session_state.get("cv_upload_revision", 0)
     st.session_state["cv_upload_revision"] = (

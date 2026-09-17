@@ -17,12 +17,23 @@ Streamlit session
 
 The hosted app never creates `JobQueue` or `CVStore`. SQLite and disk-backed CV helpers remain only for backward-compatible local CLI use.
 
+## Optional Private Accounts
+
+v1.18.0 gates the workspace behind native Google OIDC when `accounts.enabled` is true. Verified email gates access; canonical Google issuer + stable subject hashes to the owner ID. Invalid setup, signed-out/denied/expired identities and failed initial loads cannot reach the workspace. Account mode is off by default.
+
+The account adapter restores a versioned snapshot before widget creation, and saves only changed snapshots after settings callbacks, CV changes, posting/application edits and accepted background results. Snapshot contents are Fernet-encrypted CV bytes/text, settings/mode and JobRecords. Controllers, caches, API keys and provider tokens stay session-local. Native OIDC identity is not Supabase `auth.uid()`; server-only Supabase secret-key RPCs operate with service-role privileges, with app owner checks plus revoked anon/authenticated table/function access.
+
+Database writes use atomic compare-and-swap revisions. Conflicting tabs stop saving until explicit reload; failed loads never permit writes/clear. Deletion increments revision and nulls the payload rather than removing its tombstone. Logout/account changes cancel controllers and clear all session/widget state. Account save errors remain visible; retries are explicit after failure. Backend requests have bounded timeouts and never follow redirects. See [Account Setup](ACCOUNT_SETUP.md) for trust boundaries, limits, encryption-key recovery and real deployment checks.
+
 ## Components
 
 | Component | Responsibility |
 |---|---|
 | `src/app.py` | Session UI, matching modes, criteria, fragment polling, queue, and Apply |
 | `session_workspace.py` | Session-only CV and queue lifecycle, active run ID, application evidence |
+| `account_config.py` / `account_ui.py` | Validated native identity, personal access gate, restore/save controls and sign-out cleanup |
+| `account_snapshot.py` / `account_session.py` | Validated private snapshots, change detection, failure/conflict lifecycle |
+| `account_store.py` / `config/supabase_accounts.sql` | Encrypted server-only owner RPCs, revisions and deletion tombstones |
 | `search_runner.py` | Coordinator, two-worker pool, ceilings, cancellation, events, completed matches |
 | `search.py` | Query planning, provider parsers, safe page loading, dates, descriptions, availability |
 | `matching.py` | Mode validation, Gemini adapter, structured output, retry, cache, fallback |
@@ -35,7 +46,7 @@ The hosted app never creates `JobQueue` or `CVStore`. SQLite and disk-backed CV 
 
 ## Data Boundaries
 
-Hosted private data lives inside one Streamlit session object. It is not persisted across session loss or app restart. Workers receive plain immutable request values, use a controller-owned session cache, and publish immutable events/results; they do not call Streamlit.
+Hosted live data lives inside one Streamlit session object. Guests do not persist across session loss or app restart; configured private accounts additionally save encrypted snapshots in Supabase. Workers receive plain immutable request values, use a controller-owned session cache, and publish immutable events/results; they do not call Streamlit or save account data.
 
 Web search selections live in a non-widget `search_settings` dictionary. Disposable underscore-prefixed widget keys copy changes into it using callbacks, and render from saved values. This prevents Streamlit's off-page widget cleanup from resetting criteria or queue hard-skip filtering. New sessions select nothing; CLI defaults remain CLI-only selections and web suggestion catalogs.
 
@@ -67,7 +78,7 @@ Europe/ASEAN/APAC use explicit country/economy presets; Global removes location 
 
 Optional quick-apply filters are own-platform and strict. LinkedIn discovery includes f_AL and web signals; Indeed/Foundit use their method signals. Actual eligibility requires observed button/link evidence, with conflicting vacancy IDs rejected and description/related-job nodes excluded. Missing evidence skips with a reason. These are discovery filters, not login or submission automation.
 
-Hosted JobInput/JobRecord carry quick_apply, availability, and availability_evidence. Source validThrough dates determine known expiry before scoring; unknown expiry is not inferred from posting age. User edits to date/expiry are session-only and explicitly unverified, while unchanged source evidence is preserved. Duplicate date/provenance merges are atomic. Expired jobs are retained in All with Apply disabled. Location columns are omitted only when all visible records lack observed location. Alternate source fields/storage/runner alias publication are removed; primary URL/provider/fingerprint checks remain.
+Hosted JobInput/JobRecord carry quick_apply, availability, and availability_evidence. Source validThrough dates determine known expiry before scoring; unknown expiry is not inferred from posting age. User edits to date/expiry are explicitly unverified; they also persist across sessions for configured private accounts. Unchanged source evidence is preserved. Duplicate date/provenance merges are atomic. Expired jobs are retained in All with Apply disabled. Location columns are omitted only when all visible records lack observed location. Alternate source fields/storage/runner alias publication are removed; primary URL/provider/fingerprint checks remain.
 
 ## Local SQLite Compatibility
 

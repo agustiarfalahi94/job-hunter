@@ -2,15 +2,15 @@
 
 ## Start Here
 
-Job Hunter v1.17.2 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.18.0 is a public Streamlit job-discovery and matching app with optional private Google accounts. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
 1. Keep the repository safe to publish.
 2. Never commit CVs, extracted CV text, contact details, job-board credentials, cookies, API keys, private preferences, local databases, application records, identity documents, or form answers.
 3. Do not invent candidate experience. Gemini and deterministic reasons must use only supplied CV text, editable criteria, and job content.
-4. Criteria-based search must never load or send CV text.
-5. Hosted data stays in `SessionWorkspace`; do not route Streamlit users through shared files or SQLite.
+4. Criteria-based discovery/matching must never load or send CV text. Separately authorized private account restore/save may retain the CV without exposing it to scoring.
+5. Hosted live data stays in `SessionWorkspace`; do not route Streamlit users through shared files or SQLite. Only the authenticated account adapter may persist encrypted private snapshots to the configured backend.
 6. Background workers must not call Streamlit or mutate `st.session_state`. Publish immutable events and matches for the Streamlit thread to accept.
 7. Respect ceilings: 12 discovery requests, 50 unique candidates, 50 page fetches, 50 scoring attempts, two workers, and five minutes of new-work scheduling.
 8. Stop must prevent new work after cancellation is observed. Keep already completed results and use bounded timeouts for in-flight calls.
@@ -22,6 +22,8 @@ Job Hunter v1.17.2 is a public Streamlit job-discovery and matching app. Read th
 14. Keep at most five selected/resolved company sites and five company/region lookup pairs per selection. Validate lookup budgets before contacting Gemini; regional presets count as one company-verification region rather than dozens of country calls.
 15. Optional quick-apply filters apply only to their named platform and require vacancy-associated controls, never description words. Manual date/expiry corrections retain user provenance; merge dates and verification atomically. No alternate-source storage/display; retain primary-identity duplicate checks.
 16. Discovery errors must never be reported as empty success. Report API web-result/eligible-link counts and safe error classifications; never expose query URLs with keys or raw provider errors. Zero scored jobs require a warning, not a queue-success claim.
+17. Accounts are off by default; enabled invalid setup fails closed. Use native Streamlit Google claims, verified-email allowlists and stable issuer/subject ownership, never client-supplied ownership. Keep Supabase secret keys and encryption keys server-only; service credentials bypass RLS.
+18. Never overwrite after failed account load or conflicting revision. Clear data using revision-aware tombstones. Save accepted worker results on the Streamlit thread; sign-out, denial and account switching cancel work and clear all private state. Caches, controllers, cookies and provider tokens are not persisted. Confirm destructive actions, show failed saves honestly, and retain encryption keys privately.
 
 ## Git Flow
 

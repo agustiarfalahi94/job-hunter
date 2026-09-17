@@ -6,11 +6,13 @@ Job Hunter turns editable preferences and, optionally, a session CV into a ranke
 
 ## Supported Workflow
 
+With optional v1.18.0 private accounts enabled, authenticate with the allowlisted Google account first; restore the encrypted saved workspace and save changes automatically. Guests remain session-only. Live account operation requires [owner setup and verification](ACCOUNT_SETUP.md), not just code deployment.
+
 1. Choose Criteria-based or CV-based search.
 2. Optionally save a PDF, DOCX, or best-effort DOC CV in the current session.
 3. Edit title, description, bonus, semantic hard-skip, location, source, and freshness criteria.
 
-New sessions have empty selected criteria and no selected location. The suggestion catalogs are not automatically applied after CV upload. User edits are kept in permanent session settings across page/mode changes and completed searches; an app restart or session loss starts fresh. Date posted retains Past month protection.
+New guest sessions/accounts have empty selected criteria and no selected location. Returning private accounts restore their saved settings. The suggestion catalogs are not automatically applied after CV upload. User edits are kept across page/mode changes and completed searches; guests start fresh after session loss, while configured private accounts restore after reboot. Date posted retains Past month protection.
 
 Location supports persistent OR selections across cities, countries, ASEAN, and an explicitly documented APAC country/economy preset. Country/region membership uses observed posting geography, not query hints. Regional searches remain bounded and are not exhaustive. Company-name verification has a five company/region pair ceiling in addition to five resolved sites. Fifty unique candidates is a pre-scoring ceiling, not the fifty most suitable jobs online. See [Geographic Scopes](LOCATION_SCOPES.md).
 
@@ -25,6 +27,7 @@ Company source presets display their domains and start unselected. Unknown compa
 ## Included
 
 - Session-isolated hosted CV, queue, cache, and application records.
+- Optional personal Google accounts with encrypted durable CV/settings/history, visible save failures and revision conflicts, confirmed reload/deletion, and sign-out cleanup.
 - Criteria-only mode that never sends CV text.
 - Profile & CV is hidden in criteria mode; changing modes retains the saved session CV.
 - CV-based evidence matching with no unsupported claims.

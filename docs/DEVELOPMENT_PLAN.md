@@ -247,11 +247,16 @@
 
 ## Next
 
-- Proposed personal-account release: Google sign-in and durable private CV,
-  criteria, queue, and manually recorded application history. See
-  [Account Saving Design](ACCOUNT_SAVING_DESIGN.md) for the proposed boundaries,
-  setup requirements and release tests. This is not implemented in v1.17.2.
+- Complete owner OAuth/Supabase setup and real private-account sign-in/reboot verification for v1.18.0. The gated implementation now exists; [Account Setup](ACCOUNT_SETUP.md) records what remains external and unverified.
 - Add more provider adapters where public APIs or platform terms permit them.
 - Improve full-description extraction with provider-specific fixtures.
 - Keep job-platform login, CAPTCHA, and final submission outside the hosted app;
-  Google login to Job Hunter would not authorize job-board account access.
+  Google login to Job Hunter does not authorize job-board account access.
+
+## v1.18 - Optional Private Google Accounts
+
+- Add native OIDC identity validation, verified-email allowlisting and stable subject ownership; invalid enabled setup fails closed.
+- Persist encrypted CV bytes/text, all settings, mode, queue, manual application provenance and posting corrections through service-only revision-aware Supabase RPCs.
+- Add tombstone deletion, explicit conflict reload/retry, honest save status, storage consent/limits and logout/account-switch cancellation.
+- Keep guest behavior, criteria-mode CV non-disclosure and search budgets unchanged.
+- Verify mocked app/session round trips and disposable PostgreSQL grants/CAS/concurrency in CI. Real OAuth/gateway/reboot checks require owner credentials and are explicitly pending.

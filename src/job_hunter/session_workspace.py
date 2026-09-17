@@ -37,6 +37,15 @@ class SessionWorkspace:
         self._next_job_id = 1
         self._active_run_id = ""
 
+    @classmethod
+    def from_account(cls, cv: SessionCV | None, jobs: list[JobRecord]) -> SessionWorkspace:
+        """Restore validated records without reviving caches or running workers."""
+        workspace = cls()
+        workspace.cv = cv
+        workspace._jobs = list(jobs)
+        workspace._next_job_id = max((job.id for job in jobs), default=0) + 1
+        return workspace
+
     @property
     def cv_text(self) -> str:
         return self.cv.text if self.cv is not None else ""
