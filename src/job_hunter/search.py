@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from collections import Counter
 from datetime import date, datetime, timedelta
 from typing import Callable
 import ipaddress
@@ -29,7 +30,7 @@ SERPAPI_URL = "https://serpapi.com/search.json?{params}"
 PLATFORM_SITE_FILTERS = {
     "LinkedIn": "site:linkedin.com/jobs",
     "JobStreet": "site:jobstreet.com OR site:jobstreet.com.my",
-    "Indeed": "site:my.indeed.com OR site:indeed.com",
+    "Indeed": "(site:indeed.com OR site:indeed.com.my) inurl:viewjob",
     "Foundit": "site:foundit.my OR site:foundit.com.my OR site:foundit.id OR site:foundit.sg OR site:foundit.in",
     "Company career pages": (
         "site:careers.accenture.com OR site:hcltech.com/careers OR "
@@ -356,6 +357,16 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
             )
         )
     return candidates
+
+
+def serpapi_rejection_counts(payload: str, platform: str) -> dict[str, int]:
+    counts = Counter()
+    for item in json.loads(payload or "{}").get("organic_results", []):
+        title, href = str(item.get("title", "")).strip(), str(item.get("link", "")).strip()
+        reason = "missing title/link" if not title or not href else _job_result_rejection(href, title, platform)
+        if reason:
+            counts[reason] += 1
+    return dict(counts)
 
 
 def parse_linkedin_jobs(html: str, location: str, limit: int) -> list[SearchCandidate]:
@@ -1303,31 +1314,35 @@ def _is_blocked_search_page(html: str) -> bool:
 
 
 def _looks_like_job_result(url: str, title: str, platform: str) -> bool:
+    return not _job_result_rejection(url, title, platform)
+
+
+def _job_result_rejection(url: str, title: str, platform: str) -> str:
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").casefold()
     allowed_domains = PLATFORM_DOMAINS.get(platform, ())
     if not allowed_domains and "." in platform and " " not in platform:
         allowed_domains = (platform.casefold(),)
     if parsed.scheme != "https" or not hostname:
-        return False
+        return "unsafe URL"
     try:
         if parsed.port not in {None, 443}:
-            return False
+            return "unsafe URL"
     except ValueError:
-        return False
+        return "unsafe URL"
     trusted_domain = any(
         hostname == domain or hostname.endswith(f".{domain}") for domain in allowed_domains
     )
     if allowed_domains and not trusted_domain:
-        return False
+        return "outside selected source"
     normalized_url = url.casefold()
     normalized_title = title.casefold()
     if any(term in normalized_title or term in normalized_url for term in NOISE_TERMS):
-        return False
+        return "non-job content"
     hints = PLATFORM_JOB_PATH_HINTS.get(platform, ())
     if not hints:
-        return True
-    return any(hint in normalized_url for hint in hints)
+        return ""
+    return "" if any(hint in normalized_url for hint in hints) else "not a vacancy page"
 
 
 def _is_trusted_job_url(url: str, allowed_domains: tuple[str, ...] = ()) -> bool:

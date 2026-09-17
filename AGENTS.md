@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.17.1 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.17.2 is a public Streamlit job-discovery and matching app. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 

@@ -373,6 +373,10 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
     logs.extend(event.message for event in events)
     st.session_state["run_logs"] = logs[-30:]
     snapshot = controller.snapshot()
+    if (snapshot.state in {"completed", "cancelled", "failed"} and snapshot.run_id
+            and st.session_state.get("terminal_refreshed_run") != snapshot.run_id):
+        st.session_state["terminal_refreshed_run"] = snapshot.run_id
+        st.rerun(scope="app")
 
     left, right = st.columns([3, 1], vertical_alignment="bottom")
     with left:

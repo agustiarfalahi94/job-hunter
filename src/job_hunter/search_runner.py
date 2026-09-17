@@ -38,6 +38,7 @@ from job_hunter.search import (
     parse_linkedin_jobs,
     parse_serpapi_results,
     serpapi_web_result_count,
+    serpapi_rejection_counts,
     SearchProviderError,
 )
 
@@ -211,6 +212,10 @@ class SearchRunController:
                         self._emit(run_id, "discovered", f"{query.platform}: {count} web results; "
                                    f"{len(candidates)} eligible job links; {max(0, count - len(candidates))} "
                                    "links excluded by source/path/content checks.")
+                        rejected = serpapi_rejection_counts(payload, query.platform)
+                        if rejected:
+                            details = "; ".join(f"{reason}: {amount}" for reason, amount in rejected.items())
+                            self._emit(run_id, "excluded", f"{query.platform} exclusions: {details}.")
                 except (SearchProviderError, ValueError, TypeError, AttributeError):
                     self._increment(skipped=1, discovery_failures=1)
                     try:

@@ -78,3 +78,26 @@ class DiscoveryDiagnosticsTest(unittest.TestCase):
         self.assertGreater(summary.skipped, 0)
         self.assertIn("authentication", "\n".join(summary.logs))
         self.assertNotIn("private-key", "\n".join(summary.logs))
+
+    def test_indeed_queries_target_individual_vacancies(self):
+        from job_hunter.search import SearchCriteria, build_search_queries
+        criteria = SearchCriteria(title_terms=("Data Analyst",), description_terms=("Power BI",),
+                                  location="Kuala Lumpur", platforms=("Indeed",), posted_within_days=None)
+        for query in build_search_queries(criteria):
+            self.assertIn("inurl:viewjob", query.query)
+            self.assertIn("site:indeed.com.my", query.query)
+
+    def test_indeed_aggregate_results_explain_why_rejected(self):
+        request = replace(_request(), criteria=replace(_request().criteria, platforms=("Indeed",)),
+                          provider_config=SearchProviderConfig(serpapi_key="test"))
+        controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+            {"title": "Data Analyst jobs", "link": "https://malaysia.indeed.com/q-data-analyst-l-kuala-lumpur-jobs.html"},
+            {"title": "Power BI jobs", "link": "https://evil.example/viewjob?api_key=private-key"},
+        ]}))
+        controller.start(request)
+        self.assertTrue(controller.wait(2))
+        events, _ = controller.drain()
+        logs = "\n".join(event.message for event in events)
+        self.assertIn("not a vacancy page: 1", logs)
+        self.assertIn("outside selected source: 1", logs)
+        self.assertNotIn("private-key", logs)

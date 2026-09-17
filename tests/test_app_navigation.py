@@ -12,6 +12,19 @@ from streamlit.testing.v1 import AppTest
 
 
 class AppNavigationTest(unittest.TestCase):
+    def test_terminal_fragment_refreshes_search_controls_once(self):
+        controller = MagicMock()
+        controller.drain.return_value = ((), ())
+        controller.snapshot.return_value = RunSnapshot(run_id="finished-run", state="completed")
+        with patch.object(app, "st") as st, patch.object(app, "_get_controller", return_value=controller):
+            st.session_state = {}
+            st.columns.return_value = (MagicMock(), MagicMock())
+            st.button.return_value = False
+            render = app._render_run_fragment.__wrapped__
+            render(SessionWorkspace())
+            render(SessionWorkspace())
+            st.rerun.assert_called_once_with(scope="app")
+
     def test_new_session_starts_with_empty_selected_search_parameters(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
         app_test = AppTest.from_file(str(app_path)).run(timeout=10)

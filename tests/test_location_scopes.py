@@ -60,7 +60,7 @@ class LocationScopesTest(unittest.TestCase):
         queries = build_search_queries(criteria)
         self.assertLessEqual(len(queries), 12)
         self.assertIn('("Analyst" OR "Engineer")', queries[0].query)
-        self.assertIn('(site:my.indeed.com OR site:indeed.com)', queries[0].query)
+        self.assertIn('((site:indeed.com OR site:indeed.com.my) inurl:viewjob)', queries[0].query)
         self.assertIn('"Indonesia"', queries[0].query)
 
     def test_direct_linkedin_uses_individual_locations(self):
