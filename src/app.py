@@ -181,6 +181,7 @@ def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object])
             "Upload or replace CV",
             type=["pdf", "docx", "doc"],
             key=_cv_upload_key(st.session_state),
+            max_upload_size=5 if private_account else None,
         )
         if uploaded is not None and st.button("Save CV", icon=":material/save:"):
             try:

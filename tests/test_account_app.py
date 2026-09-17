@@ -96,6 +96,13 @@ class AccountAppTest(unittest.TestCase):
         self.assertIn("Sign in with Google", [button.label for button in test.button])
         self.assertNotIn("Run search and score jobs", [button.label for button in test.button])
 
+    def test_private_cv_uploader_displays_account_limit(self):
+        with signed_in(MemoryRPC()):
+            test = private_app(account_secrets()).run(timeout=10)
+            next(widget for widget in test.radio if widget.label == "Matching mode").set_value("CV-based search").run(timeout=10)
+            test.segmented_control[0].set_value("Profile & CV").run(timeout=10)
+            self.assertEqual(test.get("file_uploader")[0].proto.max_upload_size_mb, 5)
+
     def test_enabled_incomplete_configuration_has_no_guest_bypass(self):
         test = AppTest.from_file(APP_PATH)
         test.secrets["accounts"] = {"enabled": True}
