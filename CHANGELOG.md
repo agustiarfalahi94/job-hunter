@@ -11,6 +11,7 @@
 - Prioritize relevant citations within the resolution budget, handle punctuated company names, and search company-owned hosts without excluding job details on sibling paths.
 - Stop labelling general search results with the requested city as observed location. Extract JobPosting addresses, skip known location mismatches before scoring, and explain unverified locations in result remarks.
 - Associate structured addresses with the selected vacancy rather than merging related postings. Normalize common country codes and treat country-only city evidence as unverified, not a false city mismatch.
+- Give company lookup its own actionable provider/quota messages; never claim a deterministic scoring fallback verified a company site.
 - Add navigation, empty-default, case/OR, grounding, regional verification, source-limit, retry, privacy, cache, and path-scoping regression coverage.
 
 ## 1.15.3 - 2026-09-16

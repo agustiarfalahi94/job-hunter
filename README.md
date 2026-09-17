@@ -54,6 +54,8 @@ Automatic lookup conservatively requires a brand-matching corporate domain, a co
 
 The selected city is a search constraint, not evidence of a posting's actual location. Readable JobPosting addresses or platform location labels supply observed location; known mismatches are skipped before scoring. When a source exposes no location, the queue leaves it unverified and explains that limitation in remarks rather than assigning your selected city.
 
+If company lookup reports unavailable Gemini quota, check the API key's Google AI Studio project and its model/Google Search grounding limits. A working scoring connection does not establish available grounding quota. Wait for the applicable reset or use a known careers domain; the app cannot verify company names without an available grounded request and never guesses a replacement domain.
+
 ### 4. Review And Apply
 
 The queue defaults to **Actionable** jobs. Use **All** or **Already applied** to change the view, then filter by match decision. Each row shows the scoring engine, evidence limit, description quality, date source or limitation, reasons, remarks, and alternate sources.

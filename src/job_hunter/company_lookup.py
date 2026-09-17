@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from job_hunter.matching import GoogleGeminiClient, GeminiServiceError, MatchingConfig, _safe_error_message
+from job_hunter.matching import GoogleGeminiClient, GeminiServiceError, MatchingConfig
 from job_hunter.search import fetch_job_html, _hostname_resolves_public
 from job_hunter.source_validation import _validated_hostname
 
@@ -33,6 +33,19 @@ LOOKUP_PROMPT = (
 
 class CompanyLookupError(ValueError):
     pass
+
+
+def _lookup_service_message(kind: str) -> str:
+    reason = {
+        "authentication": "Gemini authentication failed. Check GEMINI_API_KEY in Streamlit secrets.",
+        "quota": "Gemini company lookup quota is unavailable. Check your Google AI Studio project's model and Google Search grounding limits; retry when quota is available.",
+        "rate_limit": "Gemini company lookup rate limit persisted. Retry later.",
+        "temporary": "Gemini timed out or was temporarily unavailable. Retry later.",
+        "configuration": "Gemini SDK is unavailable.",
+        "model": "Gemini model is unavailable. Check GEMINI_MODEL in Streamlit secrets.",
+        "request": "Gemini rejected the company lookup settings.",
+    }.get(kind, "Gemini company lookup was unavailable.")
+    return reason + " No company site was verified; enter the known careers domain to continue."
 
 
 @dataclass(frozen=True)
@@ -72,13 +85,13 @@ def lookup_company_site(
                 if exc.retryable and attempt == 0 and config.max_attempts > 1:
                     sleep(0.25)
                     continue
-                raise CompanyLookupError(_safe_error_message(exc.kind)) from exc
+                raise CompanyLookupError(_lookup_service_message(exc.kind)) from exc
         return _verify_reply(reply, company, region, active.model, fetcher,
                              citation_resolver or resolve_grounding_url)
     except CompanyLookupError:
         raise
     except GeminiServiceError as exc:
-        raise CompanyLookupError(_safe_error_message(exc.kind)) from exc
+        raise CompanyLookupError(_lookup_service_message(exc.kind)) from exc
     except Exception as exc:
         raise CompanyLookupError("Official regional careers evidence could not be verified. Try again or enter the careers domain.") from exc
 

@@ -132,6 +132,16 @@ class CompanyLookupTest(unittest.TestCase):
                 client=SimpleNamespace(generate=generate), sleep=lambda _: None)
         self.assertEqual(len(calls), 2)
 
+    def test_lookup_quota_error_does_not_claim_a_scoring_fallback(self):
+        from job_hunter.matching import GeminiServiceError
+        def generate(*args, **kwargs):
+            raise GeminiServiceError("quota", "private provider details", retryable=False)
+        with self.assertRaises(CompanyLookupError) as raised:
+            lookup_company_site("Deloitte", "Malaysia", MatchingConfig(api_key="test"), client=SimpleNamespace(generate=generate))
+        self.assertIn("quota", str(raised.exception))
+        self.assertNotIn("fallback was used", str(raised.exception))
+        self.assertNotIn("private", str(raised.exception))
+
     def test_unrelated_malformed_links_do_not_reject_valid_careers(self):
         self.assertEqual(self.lookup(pages={
             OFFICIAL: f'Deloitte Careers Explore careers in Malaysia <a href="https://bad:port/">Bad</a><a href="{CAREERS}">Jobs</a>',
