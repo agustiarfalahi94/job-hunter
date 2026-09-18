@@ -30,6 +30,7 @@ from job_hunter.search import (
     _job_location_matches,
     build_public_fallback_queries,
     build_serpapi_queries,
+    next_serpapi_query,
     extract_job_metadata,
     match_job_locations,
     fetch_job_html,
@@ -38,6 +39,7 @@ from job_hunter.search import (
     parse_linkedin_jobs,
     parse_serpapi_results,
     serpapi_web_result_count,
+    serpapi_page_identity,
     serpapi_rejection_counts,
     SearchProviderError,
 )
@@ -173,13 +175,16 @@ class SearchRunController:
         futures: dict[Future[_ProcessedCandidate], tuple[str, SearchCandidate]] = {}
         unique_candidates: list[tuple[str, SearchCandidate]] = []
         unique_keys: set[str] = set()
+        seen_pages: set[tuple[str, str, tuple[str, ...]]] = set()
         executor = ThreadPoolExecutor(
             max_workers=self._max_workers,
             thread_name_prefix=f"job-match-{run_id[:6]}",
         )
         try:
             queries = _planned_queries(request.criteria, request.provider_config)
-            for query in queries[:MAX_SEARCH_REQUESTS]:
+            for query_index, query in enumerate(queries):
+                if query_index >= MAX_SEARCH_REQUESTS:
+                    break
                 if self._should_stop(started):
                     break
                 self._increment(discovery_requests=1)
@@ -239,6 +244,13 @@ class SearchRunController:
                     unique_candidates.append((identity, candidate))
                 if len(unique_keys) >= MAX_UNIQUE_RESULTS:
                     break
+                if query.parser == "serpapi" and len(queries) < MAX_SEARCH_REQUESTS:
+                    signature = (query.platform, query.query, serpapi_page_identity(payload))
+                    if signature not in seen_pages:
+                        seen_pages.add(signature)
+                        following = next_serpapi_query(query, payload)
+                        if following is not None:
+                            queries.append(following)
 
             candidate_index = 0
             while (

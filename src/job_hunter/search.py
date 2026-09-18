@@ -258,7 +258,6 @@ def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[Platfo
             "engine": "google",
             "q": platform_query.query,
             "api_key": api_key,
-            "num": _result_limit(criteria.max_results),
         }
         date_filter = _google_date_filter(criteria.posted_within_days)
         if date_filter:
@@ -273,6 +272,52 @@ def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[Platfo
             )
         )
     return queries[:MAX_SEARCH_REQUESTS]
+
+
+def next_serpapi_query(query: PlatformQuery, payload: str) -> PlatformQuery | None:
+    if query.parser != "serpapi":
+        return None
+    data = json.loads(payload)
+    pagination = data.get("serpapi_pagination")
+    if not isinstance(pagination, dict) or not serpapi_web_result_count(payload):
+        return None
+    link = pagination.get("next") or pagination.get("next_link")
+    if not isinstance(link, str):
+        return None
+    try:
+        advertised = urlparse(link)
+        if (advertised.scheme != "https" or advertised.netloc != "serpapi.com"
+                or advertised.path != "/search.json" or advertised.fragment):
+            return None
+        offsets = parse_qs(advertised.query).get("start", [])
+        original = urlparse(query.url)
+        params = parse_qs(original.query)
+        current = int(params.get("start", ["0"])[0])
+        if len(offsets) != 1 or not offsets[0].isascii() or not offsets[0].isdigit():
+            return None
+        offset = int(offsets[0])
+        if offset <= current or offset > 110:
+            return None
+    except ValueError:
+        return None
+    # Keep original credentials, query and filters; never follow the response URL.
+    params["start"] = [str(offset)]
+    return replace(query, url=SERPAPI_URL.format(params=urlencode(params, doseq=True)))
+
+
+def serpapi_page_identity(payload: str) -> tuple[str, ...]:
+    data = json.loads(payload)
+    identities = []
+    for item in data.get("organic_results", []):
+        if not isinstance(item, dict) or not isinstance(item.get("link"), str):
+            continue
+        try:
+            identity = canonicalize_job_url(item["link"])
+        except ValueError:
+            continue
+        if identity:
+            identities.append(identity)
+    return tuple(sorted(identities))
 
 
 def build_public_fallback_queries(criteria: SearchCriteria) -> list[PlatformQuery]:
@@ -336,9 +381,7 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
         title, company = _split_title_company(title_text)
         observed_location = ""
         if platform == "Indeed":
-            pieces = re.split(r"\s+[-|]\s+", title_text)
-            if len(pieces) == 3 and re.fullmatch(r"indeed(?:\.com)?", pieces[-1], re.I) and is_known_area(pieces[-2]):
-                title, company, observed_location = pieces[0], "", pieces[-2]
+            title, company, observed_location = _indeed_title_fields(title_text)
         if not title or not href:
             continue
         if not _looks_like_job_result(href, title_text, platform):
@@ -425,6 +468,9 @@ def parse_duckduckgo_results(html: str, platform: str, location: str, limit: int
         snippet_node = anchor.find_next("a", class_="result__snippet") or anchor.find_next(class_="result__snippet")
         snippet = snippet_node.get_text(" ", strip=True) if snippet_node else ""
         title, company = _split_title_company(title_text)
+        observed_location = ""
+        if platform == "Indeed":
+            title, company, observed_location = _indeed_title_fields(title_text)
         if not title or not href:
             continue
         if not _looks_like_job_result(href, title_text, platform):
@@ -434,7 +480,7 @@ def parse_duckduckgo_results(html: str, platform: str, location: str, limit: int
             SearchCandidate(
                 title=title,
                 company=company,
-                location="",
+                location=observed_location,
                 description=snippet or title_text,
                 source_url=href,
                 platform=platform,
@@ -1297,6 +1343,17 @@ def _clean_duckduckgo_url(url: str) -> str:
         target = parse_qs(parsed.query).get("uddg", [""])[0]
         return unquote(target)
     return url
+
+
+def _indeed_title_fields(text: str) -> tuple[str, str, str]:
+    title = re.sub(r"\s+[-|]\s+indeed(?:\.com)?$", "", text, flags=re.I).strip()
+    separators = list(re.finditer(r"\s+[-|]\s+", title))
+    if separators:
+        last = separators[-1]
+        location = title[last.end():].strip()
+        if is_known_area(location):
+            return title[:last.start()].strip(), "", location
+    return title, "", ""
 
 
 def _split_title_company(text: str) -> tuple[str, str]:

@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.18.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
+Job Hunter v1.18.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
 
 ## What It Does
 
@@ -97,6 +97,10 @@ The default is `gemini-3.8-flash`, unless Streamlit secrets `GEMINI_MODEL` overr
 Discovery happens before Gemini scoring. The activity log shows each API query's web-result count, accepted job-link count, and excluded link count. Zero discoveries show a warning rather than claiming scored jobs exist. Authentication, allowance/rate-limit, malformed-response, and failed-search errors have sanitized messages without API keys or raw provider responses. If every discovery request fails, the run is Failed, not an empty success. Some indexed pages are search/category pages rather than individual vacancies, so web-result counts can exceed accepted links.
 
 Indeed queries target `viewjob` vacancy URLs across its supported regional domains, rather than broad job-listing pages. Rejected-link counts distinguish non-vacancy pages, outside-source domains, unsafe URLs, missing titles/links and non-job content without exposing response URLs. After a run ends, the full page refreshes once to re-enable Run search and keep controls consistent with completion.
+
+Hosted API discovery now follows provider-advertised later pages after all selected sources' initial queries. Each page consumes one SerpAPI request inside the same twelve-request session ceiling and monthly allowance; it does not raise the fifty-candidate cap. Empty or repeated pages stop, and Stop/runtime limits still apply. Google ranking/index availability can still omit a specific vacancy, even when its link opens in a browser. A queue CSV does not contain all discovery responses or skipped jobs, so absence from an export alone does not establish a scoring rejection. Check the search activity log and provider search history to distinguish those stages. See [SerpAPI pagination](https://serpapi.com/search-api#api-parameters-pagination).
+
+Indeed title parsing preserves internal hyphens/parentheses and moves a recognized trailing city to Location instead of Company. A result title alone does not verify an employer; unknown companies stay blank rather than becoming cities or fragments of the title.
 
 AI Studio Usage charts show activity and error types, not remaining quota. Success rate 100% is not 100% quota remaining. 429 means a rate/resource limit was exceeded; 404 is an unavailable model/resource, and 503 is service unavailability. Check Rate Limit for your selected project/model: requests/minute, input tokens/minute, daily requests, and grounding capacity differ. Limits apply per project, not per key ([Google rate-limit documentation](https://ai.google.dev/gemini-api/docs/rate-limits)). A working scoring call does not establish grounding capacity.
 

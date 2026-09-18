@@ -1,5 +1,13 @@
 # Positive And Negative Test Cases
 
+## Later-Page Discovery And Export Diagnosis
+
+The `test_search_pagination.py` fixtures publish the reference URL only on a later provider page. Assert that it reaches scoring after initial title/description queries, without claiming live index coverage. Other tests verify twelve requests, fifty candidates, repeated/empty pages, Stop and safe continuation reconstruction. Indeed role text with internal separators must remain intact; a trailing recognized city supplies location, not an employer.
+
+For a live narrow positive search of the reference, use target title `Senior Data Analyst (Analytics & Business Intelligence)`, primary keyword `Power BI`, optional bonus `SQL`, Location `Kuala Lumpur`, Indeed only, Any time, and empty hard-skip/quick-apply filters. The narrower title may improve discovery ranking but cannot guarantee retrieval. Keep the posting date unknown unless verified. A negative suitability test uses the same search with `Power BI` as a hard skip; any discovered posting containing that term must be skipped.
+
+An exported queue contains retained jobs only. To diagnose a missing reference, inspect the search activity log/provider history: absence from provider results is discovery coverage, whereas a logged restriction/date/location skip is filtering. Gemini quota errors happen after discovery and explain labelled fallback scoring, not an absent provider result. Browser readability does not establish app-server access. Keep private exports/logs out of Git.
+
 ## Reference Posting
 
 [Indeed reference](https://malaysia.indeed.com/viewjob?jk=9e3ad6434cb74fde): Senior Data Analyst (Analytics & Business Intelligence), Integrated Health Plans (Malaysia) Sdn Bhd, Kuala Lumpur. The readable posting mentions SQL, Power BI, dashboards, reporting, databases, pipelines, and stakeholder work. No readable posting date was found. Its authorization/sponsorship question is not proof of local-only eligibility or visa sponsorship availability.

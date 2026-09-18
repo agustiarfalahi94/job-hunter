@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.18.1 - 2026-09-18
+
+- Follow provider-advertised SerpAPI result pages in hosted discovery, after initial source/signal queries, within the existing twelve-request/fifty-candidate/runtime/cancellation limits. Stop empty/repeated pages.
+- Remove the unsupported assumption that `num=50` retrieves fifty Google results. Validate advancing pagination offsets and reconstruct the original authenticated query rather than following response URLs or replacement parameters.
+- Fix Indeed title/city/footer parsing in API and public fallback results: retain internal title separators, put recognized trailing city evidence in Location and do not infer employers from title fragments.
+- Add later-page reference-URL, source ordering, original-secret/filter preservation, invalid-link, repeated-page, caps, Stop and fallback-parser regressions. A known URL is not guaranteed to appear in real provider rankings; a queue export cannot establish whether it was discovered or skipped.
+- Retain v1.18.0's optional account saving and external owner OAuth/Supabase setup requirements.
+
 ## 1.18.0 - 2026-09-18
 
 - Add optional native Google sign-in with verified-email allowlisting and stable issuer/subject ownership. Accounts stay off by default; incomplete enabled configuration fails closed.
