@@ -254,24 +254,46 @@ def build_serpapi_queries(criteria: SearchCriteria, api_key: str) -> list[Platfo
     if not api_key:
         return []
     queries = []
-    for platform_query in build_search_queries(criteria):
-        params: dict[str, object] = {
-            "engine": "google",
-            "q": platform_query.query,
-            "api_key": api_key,
-        }
-        date_filter = _google_date_filter(criteria.posted_within_days)
-        if date_filter:
-            params["tbs"] = date_filter
-        queries.append(
-            PlatformQuery(
-                platform=platform_query.platform,
-                query=platform_query.query,
-                url=SERPAPI_URL.format(params=urlencode(params)),
-                parser="serpapi",
-                signal=platform_query.signal,
+    location_part = _group_or(_quoted_or(location_search_terms(criteria.location_targets)))
+    sources: list[tuple[str, str]] = []
+    for platform in criteria.platforms:
+        site_filter = PLATFORM_SITE_FILTERS.get(platform, "")
+        clean_site_filter = re.sub(r"\s*inurl:\w+", "", site_filter).strip()
+        sources.append((platform, clean_site_filter or site_filter))
+    sources.extend(
+        (domain, criteria.custom_site_filters[index] if index < len(criteria.custom_site_filters) else f"site:{domain}")
+        for index, domain in enumerate(criteria.custom_domains)
+    )
+    signals = (
+        ("title", _quoted_or(criteria.title_terms)),
+        ("description", _quoted_or(criteria.description_terms)),
+    )
+    for signal, terms in signals:
+        if not terms:
+            continue
+        for platform, site_filter in sources:
+            query = " ".join(
+                part for part in (_group_or(site_filter), _group_or(terms), location_part) if part
             )
-        )
+            params: dict[str, object] = {
+                "engine": "google_jobs",
+                "q": query,
+                "api_key": api_key,
+            }
+            if criteria.location:
+                params["location"] = criteria.location
+            date_filter = _google_date_filter(criteria.posted_within_days)
+            if date_filter:
+                params["tbs"] = date_filter
+            queries.append(
+                PlatformQuery(
+                    platform=platform,
+                    query=query,
+                    url=SERPAPI_URL.format(params=urlencode(params)),
+                    parser="serpapi",
+                    signal=signal,
+                )
+            )
     return queries[:MAX_SEARCH_REQUESTS]
 
 
