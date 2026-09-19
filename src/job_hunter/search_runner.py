@@ -344,7 +344,7 @@ class SearchRunController:
         if self._should_stop(started):
             return _ProcessedCandidate(None, None, "Search was cancelled.")
         self._increment(page_fetches=1)
-        description = _snippet_description(candidate.description)
+        description = _snippet_description(candidate.description, candidate.description_kind)
         posted_date = candidate.posted_date
         posted_date_verified = bool(posted_date)
         posted_date_source = "search provider" if posted_date else ""
@@ -546,7 +546,14 @@ def _candidate_identity(candidate: SearchCandidate) -> str:
     return f"url:{canonical or candidate.source_url.casefold()}"
 
 
-def _snippet_description(text: str) -> JobDescription:
+def _snippet_description(text: str, kind: str = "") -> JobDescription:
+    if kind == "full" and text.strip():
+        return JobDescription(
+            text=text.strip(),
+            kind="full",
+            source="SerpAPI Google Jobs",
+            limitation="",
+        )
     if text.strip():
         return JobDescription(
             text=text.strip(),

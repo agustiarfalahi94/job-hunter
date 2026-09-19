@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.18.2 - 2026-09-20
+
+- Integrate SerpAPI `google_jobs` engine support for structured job discovery and full description extraction.
+- Support parsing `jobs_results` payloads in `parse_serpapi_results()` including full descriptions, direct `apply_options`, `company_name`, and detected posted age.
+- Provide automatic fallback to `organic_results` web search when `jobs_results` is empty or unavailable.
+- Bypass platform anti-bot/Cloudflare challenge blocks on Indeed and LinkedIn page fetching by utilizing Google Jobs pre-crawled structured data.
+- Add unit regressions for `google_jobs` parsing, candidate fallbacks, and eligibility filtering.
+
 ## 1.18.1 - 2026-09-18
 
 - Follow provider-advertised SerpAPI result pages in hosted discovery, after initial source/signal queries, within the existing twelve-request/fifty-candidate/runtime/cancellation limits. Stop empty/repeated pages.

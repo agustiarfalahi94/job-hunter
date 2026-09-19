@@ -97,6 +97,34 @@ class SearchDiscoveryTest(unittest.TestCase):
         }
         self.assertEqual(len(first_signal_sources), 9)
 
+    def test_parse_serpapi_google_jobs_payload(self):
+        payload = """
+        {
+          "jobs_results": [
+            {
+              "title": "Data Engineer",
+              "company_name": "Tech Corp",
+              "location": "Kuala Lumpur, Malaysia",
+              "description": "We are seeking a Data Engineer proficient in SQL and Python. Full description text goes here.",
+              "via": "via Indeed",
+              "apply_options": [
+                {"title": "Apply on Indeed", "link": "https://malaysia.indeed.com/viewjob?jk=9e3ad6434cb74fde"}
+              ],
+              "detected_extensions": {"posted_at": "3 days ago"}
+            }
+          ]
+        }
+        """
+        candidates = parse_serpapi_results(payload, "Indeed", "Kuala Lumpur", 10)
+        self.assertEqual(len(candidates), 1)
+        job = candidates[0]
+        self.assertEqual(job.title, "Data Engineer")
+        self.assertEqual(job.company, "Tech Corp")
+        self.assertEqual(job.location, "Kuala Lumpur, Malaysia")
+        self.assertEqual(job.source_url, "https://malaysia.indeed.com/viewjob?jk=9e3ad6434cb74fde")
+        self.assertEqual(job.description_kind, "full")
+        self.assertIn("SQL and Python", job.description)
+
 
 if __name__ == "__main__":
     unittest.main()

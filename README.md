@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.18.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
+Job Hunter v1.18.2 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
 
 ## What It Does
 

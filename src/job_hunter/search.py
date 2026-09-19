@@ -117,6 +117,7 @@ class SearchCandidate:
     closed_reason: str = ""
     posted_date: str = ""
     apply_url: str = ""
+    description_kind: str = ""
 
 
 @dataclass(frozen=True)
@@ -305,14 +306,30 @@ def next_serpapi_query(query: PlatformQuery, payload: str) -> PlatformQuery | No
     return replace(query, url=SERPAPI_URL.format(params=urlencode(params, doseq=True)))
 
 
+def _find_google_jobs_link(item: dict) -> str:
+    for option in item.get("apply_options", []):
+        if isinstance(option, dict):
+            link = option.get("link")
+            if isinstance(link, str) and link.startswith(("http://", "https://")):
+                return link
+    share_link = item.get("share_link")
+    if isinstance(share_link, str) and share_link.startswith(("http://", "https://")):
+        return share_link
+    return str(item.get("link", "")).strip()
+
+
 def serpapi_page_identity(payload: str) -> tuple[str, ...]:
     data = json.loads(payload)
     identities = []
-    for item in data.get("organic_results", []):
-        if not isinstance(item, dict) or not isinstance(item.get("link"), str):
+    items = data.get("jobs_results") if isinstance(data.get("jobs_results"), list) and data.get("jobs_results") else data.get("organic_results", [])
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        link = _find_google_jobs_link(item) if "jobs_results" in data else str(item.get("link", "")).strip()
+        if not isinstance(link, str) or not link:
             continue
         try:
-            identity = canonicalize_job_url(item["link"])
+            identity = canonicalize_job_url(link)
         except ValueError:
             continue
         if identity:
@@ -361,6 +378,9 @@ def serpapi_web_result_count(payload: str) -> int:
         raise SearchProviderError(reason)
     if data.get("search_metadata", {}).get("status") == "Error":
         raise SearchProviderError("SerpAPI reported a failed search. Check its dashboard search history.")
+    jobs = data.get("jobs_results", [])
+    if isinstance(jobs, list) and jobs:
+        return len(jobs)
     results = data.get("organic_results", [])
     if not isinstance(results, list):
         raise SearchProviderError("SerpAPI returned an invalid web-results response.")
@@ -371,6 +391,41 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
     serpapi_web_result_count(payload)
     data = json.loads(payload or "{}")
     candidates: list[SearchCandidate] = []
+    jobs_results = data.get("jobs_results", [])
+    if isinstance(jobs_results, list) and jobs_results:
+        for item in jobs_results:
+            if len(candidates) >= limit:
+                break
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title", "")).strip()
+            company = str(item.get("company_name", "")).strip()
+            observed_location = str(item.get("location", "")).strip()
+            description = str(item.get("description", "")).strip()
+            href = _find_google_jobs_link(item)
+            posted_val = _find_provider_posted_value(item) or str(item.get("detected_extensions", {}).get("posted_at", ""))
+            posted_date = normalize_posted_date(posted_val)
+            if not title or not href:
+                continue
+            if not _looks_like_job_result(href, title, platform):
+                continue
+            closed_reason = _closed_job_reason(" ".join((title, description)))
+            candidates.append(
+                SearchCandidate(
+                    title=title,
+                    company=company,
+                    location=observed_location,
+                    description=description or title,
+                    source_url=href,
+                    platform=platform,
+                    closed_reason=closed_reason,
+                    posted_date=posted_date,
+                    description_kind="full" if description else "",
+                )
+            )
+        if candidates:
+            return candidates
+
     for item in data.get("organic_results", []):
         if len(candidates) >= limit:
             break
@@ -404,8 +459,13 @@ def parse_serpapi_results(payload: str, platform: str, location: str, limit: int
 
 def serpapi_rejection_counts(payload: str, platform: str) -> dict[str, int]:
     counts = Counter()
-    for item in json.loads(payload or "{}").get("organic_results", []):
-        title, href = str(item.get("title", "")).strip(), str(item.get("link", "")).strip()
+    data = json.loads(payload or "{}")
+    items = data.get("jobs_results") if isinstance(data.get("jobs_results"), list) and data.get("jobs_results") else data.get("organic_results", [])
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title", "")).strip()
+        href = _find_google_jobs_link(item) if "jobs_results" in data else str(item.get("link", "")).strip()
         reason = "missing title/link" if not title or not href else _job_result_rejection(href, title, platform)
         if reason:
             counts[reason] += 1
