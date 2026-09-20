@@ -92,9 +92,25 @@ def detect_cv_signals(text: str, preferences: dict[str, object]) -> CVSignals:
     )
 
 
+def cv_search_parameters(text: str, preferences: dict[str, object]) -> dict[str, list[str]]:
+    signals = detect_cv_signals(text, preferences)
+    return {
+        "target_roles": _string_values(preferences.get("target_roles", ())),
+        "primary_keywords": list(signals.primary_matches),
+        "bonus_keywords": list(signals.bonus_matches),
+        "hard_skip_keywords": _string_values(preferences.get("hard_skip_keywords", ())),
+    }
+
+
 def _matches(text: str, keywords: object) -> tuple[str, ...]:
     normalized = text.casefold()
     return tuple(str(keyword) for keyword in keywords or () if str(keyword).casefold() in normalized)
+
+
+def _string_values(values: object) -> list[str]:
+    if not isinstance(values, (list, tuple)):
+        return []
+    return [str(value) for value in values if str(value).strip()]
 
 
 def _readable_score(text: str) -> int:

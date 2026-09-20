@@ -7,6 +7,7 @@ from docx import Document
 
 from job_hunter.cv_parser import (
     CVPage,
+    cv_search_parameters,
     detect_cv_signals,
     extract_cv_text,
     extract_cv_text_from_docx_bytes,
@@ -39,6 +40,26 @@ class CVParserTest(unittest.TestCase):
         self.assertEqual(signals.primary_matches, ("Power BI",))
         self.assertEqual(signals.bonus_matches, ("Python",))
         self.assertEqual(signals.total_matches, 2)
+
+    def test_cv_search_parameters_use_profile_roles_and_cv_skill_evidence(self):
+        preferences = {
+            "target_roles": ["Data Analyst", "BI Developer"],
+            "primary_keywords": ["Power BI", "SSRS", "BigQuery"],
+            "bonus_keywords": ["Python", "Docker", "Airflow"],
+            "hard_skip_keywords": ["local applicant only", "mandarin mandatory"],
+        }
+
+        parameters = cv_search_parameters(
+            "Built Power BI dashboards with Python scripts.", preferences
+        )
+
+        self.assertEqual(parameters["target_roles"], ["Data Analyst", "BI Developer"])
+        self.assertEqual(parameters["primary_keywords"], ["Power BI"])
+        self.assertEqual(parameters["bonus_keywords"], ["Python"])
+        self.assertEqual(
+            parameters["hard_skip_keywords"],
+            ["local applicant only", "mandarin mandatory"],
+        )
 
     def test_cv_store_saves_and_loads_extracted_text(self):
         with tempfile.TemporaryDirectory() as tmpdir:

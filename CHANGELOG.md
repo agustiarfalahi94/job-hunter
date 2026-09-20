@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.18.4 - 2026-09-20
+
+### Added
+
+- Auto-merge configured target roles and hard-skip rules plus supported primary/bonus skills detected in a saved CV when CV-based mode is selected.
+- Persist an applied-CV fingerprint with signed-in account settings so later manual edits remain authoritative across page changes and app restarts.
+- Explain required versus optional empty search fields in the app and user guide.
+
+### Changed
+
+- Keep criteria-based mode empty by default and leave location/platform/company source selection entirely under user control.
+- Clear the applied-CV fingerprint when a saved CV is removed, allowing a later saved CV to initialize criteria once again.
+
+### Tests
+
+- Cover one-time CV parameter application, criteria-mode isolation, account restart persistence, malformed fingerprints, and backward-compatible snapshots.
+
 ## 1.18.3 - 2026-09-20
 
 - Add credit-aware fallback pagination for standard Google responses only: a full ten-result page with no pagination field may advance by ten up to offset forty.

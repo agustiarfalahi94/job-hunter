@@ -13,6 +13,7 @@ SETTINGS = {
     "bonus_keywords": ["Scrum"], "hard_skip_keywords": ["AZURE"],
     "search_location": ["Kuala Lumpur", "Jakarta"], "search_platforms": ["Indeed"],
     "company_sources": ["Deloitte"], "posting_age": "Any time", "application_filters": [],
+    "cv_profile_digest": "a" * 64,
 }
 
 
@@ -75,6 +76,7 @@ class AccountSnapshotTest(unittest.TestCase):
             lambda raw: raw["jobs"].append(raw["jobs"][0]),
             lambda raw: raw["cv"].update(content="not-base64"),
             lambda raw: raw["settings"].update(hard_skip_keywords="azure"),
+            lambda raw: raw["settings"].update(cv_profile_digest="not-a-digest"),
         ):
             raw = json.loads(encode_snapshot(OWNER, private_workspace(), SETTINGS, "CV-based search"))
             mutate(raw)
@@ -86,6 +88,7 @@ class AccountSnapshotTest(unittest.TestCase):
         self.assertIsNone(restored.workspace.cv)
         self.assertEqual(restored.workspace.list_jobs(), [])
         self.assertEqual(restored.settings["target_roles"], [])
+        self.assertEqual(restored.settings["cv_profile_digest"], "")
         with self.assertRaises(SnapshotError):
             decode_snapshot(OWNER, "x" * (12 * 1024 * 1024 + 1))
 

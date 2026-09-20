@@ -17,11 +17,11 @@ class ReleaseDocumentationTest(unittest.TestCase):
         self.assertTrue(Path("docs/ACCOUNT_SETUP.md").is_file())
 
     def test_release_version_is_consistent(self):
-        self.assertIn('version = "1.18.3"', Path("pyproject.toml").read_text())
-        self.assertIn("v1.18.3", Path("README.md").read_text())
-        self.assertIn("v1.18.3", Path("src/job_hunter/__init__.py").read_text())
-        self.assertIn("v1.18.3", Path("AGENTS.md").read_text())
-        self.assertIn("v1.18.3", Path("docs/ARCHITECTURE.md").read_text())
+        self.assertIn('version = "1.18.4"', Path("pyproject.toml").read_text())
+        self.assertIn("v1.18.4", Path("README.md").read_text())
+        self.assertIn("v1.18.4", Path("src/job_hunter/__init__.py").read_text())
+        self.assertIn("v1.18.4", Path("AGENTS.md").read_text())
+        self.assertIn("v1.18.4", Path("docs/ARCHITECTURE.md").read_text())
 
     def test_readme_documents_modes_privacy_and_stop_limit(self):
         readme = Path("README.md").read_text()
@@ -37,6 +37,8 @@ class ReleaseDocumentationTest(unittest.TestCase):
             self.assertIn(phrase, readme)
         self.assertNotIn("Strong-match goal", readme)
         self.assertNotIn("Maximum jobs in one session", readme)
+        self.assertIn("an empty platform selection does not mean all platforms", readme)
+        self.assertIn("CV-derived selections", readme)
 
     def test_example_secret_keys_are_blank(self):
         secrets = Path(".streamlit/secrets.example.toml").read_text()

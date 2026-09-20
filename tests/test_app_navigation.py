@@ -32,18 +32,61 @@ class AppNavigationTest(unittest.TestCase):
             self.assertEqual(widget.value, [], widget.label)
         self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location").value, [])
 
-    def test_saved_cv_does_not_populate_fresh_search_criteria(self):
+    def test_saved_cv_populates_cv_mode_search_criteria_once(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
         app_test = AppTest.from_file(str(app_path))
         workspace = SessionWorkspace()
-        workspace.save_cv("test.docx", b"synthetic", "Power BI SQL Azure experience")
+        workspace.save_cv("test.docx", b"synthetic", "Power BI and Python experience")
         app_test.session_state[WORKSPACE_KEY] = workspace
         app_test.session_state["search_mode"] = "CV-based search"
         app_test.run(timeout=10)
         app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+        self.assertIn(
+            "Data Analyst",
+            next(widget for widget in app_test.multiselect if widget.label == "Target job titles").value,
+        )
+        self.assertEqual(
+            next(widget for widget in app_test.multiselect if widget.label == "Required description keywords").value,
+            ["Power BI"],
+        )
+        self.assertIn(
+            "Python",
+            next(widget for widget in app_test.multiselect if widget.label == "Bonus keywords").value,
+        )
+        self.assertIn(
+            "locals/malaysian only",
+            next(widget for widget in app_test.multiselect if widget.label == "Hard skip keywords").value,
+        )
+        self.assertEqual(
+            next(widget for widget in app_test.multiselect if widget.label == "Location").value,
+            [],
+        )
+        self.assertEqual(
+            next(widget for widget in app_test.multiselect if widget.label == "Platforms to search").value,
+            [],
+        )
+
+        primary = next(
+            widget for widget in app_test.multiselect
+            if widget.label == "Required description keywords"
+        )
+        primary.set_value([]).run(timeout=10)
+        self.assertEqual(
+            next(widget for widget in app_test.multiselect if widget.label == "Required description keywords").value,
+            [],
+        )
+        self.assertIsNotNone(workspace.cv)
+
+    def test_saved_cv_does_not_populate_criteria_mode(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path))
+        workspace = SessionWorkspace()
+        workspace.save_cv("test.docx", b"synthetic", "Power BI and Python experience")
+        app_test.session_state[WORKSPACE_KEY] = workspace
+        app_test.run(timeout=10)
+
         for widget in app_test.multiselect:
             self.assertEqual(widget.value, [], widget.label)
-        self.assertIsNotNone(workspace.cv)
 
     def test_company_lookup_success_is_cached_by_company_and_region(self):
         from job_hunter.company_lookup import CompanySite
@@ -98,14 +141,14 @@ class AppNavigationTest(unittest.TestCase):
         self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Date posted").value, "Past week")
         self.assertEqual(len(app_test.exception), 0)
 
-    def test_criteria_suggestions_are_static_not_extracted_from_cv(self):
+    def test_criteria_mode_suggestions_are_static_not_extracted_from_cv(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
         app_test = AppTest.from_file(str(app_path)).run(timeout=10)
         labels = ("Target job titles", "Required description keywords", "Bonus keywords", "Hard skip keywords")
         before = {label: list(next(widget for widget in app_test.multiselect if widget.label == label).options) for label in labels}
         workspace = app_test.session_state[WORKSPACE_KEY]
         workspace.save_cv("synthetic.docx", b"synthetic", "Unique CV skill: CUSTOM-CV-ONLY-SKILL")
-        next(radio for radio in app_test.radio if radio.key == "search_mode").set_value("CV-based search").run(timeout=10)
+        app_test.run(timeout=10)
         for label in labels:
             widget = next(widget for widget in app_test.multiselect if widget.label == label)
             self.assertEqual(list(widget.options), before[label])

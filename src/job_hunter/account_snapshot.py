@@ -87,6 +87,11 @@ def _settings(value: object) -> dict[str, object]:
     if age not in POSTING_AGES:
         raise SnapshotError("Account posting-age setting is invalid.")
     result["posting_age"] = age
+    cv_profile_digest = value.get("cv_profile_digest", "")
+    if (not isinstance(cv_profile_digest, str)
+            or (cv_profile_digest and not re.fullmatch(r"[a-f0-9]{64}", cv_profile_digest))):
+        raise SnapshotError("Account CV search profile fingerprint is invalid.")
+    result["cv_profile_digest"] = cv_profile_digest
     return result
 
 

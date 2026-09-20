@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.18.3 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
+Job Hunter v1.18.4 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
 
 ## What It Does
 
@@ -30,20 +30,20 @@ Without account setup, guest mode remains session-only. Switching to private mod
 Use **Matching mode** in the sidebar:
 
 - **Criteria-based search** uses only the editable titles, primary keywords, bonus keywords, hard skips, and location. Discovery and matching never read or send CV text; private account restore/save can retain the CV separately.
-- **CV-based search** compares each job with both the editable criteria and readable text from the CV saved in the current session.
+- **CV-based search** compares each job with both the editable criteria and readable text from the saved CV. Once per saved CV, it merges configured target roles and hard skips plus primary/bonus skills actually detected in that CV into the selected criteria. It does not replace existing manual selections.
 
 Profile & CV is hidden in Criteria-based mode. Switching modes does not clear a saved CV; it remains available when you switch back. Private accounts restore it across sessions; guests retain it only within the same session.
 
 ### 2. Optional CV
 
-Open **Profile & CV** to upload PDF, DOCX, or best-effort legacy DOC. Click **Save CV**, then **Continue to Search jobs**. A CV can be replaced or removed at any time. Removing it also clears the visible upload selection.
+Open **Profile & CV** to upload PDF, DOCX, or best-effort legacy DOC. Click **Save CV**, then **Continue to Search jobs**. In CV mode, the CV-derived selections are applied on the next render of Search jobs. A CV can be replaced or removed at any time. Removing it also clears the visible upload selection.
 
 In guest mode, CV bytes and extracted text are session-only and disappear when the session resets or the app restarts. In private account mode, Save CV stores both encrypted in the owner's Supabase database; a notice appears before upload. Account CVs must be 5 MB or smaller. Removing a saved CV also removes it from the next saved account snapshot without deleting application history. CVs are never written to the public repository. In CV-based matching, readable CV text is sent to the configured Gemini provider.
 
 ### 3. Search Jobs
 
 1. Open **Search jobs**.
-2. Select or type the title, description, bonus, and hard-skip terms. New sessions start empty: suggestions are not preselected, and saving a CV does not populate criteria. Edited parameters survive page/mode changes and completed searches in this session. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
+2. Select or type the title, description, bonus, and hard-skip terms. Criteria mode starts empty. CV mode performs a one-time merge for each saved CV, then respects any manual additions or removals. Edited parameters survive page/mode changes and completed searches in this session. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
 3. Select one or more areas in **Location**, for example `Kuala Lumpur` OR `Jakarta`, or `Europe` OR `APAC`. Choose `Malaysia` for country-wide search, `ASEAN` for its members, or `Global` for no geographic restriction. Global overrides other areas. Selections persist just like keywords.
 4. Select job platforms and a posting-age limit. Optional **Platform application filters** restrict only their named platform: LinkedIn Easy Apply, Indeed Apply, or Foundit Quick Apply. Other platforms are unaffected. These strict filters require posting-level button/link evidence; inaccessible or unverified quick-apply jobs are skipped with a log reason. They do not submit applications. Leave them empty for widest discovery coverage.
 5. In **Company career sites**, select a preset (its domain is shown), enter a company name such as `Deloitte`, or enter a public HTTPS careers domain. Up to five sites are allowed; company-site job searches require SerpAPI. New company names additionally require Gemini and a selected location. The app searches the web, checks official careers/regional evidence, and shows the confirmed destination plus source links. If verification fails, it explains why rather than guessing; use **Retry company lookup** or enter the known careers domain.
@@ -55,6 +55,8 @@ Stop prevents new discovery, page-fetch, and scoring work after cancellation is 
 
 **Matching rules:** Text matches ignore capitalization: `azure`, `Azure`, and `AZURE` are equivalent. Values within a title/keyword list are alternatives, not an AND checklist. Discovery uses title signals OR description signals. Bonus terms such as Agile OR Scrum can improve scoring when present in a title or description; they do not generate discovery queries or exclude jobs if absent, and more matches can earn more bonus points. Any matched hard-skip term excludes the job. The selected location, sources, and posting-date limit still constrain the search; they are not OR alternatives to keywords.
 
+**Empty fields:** A run requires at least one target title or required description keyword, one location, and one platform or verified company source. Therefore, an empty platform selection does not mean all platforms; it means there is no discovery source and Run stays disabled. Empty bonus keywords, hard skips, company sites, or platform application filters add no restriction. `Global` is the explicit location choice for a worldwide search.
+
 All four fields share session persistence, case-insensitive matching, and OR alternatives within their own list:
 
 | Field | Meaning of OR |
@@ -64,9 +66,9 @@ All four fields share session persistence, case-insensitive matching, and OR alt
 | Bonus keywords | Any listed bonus can add points; bonuses are optional and do not drive discovery. |
 | Hard skip keywords | Any listed restriction match excludes the job; it overrides positive matches. |
 
-**Available suggestions:** These are a static catalog from the project's original search preferences, not terms extracted from a visitor's CV. They intentionally remain available but unselected. Every title/keyword field accepts custom values outside the catalog, and those custom selections persist across page changes just like suggested values. Saving, replacing, or removing a CV does not rewrite the catalog or automatically select criteria.
+**Available suggestions:** These are a static catalog from the project's original search preferences. They remain available without restricting custom values. Criteria mode leaves them unselected. CV mode selects only the configured roles/hard skips and supported skill terms described above; it does not rewrite the catalog.
 
-**Persistence:** Page navigation and completed searches do not reset parameters. Private accounts save and restore parameters, matching mode, CV and job history. Guest parameters are session-only and start empty after session loss or reboot. A new account also starts empty. Date posted defaults to Past month and the session job cap remains 50.
+**Persistence:** Page navigation and completed searches do not reset parameters. Private accounts save and restore parameters, matching mode, the applied-CV fingerprint, CV and job history in the encrypted account snapshot. This prevents CV-derived terms from reappearing after you manually remove them. Replacing the CV allows one new merge. Guest parameters are session-only and are lost after session loss or reboot. A new account starts empty until a CV is saved and CV mode is selected. Date posted defaults to Past month and the session job cap remains 50.
 
 **Company presets and region:** Accenture, HCLTech, Razer, Prudential Malaysia, and Accord Innovations are hand-maintained examples originally requested by the project owner; they are not automatic CV recommendations or live-verified lookup results. New names use [Gemini Google Search grounding](https://ai.google.dev/gemini-api/docs/generate-content/google-search), not model memory. Malaysian city selections look up careers serving Malaysia; other typed locations require evidence for that location. Verification may fail on blocked/JavaScript-only sites or ambiguous company names. Explicit domains remain user-provided sources, not independently verified regional destinations. Successful and failed lookups are cached per session, so page changes do not repeatedly call Gemini. Grounded lookups have separate Google Search usage/quota and may incur charges under your Google plan; they do not consume SerpAPI discovery requests.
 

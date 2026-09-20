@@ -29,7 +29,7 @@ For local sign-in, also register `http://localhost:8501/oauth2callback` in the s
 
 - Signed-out users see Google sign-in, not CV/search/history controls. A Google account outside `allowed_emails` cannot access the workspace.
 - Sign in with the allowed account. A new account has empty criteria and no CV. Upload a synthetic, readable PDF/DOCX before testing your real CV; check the storage notice and account save status.
-- Edit custom criteria, navigate to the queue and back, and confirm they remain. Switch modes: Criteria-based hides Profile & CV without deleting its saved contents.
+- In CV mode, confirm supported CV skills and configured roles/rules appear in Search jobs. Edit or remove one, navigate to the queue and back, reboot, and confirm the manual result remains rather than being auto-filled again. Switch modes: Criteria-based hides Profile & CV without deleting its saved contents.
 - Search, review a job, manually record Applied, and correct posting date/expiry. Check that saving succeeds. Opening Apply alone must not record Applied.
 - Sign out, sign in again, then reboot the app and sign in again. Confirm CV, criteria/mode, job records, manual Applied timestamp/evidence and posting corrections restore. These are the real durability tests; mocked tests are not a substitute.
 - Replace and remove the CV; after another sign-in, removal must persist while application history remains.
@@ -42,7 +42,7 @@ Until this checklist passes, real Google login and provider-backed persistence a
 
 The allowlist restricts access by verified Google email; stable Google issuer/subject determines the actual data owner. Email changes do not create a new owner. OAuth identity expiry requires fresh sign-in even if Streamlit's browser cookie remains present.
 
-CV bytes, extracted text, criteria and job/application records are encrypted together with Fernet before the server sends a snapshot to Supabase. Supabase receives ciphertext, an opaque hashed owner ID, revision and update time. Encryption protects backend records, not a compromised app server or stolen deployment key. CV-based Gemini matching separately sends readable CV text to Gemini; criteria-based matching does not. Provider tokens/cookies, API keys, caches and unfinished searches are not saved.
+CV bytes, extracted text, criteria, the non-reversible applied-CV fingerprint, and job/application records are encrypted together with Fernet before the server sends a snapshot to Supabase. Supabase receives ciphertext, an opaque hashed owner ID, revision and update time. Encryption protects backend records, not a compromised app server or stolen deployment key. CV-based Gemini matching separately sends readable CV text to Gemini; criteria-based matching does not. Provider tokens/cookies, API keys, caches and unfinished searches are not saved.
 
 Limits: account CVs up to 5 MB, plaintext snapshot up to 12 MB, 5,000 jobs and up to 100 values per saved list. These do not increase the 50-job search ceiling. Exceeding limits shows Not saved; reduce data before assuming it is durable. No guest session is automatically imported when account mode is enabled, and old guest data is not recoverable after a reset.
 

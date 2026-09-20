@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 from datetime import date
 from pathlib import Path
@@ -16,7 +17,7 @@ from job_hunter.application_links import (
     application_destination_hostname,
     application_destination_url,
 )
-from job_hunter.cv_parser import detect_cv_signals, extract_cv_text
+from job_hunter.cv_parser import cv_search_parameters, detect_cv_signals, extract_cv_text
 from job_hunter.cv_store import format_size
 from job_hunter.company_lookup import CompanyLookupError, CompanySite, lookup_company_site
 from job_hunter.locations import company_region, fetch_malaysia_cities, is_global, location_options
@@ -74,6 +75,7 @@ def main() -> None:
     workspace = get_session_workspace(st.session_state)
     preferences = load_preferences(PREFERENCES_PATH)
     provider_config = load_search_provider_config(st.secrets)
+    _apply_cv_search_parameters(workspace, preferences)
 
     _inject_table_styles()
     _render_header(private_account)
@@ -335,6 +337,11 @@ def _render_search_jobs(
             "the five-minute scheduling limit is reached, or you press Stop."
         )
         st.caption(provider_status_label(provider_config.has_api_search))
+        st.caption(
+            "Required to run: a target title or required description keyword, a location, "
+            "and a platform or verified company source. Empty optional fields add no extra "
+            "restriction; an empty platform list does not search every platform."
+        )
 
         criteria = SearchCriteria(
             title_terms=tuple(str(value) for value in title_terms),
@@ -666,13 +673,43 @@ def _search_settings() -> dict[str, object]:
             "target_roles": [], "primary_keywords": [], "bonus_keywords": [],
             "hard_skip_keywords": [], "search_platforms": [], "company_sources": [],
             "search_location": [], "posting_age": "Past month", "application_filters": [],
+            "cv_profile_digest": "",
         }
         st.session_state["search_settings"] = settings
     settings.setdefault("application_filters", [])
+    settings.setdefault("cv_profile_digest", "")
     location = settings.get("search_location")
     if not isinstance(location, list):
         settings["search_location"] = [location] if isinstance(location, str) and location else []
     return settings
+
+
+def _apply_cv_search_parameters(
+    workspace: SessionWorkspace, preferences: dict[str, object]
+) -> bool:
+    if st.session_state.get("search_mode") != SEARCH_MODES[1] or workspace.cv is None:
+        return False
+    cv_text = workspace.cv_text.strip()
+    if not cv_text:
+        return False
+    digest = hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
+    settings = _search_settings()
+    if settings.get("cv_profile_digest") == digest:
+        return False
+    for field, suggested in cv_search_parameters(cv_text, preferences).items():
+        settings[field] = _merge_unique(_string_list(settings.get(field)), suggested)
+    settings["cv_profile_digest"] = digest
+    return True
+
+
+def _merge_unique(existing: list[str], suggested: list[str]) -> list[str]:
+    result = list(existing)
+    seen = {value.casefold() for value in result}
+    for value in suggested:
+        if value.casefold() not in seen:
+            result.append(value)
+            seen.add(value.casefold())
+    return result
 
 
 def _save_search_setting(field: str) -> None:
@@ -793,6 +830,7 @@ def _cv_upload_key(state: MutableMapping[str, object]) -> str:
 def _remove_saved_cv(workspace: SessionWorkspace) -> None:
     current_key = _cv_upload_key(st.session_state)
     workspace.remove_cv()
+    _search_settings()["cv_profile_digest"] = ""
     account_ui.persist_account(st.session_state)
     st.session_state.pop(current_key, None)
     revision = st.session_state.get("cv_upload_revision", 0)

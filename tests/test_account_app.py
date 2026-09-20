@@ -130,6 +130,13 @@ class AccountAppTest(unittest.TestCase):
                 self.assertEqual(len(first.exception), 0)
                 first.session_state[WORKSPACE_KEY] = private_workspace()
                 first.run(timeout=10)
+                next(widget for widget in first.radio if widget.label == "Matching mode").set_value(
+                    "CV-based search"
+                ).run(timeout=10)
+                self.assertEqual(
+                    next(widget for widget in first.multiselect if widget.label == "Required description keywords").value,
+                    ["Power BI"],
+                )
                 next(widget for widget in first.multiselect if widget.label == "Hard skip keywords").set_value(["custom exclusion"]).run(timeout=10)
                 first.segmented_control[0].set_value("Job queue").run(timeout=10)
                 first.segmented_control[0].set_value("Search jobs").run(timeout=10)
@@ -141,7 +148,9 @@ class AccountAppTest(unittest.TestCase):
                 self.assertIsNotNone(workspace.cv)
                 self.assertEqual(workspace.list_jobs()[0].application_status, "applied")
                 self.assertEqual(second.session_state["search_settings"]["hard_skip_keywords"], ["custom exclusion"])
-                self.assertNotIn("Profile & CV", second.segmented_control[0].options)
+                self.assertEqual(second.session_state["search_settings"]["primary_keywords"], ["Power BI"])
+                self.assertRegex(second.session_state["search_settings"]["cv_profile_digest"], r"^[a-f0-9]{64}$")
+                self.assertIn("Profile & CV", second.segmented_control[0].options)
                 self.assertNotIn("Synthetic experience", str(rpc.rows))
 
     def test_real_queue_edits_and_cv_removal_persist_without_history_loss(self):

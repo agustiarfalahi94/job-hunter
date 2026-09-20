@@ -12,7 +12,9 @@ With optional v1.18.0 private accounts enabled, authenticate with the allowliste
 2. Optionally save a PDF, DOCX, or best-effort DOC CV in the current session.
 3. Edit title, description, bonus, semantic hard-skip, location, source, and freshness criteria.
 
-New guest sessions/accounts have empty selected criteria and no selected location. Returning private accounts restore their saved settings. The suggestion catalogs are not automatically applied after CV upload. User edits are kept across page/mode changes and completed searches; guests start fresh after session loss, while configured private accounts restore after reboot. Date posted retains Past month protection.
+New guest sessions/accounts have empty selected criteria and no selected location. Returning private accounts restore their saved settings. Criteria mode remains empty until edited. CV mode merges configured roles/hard skips and detected supported CV skills once per saved CV without overwriting existing selections; later manual edits remain authoritative. Location and sources always remain user choices. Guests start fresh after session loss, while configured private accounts restore settings and the applied-CV fingerprint after reboot. Date posted retains Past month protection.
+
+A run requires at least one title or required-description signal, one location, and one platform or verified company source. Empty optional lists add no restriction. Empty platforms mean no source, not every source.
 
 Location supports persistent OR selections across cities, countries, ASEAN, and an explicitly documented APAC country/economy preset. Country/region membership uses observed posting geography, not query hints. Regional searches remain bounded and are not exhaustive. Company-name verification has a five company/region pair ceiling in addition to five resolved sites. Fifty unique candidates is a pre-scoring ceiling, not the fifty most suitable jobs online. See [Geographic Scopes](LOCATION_SCOPES.md).
 
@@ -44,7 +46,7 @@ Company source presets display their domains and start unselected. Unknown compa
 
 ## Not Included
 
-- Durable hosted user accounts or cross-session history.
+- Public multi-user profiles or automatic job-board history synchronization.
 - Guaranteed access to every public job page or complete search coverage.
 - Automatic third-party application-history lookup.
 - Login automation, CAPTCHA bypass, credential storage, or auto-submit.
