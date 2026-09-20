@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.18.5 - 2026-09-20
+
+### Added
+
+- Mark Location, Platforms to search, and Date posted with red required-field asterisks.
+- Support bounded broad location/platform discovery when both title and required-description terms are empty.
+
+### Changed
+
+- Make every title and keyword field optional while requiring at least one selected platform; optional company career sites no longer satisfy the platform requirement by themselves.
+- Explain broad-search scoring limitations and required/optional field behavior in the app and documentation.
+
+### Tests
+
+- Cover broad public, direct LinkedIn, and SerpAPI query plans plus the revised readiness contract and required labels.
+
 ## 1.18.4 - 2026-09-20
 
 ### Added

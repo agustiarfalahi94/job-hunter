@@ -17,6 +17,20 @@ class StreamlitSearchContractTest(unittest.TestCase):
             app._search_is_ready("Criteria-based search", workspace, description_only)[0]
         )
 
+    def test_search_readiness_allows_broad_platform_search_without_keyword_signals(self):
+        workspace = SessionWorkspace()
+        broad = SearchCriteria((), (), "Kuala Lumpur", ("Indeed",))
+        company_only = SearchCriteria(
+            (), (), "Kuala Lumpur", (), custom_domains=("careers.example.com",)
+        )
+
+        self.assertTrue(app._search_is_ready("Criteria-based search", workspace, broad)[0])
+        ready, reason = app._search_is_ready(
+            "Criteria-based search", workspace, company_only
+        )
+        self.assertFalse(ready)
+        self.assertIn("platform", reason.casefold())
+
     def test_cv_mode_requires_readable_session_cv(self):
         workspace = SessionWorkspace()
         criteria = SearchCriteria(("BI Analyst",), (), "Kuala Lumpur", ("LinkedIn",))
@@ -34,6 +48,9 @@ class StreamlitSearchContractTest(unittest.TestCase):
         self.assertNotIn('"Maximum jobs in one session"', source)
         self.assertIn('key="stop_search"', source)
         self.assertIn("resolve_company_sources", source)
+        self.assertIn('"Location :red[*]"', source)
+        self.assertIn('"Platforms to search :red[*]"', source)
+        self.assertIn('"Date posted :red[*]"', source)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,34 @@ from job_hunter.search import (
 
 
 class SearchDiscoveryTest(unittest.TestCase):
+    def test_empty_title_and_description_build_broad_location_queries(self):
+        criteria = SearchCriteria(
+            title_terms=(),
+            description_terms=(),
+            location="Kuala Lumpur",
+            platforms=("LinkedIn", "Indeed"),
+            posted_within_days=7,
+        )
+
+        web_queries = build_search_queries(criteria)
+        direct_queries = build_direct_platform_queries(criteria)
+        serpapi_queries = build_serpapi_queries(criteria, "secret")
+
+        self.assertEqual(
+            {(query.platform, query.signal) for query in web_queries},
+            {("LinkedIn", "broad"), ("Indeed", "broad")},
+        )
+        self.assertEqual(
+            [(query.platform, query.signal) for query in direct_queries],
+            [("LinkedIn", "broad")],
+        )
+        self.assertEqual(
+            {(query.platform, query.signal) for query in serpapi_queries},
+            {("LinkedIn", "broad"), ("Indeed", "broad")},
+        )
+        self.assertTrue(all('"Kuala Lumpur"' in query.query for query in web_queries))
+        self.assertTrue(all("Data Analyst" not in query.query for query in web_queries))
+
     def test_custom_source_results_must_stay_on_the_selected_host(self):
         payload = """
         {"organic_results": [

@@ -186,12 +186,14 @@ def _bounded_signal_queries(
 ) -> list[PlatformQuery]:
     first_pass: list[PlatformQuery] = []
     second_pass: list[PlatformQuery] = []
-    signals = (
+    signals = [
         ("title", _quoted_or(criteria.title_terms)),
         ("description", _quoted_or(criteria.description_terms)),
-    )
+    ]
+    if not any(terms for _, terms in signals):
+        signals = [("broad", "")]
     for signal_index, (signal, terms) in enumerate(signals):
-        if not terms:
+        if signal != "broad" and not terms:
             continue
         destination = first_pass if signal_index == 0 else second_pass
         for platform, site_filter in sources:
@@ -222,13 +224,16 @@ def build_direct_platform_queries(criteria: SearchCriteria) -> list[PlatformQuer
     queries = []
     if "LinkedIn" not in criteria.platforms:
         return queries
+    signals = [
+        ("title", criteria.title_terms),
+        ("description", criteria.description_terms),
+    ]
+    if not any(terms for _, terms in signals):
+        signals = [("broad", ())]
     for location in location_search_terms(criteria.location_targets) or ("",):
-        for signal, terms in (
-            ("title", criteria.title_terms),
-            ("description", criteria.description_terms),
-        ):
+        for signal, terms in signals:
             keywords = _quoted_or(terms)
-            if not keywords:
+            if signal != "broad" and not keywords:
                 continue
             queries.append(
                 PlatformQuery(

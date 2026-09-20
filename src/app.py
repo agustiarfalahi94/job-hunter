@@ -286,14 +286,14 @@ def _render_search_jobs(
             help="Matching titles, descriptions, or page text are excluded before scoring.",
         )
         locations = st.multiselect(
-            "Location",
+            "Location :red[*]",
             _setting_options("search_location", _location_options(_cached_malaysia_cities())),
             accept_new_options=True,
             **_setting_widget("search_location"),
             help="Choose cities, countries, Europe, ASEAN, APAC, or Global. Any selected area can match (OR). Global removes the geographic restriction.",
         )
         platforms = st.multiselect(
-            "Platforms to search", SOURCES, **_setting_widget("search_platforms")
+            "Platforms to search :red[*]", SOURCES, **_setting_widget("search_platforms")
         )
         application_filters = st.multiselect(
             "Platform application filters",
@@ -314,7 +314,7 @@ def _render_search_jobs(
             ),
         )
         posting_age = st.selectbox(
-            "Date posted", tuple(POSTING_AGE_OPTIONS), **_setting_widget("posting_age")
+            "Date posted :red[*]", tuple(POSTING_AGE_OPTIONS), **_setting_widget("posting_age")
         )
         custom_sources, source_errors = resolve_company_sources(
             company_values, has_api_search=provider_config.has_api_search,
@@ -338,9 +338,9 @@ def _render_search_jobs(
         )
         st.caption(provider_status_label(provider_config.has_api_search))
         st.caption(
-            "Required to run: a target title or required description keyword, a location, "
-            "and a platform or verified company source. Empty optional fields add no extra "
-            "restriction; an empty platform list does not search every platform."
+            "Required to run: Location, Platforms to search, and Date posted. Empty title "
+            "and description fields run a broader search; other empty optional fields add "
+            "no extra restriction."
         )
 
         criteria = SearchCriteria(
@@ -579,12 +579,10 @@ def _search_is_ready(
 ) -> tuple[bool, str]:
     if mode == "CV-based search" and not workspace.cv_text.strip():
         return False, "Upload a readable CV before using CV-based search."
-    if not criteria.title_terms and not criteria.description_terms:
-        return False, "Add at least one title or description keyword."
     if not criteria.location_targets:
         return False, "Choose or type a location."
-    if not criteria.platforms and not criteria.custom_domains:
-        return False, "Select at least one platform or valid custom source."
+    if not criteria.platforms:
+        return False, "Select at least one platform."
     return True, ""
 
 

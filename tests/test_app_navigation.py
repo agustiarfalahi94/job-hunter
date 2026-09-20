@@ -30,7 +30,7 @@ class AppNavigationTest(unittest.TestCase):
         app_test = AppTest.from_file(str(app_path)).run(timeout=10)
         for widget in app_test.multiselect:
             self.assertEqual(widget.value, [], widget.label)
-        self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location").value, [])
+        self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location :red[*]").value, [])
 
     def test_saved_cv_populates_cv_mode_search_criteria_once(self):
         app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
@@ -58,11 +58,11 @@ class AppNavigationTest(unittest.TestCase):
             next(widget for widget in app_test.multiselect if widget.label == "Hard skip keywords").value,
         )
         self.assertEqual(
-            next(widget for widget in app_test.multiselect if widget.label == "Location").value,
+            next(widget for widget in app_test.multiselect if widget.label == "Location :red[*]").value,
             [],
         )
         self.assertEqual(
-            next(widget for widget in app_test.multiselect if widget.label == "Platforms to search").value,
+            next(widget for widget in app_test.multiselect if widget.label == "Platforms to search :red[*]").value,
             [],
         )
 
@@ -117,14 +117,14 @@ class AppNavigationTest(unittest.TestCase):
             "Required description keywords": ["custom reporting suite", "CUSTOM DATA PLATFORM"],
             "Bonus keywords": ["custom workflow", "CUSTOM COLLABORATION"],
             "Hard skip keywords": ["azure", "CUSTOM EXCLUSION"],
-            "Platforms to search": ["LinkedIn"],
+            "Platforms to search :red[*]": ["LinkedIn"],
             "Company career sites": ["Razer"],
-            "Location": ["Petaling Jaya", "Jakarta"],
+            "Location :red[*]": ["Petaling Jaya", "Jakarta"],
             "Platform application filters": ["Indeed Apply"],
         }
         for label, selected in values.items():
             next(widget for widget in app_test.multiselect if widget.label == label).set_value(selected).run(timeout=10)
-        next(widget for widget in app_test.selectbox if widget.label == "Date posted").set_value("Past week").run(timeout=10)
+        next(widget for widget in app_test.selectbox if widget.label == "Date posted :red[*]").set_value("Past week").run(timeout=10)
         next(widget for widget in app_test.multiselect if widget.label == "Company career sites").set_value([]).run(timeout=10)
         controller = SearchRunController(discovery_fetcher=lambda _: "", page_fetcher=lambda _: "")
         app_test.session_state["search_controller"] = controller
@@ -137,8 +137,8 @@ class AppNavigationTest(unittest.TestCase):
         app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
         for label, selected in values.items():
             self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == label).value, selected, label)
-        self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location").value, ["Petaling Jaya", "Jakarta"])
-        self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Date posted").value, "Past week")
+        self.assertEqual(next(widget for widget in app_test.multiselect if widget.label == "Location :red[*]").value, ["Petaling Jaya", "Jakarta"])
+        self.assertEqual(next(widget for widget in app_test.selectbox if widget.label == "Date posted :red[*]").value, "Past week")
         self.assertEqual(len(app_test.exception), 0)
 
     def test_criteria_mode_suggestions_are_static_not_extracted_from_cv(self):
@@ -228,8 +228,8 @@ class AppNavigationTest(unittest.TestCase):
         )
         self.assertTrue(search_button.disabled)
         next(widget for widget in app_test.multiselect if widget.label == "Target job titles").set_value(["Data Analyst"]).run(timeout=10)
-        next(widget for widget in app_test.multiselect if widget.label == "Platforms to search").set_value(["LinkedIn"]).run(timeout=10)
-        next(widget for widget in app_test.multiselect if widget.label == "Location").set_value(["Kuala Lumpur"]).run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Platforms to search :red[*]").set_value(["LinkedIn"]).run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Location :red[*]").set_value(["Kuala Lumpur"]).run(timeout=10)
         self.assertFalse(next(button for button in app_test.button if button.label == "Run search and score jobs").disabled)
         stop_button = next(button for button in app_test.button if button.label == "Stop search")
         self.assertTrue(stop_button.disabled)

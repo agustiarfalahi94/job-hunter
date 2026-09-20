@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.18.4 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
+Job Hunter v1.18.5 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
 
 ## What It Does
 
@@ -43,9 +43,9 @@ In guest mode, CV bytes and extracted text are session-only and disappear when t
 ### 3. Search Jobs
 
 1. Open **Search jobs**.
-2. Select or type the title, description, bonus, and hard-skip terms. Criteria mode starts empty. CV mode performs a one-time merge for each saved CV, then respects any manual additions or removals. Edited parameters survive page/mode changes and completed searches in this session. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
+2. Optionally select or type title, description, bonus, and hard-skip terms. Criteria mode starts empty. CV mode performs a one-time merge for each saved CV, then respects any manual additions or removals. Edited parameters survive page/mode changes and completed searches in this session. Hard skips use normalized intent matching for supported eligibility and language requirements, so wording does not need to be identical.
 3. Select one or more areas in **Location**, for example `Kuala Lumpur` OR `Jakarta`, or `Europe` OR `APAC`. Choose `Malaysia` for country-wide search, `ASEAN` for its members, or `Global` for no geographic restriction. Global overrides other areas. Selections persist just like keywords.
-4. Select job platforms and a posting-age limit. Optional **Platform application filters** restrict only their named platform: LinkedIn Easy Apply, Indeed Apply, or Foundit Quick Apply. Other platforms are unaffected. These strict filters require posting-level button/link evidence; inaccessible or unverified quick-apply jobs are skipped with a log reason. They do not submit applications. Leave them empty for widest discovery coverage.
+4. Select at least one job platform and a **Date posted** option. Optional **Platform application filters** restrict only their named platform: LinkedIn Easy Apply, Indeed Apply, or Foundit Quick Apply. Other platforms are unaffected. These strict filters require posting-level button/link evidence; inaccessible or unverified quick-apply jobs are skipped with a log reason. They do not submit applications. Leave them empty for widest discovery coverage.
 5. In **Company career sites**, select a preset (its domain is shown), enter a company name such as `Deloitte`, or enter a public HTTPS careers domain. Up to five sites are allowed; company-site job searches require SerpAPI. New company names additionally require Gemini and a selected location. The app searches the web, checks official careers/regional evidence, and shows the confirmed destination plus source links. If verification fails, it explains why rather than guessing; use **Retry company lookup** or enter the known careers domain.
 6. Click **Run search and score jobs**.
 7. Follow the progress bar and activity log. Fifty is the maximum, not a required result count; a completed search fills the bar even when sources return fewer jobs and reports the number actually checked.
@@ -53,9 +53,11 @@ In guest mode, CV bytes and extracted text are session-only and disappear when t
 
 Stop prevents new discovery, page-fetch, and scoring work after cancellation is observed. An in-flight network or Gemini request has its own timeout and may take a short time to settle; completed results are kept.
 
-**Matching rules:** Text matches ignore capitalization: `azure`, `Azure`, and `AZURE` are equivalent. Values within a title/keyword list are alternatives, not an AND checklist. Discovery uses title signals OR description signals. Bonus terms such as Agile OR Scrum can improve scoring when present in a title or description; they do not generate discovery queries or exclude jobs if absent, and more matches can earn more bonus points. Any matched hard-skip term excludes the job. The selected location, sources, and posting-date limit still constrain the search; they are not OR alternatives to keywords.
+**Matching rules:** Text matches ignore capitalization: `azure`, `Azure`, and `AZURE` are equivalent. Values within a title/keyword list are alternatives, not an AND checklist. Discovery uses title signals OR description signals, or broad platform/location discovery when both are empty. Bonus terms such as Agile OR Scrum can improve scoring when present in a title or description; they do not generate discovery queries or exclude jobs if absent, and more matches can earn more bonus points. Any matched hard-skip term excludes the job. The selected location, sources, and posting-date limit still constrain the search; they are not OR alternatives to keywords.
 
-**Empty fields:** A run requires at least one target title or required description keyword, one location, and one platform or verified company source. Therefore, an empty platform selection does not mean all platforms; it means there is no discovery source and Run stays disabled. Empty bonus keywords, hard skips, company sites, or platform application filters add no restriction. `Global` is the explicit location choice for a worldwide search.
+**Required fields:** Red asterisks mark the only three required selections: Location, Platforms to search, and Date posted. An empty platform selection does not mean all platforms; Run stays disabled. `Global` is the explicit location choice for a worldwide search, and `Any time` is a valid Date posted choice.
+
+**Optional fields:** Target titles, required-description keywords, bonuses, hard skips, company sites, and platform application filters may all be empty. When both title and description are empty, the app sends one broad location query to each selected platform within the same request and 50-candidate limits. This can uncover unfamiliar titles, but criteria-only suitability scores have fewer personal-fit signals; CV mode can still use the saved CV. Other empty optional fields add no restriction.
 
 All four fields share session persistence, case-insensitive matching, and OR alternatives within their own list:
 

@@ -16,6 +16,8 @@ Location values are also OR alternatives: cities, ISO countries, ASEAN, or the d
 
 Persistence, case-insensitive comparison, and OR alternatives apply to every one of Target job titles, Required description keywords, Bonus keywords, and Hard skip keywords, including custom typed values. Positive title/primary signals can discover or strengthen a match, any bonus can add points without being mandatory, and any hard skip overrides positive signals. Direct LinkedIn queries use the same quoted OR alternatives as web/SerpAPI queries. External sources may still limit or reinterpret queries; the app's deterministic matching and Gemini instructions preserve these rules.
 
+All four text fields are optional. With no title or required-description signals, discovery runs a broad selected-platform/location query. Criteria-only scoring then has fewer personal-fit signals and may produce weak results; CV mode still supplies CV evidence. Location, platform, and Date posted remain required search controls.
+
 Available dropdown suggestions are a static catalog from the project's original preferences. Criteria mode leaves them unselected; CV mode selects the evidence-backed subset and configured role/rule values without changing the catalog. All four fields accept custom terms; the catalog is not an allowed-values restriction.
 
 ## Criteria

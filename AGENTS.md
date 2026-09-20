@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.18.4 is a public Streamlit job-discovery and matching app with optional private Google accounts. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.18.5 is a public Streamlit job-discovery and matching app with optional private Google accounts. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
@@ -25,6 +25,7 @@ Job Hunter v1.18.4 is a public Streamlit job-discovery and matching app with opt
 17. Accounts are off by default; enabled invalid setup fails closed. Use native Streamlit Google claims, verified-email allowlists and stable issuer/subject ownership, never client-supplied ownership. Keep Supabase secret keys and encryption keys server-only; service credentials bypass RLS.
 18. Never overwrite after failed account load or conflicting revision. Clear data using revision-aware tombstones. Save accepted worker results on the Streamlit thread; sign-out, denial and account switching cancel work and clear all private state. Caches, controllers, cookies and provider tokens are not persisted. Confirm destructive actions, show failed saves honestly, and retain encryption keys privately.
 19. Hosted SerpAPI pagination shares the twelve-request ceiling and processes initial source/signal queries first. Prefer validated advancing offsets from official continuation links; rebuild original server URL/parameters, never follow provider-supplied destinations or replacements. For standard Google results only, a full ten-result page with the pagination field entirely absent may advance by ten up to offset forty. A present pagination field without a valid next link, a short page, a structured Jobs payload, a repeated page, or an empty page must stop. Indeed result-title separators do not establish an employer; preserve complete titles and recognized trailing location evidence.
+20. Web search requires Location, Platforms to search, and Date posted. Title and description signals are optional; when both are empty, build one bounded broad signal pass for selected sources. Existing direct LinkedIn location expansion remains bounded. Company sites are optional additions and do not replace the selected-platform requirement.
 
 ## Git Flow
 
