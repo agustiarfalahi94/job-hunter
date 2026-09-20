@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.18.2 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
+Job Hunter v1.18.3 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
 
 ## What It Does
 
@@ -98,7 +98,7 @@ Discovery happens before Gemini scoring. The activity log shows each API query's
 
 Indeed queries target `viewjob` vacancy URLs across its supported regional domains, rather than broad job-listing pages. Rejected-link counts distinguish non-vacancy pages, outside-source domains, unsafe URLs, missing titles/links and non-job content without exposing response URLs. After a run ends, the full page refreshes once to re-enable Run search and keep controls consistent with completion.
 
-Hosted API discovery now follows provider-advertised later pages after all selected sources' initial queries. Each page consumes one SerpAPI request inside the same twelve-request session ceiling and monthly allowance; it does not raise the fifty-candidate cap. Empty or repeated pages stop, and Stop/runtime limits still apply. Google ranking/index availability can still omit a specific vacancy, even when its link opens in a browser. A queue CSV does not contain all discovery responses or skipped jobs, so absence from an export alone does not establish a scoring rejection. Check the search activity log and provider search history to distinguish those stages. See [SerpAPI pagination](https://serpapi.com/search-api#api-parameters-pagination).
+Hosted API discovery follows provider-advertised later pages after all selected sources' initial queries. Standard Google responses may also advance by ten after a full ten-result page only when pagination metadata is entirely absent, stopping at offset forty. An explicit final page, invalid continuation, short page, structured Jobs payload, empty page, or repeated page stops instead of spending another credit. Each page consumes one SerpAPI request inside the same twelve-request session ceiling and monthly allowance; it does not raise the fifty-candidate cap. The activity log identifies bounded manual continuations. Google ranking/index availability can still omit a specific vacancy, even when its link opens in a browser. A queue CSV does not contain all discovery responses or skipped jobs, so absence from an export alone does not establish a scoring rejection. Check the search activity log and provider search history to distinguish those stages. See [SerpAPI pagination](https://serpapi.com/search-api#api-parameters-pagination).
 
 Indeed title parsing preserves internal hyphens/parentheses and moves a recognized trailing city to Location instead of Company. A result title alone does not verify an employer; unknown companies stay blank rather than becoming cities or fragments of the title.
 

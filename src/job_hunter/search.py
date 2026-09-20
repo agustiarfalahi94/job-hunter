@@ -306,6 +306,39 @@ def next_serpapi_query(query: PlatformQuery, payload: str) -> PlatformQuery | No
     return replace(query, url=SERPAPI_URL.format(params=urlencode(params, doseq=True)))
 
 
+MAX_AUTO_ADVANCE_OFFSET = 40  # 5 pages × ~10 results ≈ 50 candidates
+
+
+def auto_advance_serpapi_query(
+    query: PlatformQuery, payload: str
+) -> PlatformQuery | None:
+    """Advance a full Google page only when pagination metadata is absent."""
+    if query.parser != "serpapi":
+        return None
+    try:
+        data = json.loads(payload or "{}")
+        if not isinstance(data, dict):
+            return None
+        if "serpapi_pagination" in data or "jobs_results" in data:
+            return None
+        if serpapi_web_result_count(payload) < 10:
+            return None
+    except (json.JSONDecodeError, SearchProviderError, TypeError, AttributeError):
+        return None
+    try:
+        original = urlparse(query.url)
+        params = parse_qs(original.query)
+        if params.get("engine", ["google"]) != ["google"]:
+            return None
+        current = int(params.get("start", ["0"])[0])
+        if current >= MAX_AUTO_ADVANCE_OFFSET:
+            return None
+        params["start"] = [str(current + 10)]
+        return replace(query, url=SERPAPI_URL.format(params=urlencode(params, doseq=True)))
+    except (ValueError, TypeError):
+        return None
+
+
 def _find_google_jobs_link(item: dict) -> str:
     for option in item.get("apply_options", []):
         if isinstance(option, dict):

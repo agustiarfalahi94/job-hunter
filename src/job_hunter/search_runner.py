@@ -30,6 +30,7 @@ from job_hunter.search import (
     _job_location_matches,
     build_public_fallback_queries,
     build_serpapi_queries,
+    auto_advance_serpapi_query,
     next_serpapi_query,
     extract_job_metadata,
     match_job_locations,
@@ -249,6 +250,15 @@ class SearchRunController:
                     if signature not in seen_pages:
                         seen_pages.add(signature)
                         following = next_serpapi_query(query, payload)
+                        if following is None:
+                            following = auto_advance_serpapi_query(query, payload)
+                            if following is not None:
+                                self._emit(
+                                    run_id,
+                                    "continued",
+                                    f"Continuing {query.platform}: full page without pagination metadata; "
+                                    "using one bounded Google result offset.",
+                                )
                         if following is not None:
                             queries.append(following)
 

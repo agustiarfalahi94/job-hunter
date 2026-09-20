@@ -17,9 +17,11 @@ class ReleaseDocumentationTest(unittest.TestCase):
         self.assertTrue(Path("docs/ACCOUNT_SETUP.md").is_file())
 
     def test_release_version_is_consistent(self):
-        self.assertIn('version = "1.18.2"', Path("pyproject.toml").read_text())
-        self.assertIn("v1.18.2", Path("README.md").read_text())
-        self.assertIn("v1.18.2", Path("src/job_hunter/__init__.py").read_text())
+        self.assertIn('version = "1.18.3"', Path("pyproject.toml").read_text())
+        self.assertIn("v1.18.3", Path("README.md").read_text())
+        self.assertIn("v1.18.3", Path("src/job_hunter/__init__.py").read_text())
+        self.assertIn("v1.18.3", Path("AGENTS.md").read_text())
+        self.assertIn("v1.18.3", Path("docs/ARCHITECTURE.md").read_text())
 
     def test_readme_documents_modes_privacy_and_stop_limit(self):
         readme = Path("README.md").read_text()

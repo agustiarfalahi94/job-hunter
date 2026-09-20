@@ -4,7 +4,15 @@ from dataclasses import replace
 from urllib.parse import parse_qs, urlparse
 
 from job_hunter.runtime_config import SearchProviderConfig
-from job_hunter.search import SearchCriteria, PlatformQuery, build_serpapi_queries, next_serpapi_query, parse_duckduckgo_results, parse_serpapi_results
+from job_hunter.search import (
+    SearchCriteria,
+    PlatformQuery,
+    auto_advance_serpapi_query,
+    build_serpapi_queries,
+    next_serpapi_query,
+    parse_duckduckgo_results,
+    parse_serpapi_results,
+)
 from job_hunter.search_runner import SearchRunController
 from test_search_runner import _request, _score
 
@@ -164,6 +172,118 @@ class IndeedCoverageTest(unittest.TestCase):
         self.assertIn(TARGET, [match.job.source_url for match in matches])
         self.assertEqual([start for _, start in calls], ["0", "0", "10", "10"])
         self.assertEqual(controller.snapshot().discovery_requests, 4)
+
+    def test_auto_advance_advances_by_ten_and_preserves_query(self):
+        original = build_serpapi_queries(self.request().criteria, "synthetic-key")[0]
+        payload = json.dumps({"organic_results": [
+            {"title": f"Analyst {index}", "link": f"{TARGET}-{index}"}
+            for index in range(10)
+        ]})
+        following = auto_advance_serpapi_query(original, payload)
+        self.assertIsNotNone(following)
+        params = parse_qs(urlparse(following.url).query)
+        orig_params = parse_qs(urlparse(original.url).query)
+        self.assertEqual(params["start"], ["10"])
+        self.assertEqual(params["api_key"], orig_params["api_key"])
+        self.assertEqual(params["q"], orig_params["q"])
+        self.assertEqual(params["engine"], orig_params["engine"])
+
+    def test_auto_advance_returns_none_when_short_final_invalid_or_capped(self):
+        original = build_serpapi_queries(self.request().criteria, "synthetic-key")[0]
+        empty_payload = json.dumps({"organic_results": []})
+        self.assertIsNone(auto_advance_serpapi_query(original, empty_payload))
+
+        short_payload = json.dumps({"organic_results": [{"title": "Analyst", "link": TARGET}]})
+        self.assertIsNone(auto_advance_serpapi_query(original, short_payload))
+
+        explicit_final_payload = json.dumps({
+            "organic_results": [
+                {"title": f"Analyst {index}", "link": f"{TARGET}-{index}"}
+                for index in range(10)
+            ],
+            "serpapi_pagination": {"current": 1},
+        })
+        self.assertIsNone(auto_advance_serpapi_query(original, explicit_final_payload))
+
+        invalid_continuation_payload = json.dumps({
+            "organic_results": [
+                {"title": f"Analyst {index}", "link": f"{TARGET}-{index}"}
+                for index in range(10)
+            ],
+            "serpapi_pagination": {"next": "https://evil.test/search.json?start=10"},
+        })
+        self.assertIsNone(auto_advance_serpapi_query(original, invalid_continuation_payload))
+
+        error_payload = json.dumps({"error": "SerpAPI could not complete this query."})
+        self.assertIsNone(auto_advance_serpapi_query(original, error_payload))
+
+        non_serp = replace(original, parser="duckduckgo")
+        valid_payload = json.dumps({"organic_results": [{"title": "Analyst", "link": TARGET}]})
+        self.assertIsNone(auto_advance_serpapi_query(non_serp, valid_payload))
+
+        capped = replace(original, url="https://serpapi.com/search.json?engine=google&start=40&api_key=key")
+        self.assertIsNone(auto_advance_serpapi_query(capped, valid_payload))
+
+    def test_auto_advance_does_not_apply_google_jobs_offset_pagination(self):
+        original = build_serpapi_queries(self.request().criteria, "synthetic-key")[0]
+        payload = json.dumps({"jobs_results": [
+            {"title": f"Analyst {index}", "apply_options": [{"link": f"{TARGET}-{index}"}]}
+            for index in range(10)
+        ]})
+        following = auto_advance_serpapi_query(original, payload)
+        self.assertIsNone(following)
+
+    def test_auto_advance_discovers_up_to_fifty_results_without_pagination_object(self):
+        calls = []
+        def fetch(url):
+            params = parse_qs(urlparse(url).query)
+            offset = int(params.get("start", ["0"])[0])
+            calls.append(offset)
+            # 10 results per page, NO serpapi_pagination key in response
+            rows = [
+                {"title": f"Analyst {offset + i} - Kuala Lumpur", "link": f"https://malaysia.indeed.com/viewjob?jk=auto-{offset}-{i}"}
+                for i in range(10)
+            ]
+            return json.dumps({"organic_results": rows})
+
+        controller = SearchRunController(discovery_fetcher=fetch, page_fetcher=lambda _: "", scorer=_score)
+        controller.start(self.request())
+        self.assertTrue(controller.wait(3))
+        snapshot = controller.snapshot()
+        events, _ = controller.drain()
+        self.assertEqual(snapshot.state, "completed")
+        self.assertEqual(snapshot.discovered, 50)
+        self.assertEqual(snapshot.completed, 50)
+        self.assertIn(
+            "full page without pagination metadata",
+            "\n".join(event.message for event in events),
+        )
+        # Verify offsets advanced across multiple pages (0, 10, 20, 30, 40)
+        self.assertIn(0, calls)
+        self.assertIn(10, calls)
+        self.assertIn(20, calls)
+
+    def test_auto_advance_stops_when_subsequent_page_empty(self):
+        calls = []
+        def fetch(url):
+            params = parse_qs(urlparse(url).query)
+            offset = int(params.get("start", ["0"])[0])
+            calls.append(offset)
+            if offset == 0:
+                rows = [{"title": f"Analyst {i} - Kuala Lumpur", "link": f"https://malaysia.indeed.com/viewjob?jk=first-{i}"} for i in range(10)]
+                return json.dumps({"organic_results": rows})
+            # Later page has 0 results
+            return json.dumps({"organic_results": []})
+
+        controller = SearchRunController(discovery_fetcher=fetch, page_fetcher=lambda _: "", scorer=_score)
+        controller.start(self.request())
+        self.assertTrue(controller.wait(2))
+        snapshot = controller.snapshot()
+        self.assertEqual(snapshot.state, "completed")
+        self.assertEqual(snapshot.discovered, 10)
+        # Should not have attempted page 20, 30, etc.
+        self.assertNotIn(20, calls)
+        self.assertNotIn(30, calls)
 
 
 if __name__ == "__main__":

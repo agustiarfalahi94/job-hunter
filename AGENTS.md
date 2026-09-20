@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.18.1 is a public Streamlit job-discovery and matching app with optional private Google accounts. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.18.3 is a public Streamlit job-discovery and matching app with optional private Google accounts. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
@@ -24,7 +24,7 @@ Job Hunter v1.18.1 is a public Streamlit job-discovery and matching app with opt
 16. Discovery errors must never be reported as empty success. Report API web-result/eligible-link counts and safe error classifications; never expose query URLs with keys or raw provider errors. Zero scored jobs require a warning, not a queue-success claim.
 17. Accounts are off by default; enabled invalid setup fails closed. Use native Streamlit Google claims, verified-email allowlists and stable issuer/subject ownership, never client-supplied ownership. Keep Supabase secret keys and encryption keys server-only; service credentials bypass RLS.
 18. Never overwrite after failed account load or conflicting revision. Clear data using revision-aware tombstones. Save accepted worker results on the Streamlit thread; sign-out, denial and account switching cancel work and clear all private state. Caches, controllers, cookies and provider tokens are not persisted. Confirm destructive actions, show failed saves honestly, and retain encryption keys privately.
-19. Hosted SerpAPI pagination shares the twelve-request ceiling and processes initial source/signal queries first. Read only validated advancing offsets from official continuation links; rebuild original server URL/parameters, never follow provider-supplied destinations or replacements. Stop repeated/empty pages. Indeed result-title separators do not establish an employer; preserve complete titles and recognized trailing location evidence.
+19. Hosted SerpAPI pagination shares the twelve-request ceiling and processes initial source/signal queries first. Prefer validated advancing offsets from official continuation links; rebuild original server URL/parameters, never follow provider-supplied destinations or replacements. For standard Google results only, a full ten-result page with the pagination field entirely absent may advance by ten up to offset forty. A present pagination field without a valid next link, a short page, a structured Jobs payload, a repeated page, or an empty page must stop. Indeed result-title separators do not establish an employer; preserve complete titles and recognized trailing location evidence.
 
 ## Git Flow
 

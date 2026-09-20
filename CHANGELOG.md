@@ -1,12 +1,18 @@
 # Changelog
 
+## 1.18.3 - 2026-09-20
+
+- Add credit-aware fallback pagination for standard Google responses only: a full ten-result page with no pagination field may advance by ten up to offset forty.
+- Stop fallback pagination on short pages, explicit final pages, invalid continuation evidence, structured Jobs payloads, repeated pages, provider errors, or the existing request/candidate limits.
+- Keep source-specific discovery on SerpAPI's standard Google engine so platform and company `site:` filters remain effective; retain structured `jobs_results` parsing compatibility without claiming that the app requests the Google Jobs engine.
+- Show bounded manual continuations in the activity log, cap every CV upload at 5 MB, sanitize document parsing errors, and align release/architecture documentation.
+- Add positive and negative unit and integration coverage for continuation credit use, engine selection, upload limits, and release-version consistency.
+
 ## 1.18.2 - 2026-09-20
 
-- Integrate SerpAPI `google_jobs` engine support for structured job discovery and full description extraction.
-- Support parsing `jobs_results` payloads in `parse_serpapi_results()` including full descriptions, direct `apply_options`, `company_name`, and detected posted age.
-- Provide automatic fallback to `organic_results` web search when `jobs_results` is empty or unavailable.
-- Bypass platform anti-bot/Cloudflare challenge blocks on Indeed and LinkedIn page fetching by utilizing Google Jobs pre-crawled structured data.
-- Add unit regressions for `google_jobs` parsing, candidate fallbacks, and eligibility filtering.
+- Add parsing compatibility for SerpAPI `jobs_results` payloads, including full descriptions, direct `apply_options`, `company_name`, and detected posted age.
+- Preserve `organic_results` parsing when structured records are empty or unavailable.
+- Add unit regressions for structured-result parsing, candidate fallbacks, and eligibility filtering.
 
 ## 1.18.1 - 2026-09-18
 

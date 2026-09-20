@@ -181,16 +181,18 @@ def _render_profile(workspace: SessionWorkspace, preferences: dict[str, object])
             "Upload or replace CV",
             type=["pdf", "docx", "doc"],
             key=_cv_upload_key(st.session_state),
-            max_upload_size=5 if private_account else None,
+            max_upload_size=MAX_CV_BYTES // (1024 * 1024),
         )
         if uploaded is not None and st.button("Save CV", icon=":material/save:"):
             try:
                 content = uploaded.getvalue()
-                if private_account and len(content) > MAX_CV_BYTES:
-                    raise ValueError("Account CVs must be 5 MB or smaller.")
+                if len(content) > MAX_CV_BYTES:
+                    raise ValueError("CV files must be 5 MB or smaller.")
                 workspace.save_cv(uploaded.name, content, extract_cv_text(content, uploaded.name))
-            except Exception as exc:
-                st.warning(f"CV could not be saved because readable text was not extracted: {exc}")
+            except Exception:
+                st.warning(
+                    "CV could not be saved. Use a readable PDF, DOCX, or DOC file no larger than 5 MB."
+                )
             else:
                 account_ui.persist_account(st.session_state)
                 st.toast("CV loaded. Check the account save status." if private_account else "CV Saved")

@@ -1,4 +1,5 @@
 import unittest
+from urllib.parse import parse_qs, urlparse
 
 from job_hunter.search import (
     SearchCriteria,
@@ -49,6 +50,8 @@ class SearchDiscoveryTest(unittest.TestCase):
         self.assertNotIn('"Data Analyst"', description_query.query)
         self.assertIn('"Kuala Lumpur"', title_query.query)
         self.assertIn("tbs=qdr%3Am", description_query.url)
+        self.assertEqual(parse_qs(urlparse(title_query.url).query)["engine"], ["google"])
+        self.assertIn("site:linkedin.com/jobs", title_query.query)
 
     def test_public_fallback_also_splits_title_and_description_signals(self):
         criteria = SearchCriteria(
