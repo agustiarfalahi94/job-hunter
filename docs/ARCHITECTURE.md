@@ -1,5 +1,34 @@
 # Architecture
 
+Current release: v1.19.0.
+
+## User-Operated Application Browser
+
+The optional Browserbase adapter creates remote sessions only after the private
+account gate and explicit per-job consent. `application_ui.py` revalidates native
+identity during fragment updates. `application_browser.py` owns one dedicated
+Playwright/CDP worker per Streamlit session, never a shared cached browser.
+Snapshots are immutable; worker threads do not call Streamlit or save accounts.
+The server-only REST adapter validates provider control addresses and disables
+redirects for credentialed API requests. Starting URLs and navigation requests
+must be public HTTPS, including redirects checked with CDP Document interception.
+Cross-origin job-platform authentication remains manual.
+
+Creation disables recording, logging, proxies, automatic CAPTCHA solving and
+persistent contexts. The worker maintains CDP without paid keep-alive, closes at
+identity expiry, and enforces a 15-minute maximum plus a 60-second UI heartbeat
+lease. Close, sign-out, reload and account switch request release; server/process
+loss is covered by the provider timeout. Uncertain create/release requests are
+not automatically retried and display safe warnings without response bodies.
+
+File chooser events carry a short-lived request ID and requesting frame URL.
+Only an explicit attachment command sends in-memory PDF/Word bytes to that
+input. Navigation invalidates outstanding requests, which also expire after
+two minutes. Changed/detached targets, stale commands and >5 MB files are rejected.
+No document or browser token enters a persisted account snapshot. Manual
+application status is unchanged by browser activity. See
+[Browserbase Setup](BROWSERBASE_SETUP.md) for operational and privacy limits.
+
 ## Hosted Shape
 
 ```text

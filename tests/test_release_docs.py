@@ -17,11 +17,18 @@ class ReleaseDocumentationTest(unittest.TestCase):
         self.assertTrue(Path("docs/ACCOUNT_SETUP.md").is_file())
 
     def test_release_version_is_consistent(self):
-        self.assertIn('version = "1.18.5"', Path("pyproject.toml").read_text())
-        self.assertIn("v1.18.5", Path("README.md").read_text())
-        self.assertIn("v1.18.5", Path("src/job_hunter/__init__.py").read_text())
-        self.assertIn("v1.18.5", Path("AGENTS.md").read_text())
-        self.assertIn("v1.18.5", Path("docs/ARCHITECTURE.md").read_text())
+        self.assertIn('version = "1.19.0"', Path("pyproject.toml").read_text())
+        self.assertIn("v1.19.0", Path("README.md").read_text())
+        self.assertIn("v1.19.0", Path("src/job_hunter/__init__.py").read_text())
+        self.assertIn("v1.19.0", Path("AGENTS.md").read_text())
+        self.assertIn("v1.19.0", Path("docs/ARCHITECTURE.md").read_text())
+
+    def test_browserbase_template_is_disabled_with_root_level_empty_secrets(self):
+        raw = tomllib.loads(Path(".streamlit/secrets.example.toml").read_text())
+        self.assertIs(raw["BROWSERBASE_ENABLED"], False)
+        self.assertEqual(raw["BROWSERBASE_API_KEY"], "")
+        self.assertEqual(raw["BROWSERBASE_PROJECT_ID"], "")
+        self.assertTrue(Path("docs/BROWSERBASE_SETUP.md").is_file())
 
     def test_readme_documents_modes_privacy_and_stop_limit(self):
         readme = Path("README.md").read_text()

@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.18.5 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first.
+Job Hunter v1.19.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first. Optional Browserbase integration opens a user-operated application browser inside the queue; see [Browserbase Setup](docs/BROWSERBASE_SETUP.md).
 
 ## What It Does
 
@@ -14,6 +14,7 @@ Job Hunter v1.18.5 is a Streamlit app that discovers, scores, and organizes data
 - Skips confident duplicates while keeping one primary posting per vacancy, without alternate-source storage or display.
 - Supports platform quick-apply filters and user corrections for posting date/expiry.
 - Opens the safest application page in a new tab and lets the user record an application manually.
+- Offers **Apply here** for configured private accounts, with an embedded Browserbase session, explicit document attachments, and manual submission.
 
 ## Web App Tutorial
 
@@ -116,6 +117,10 @@ See [Positive And Negative Test Cases](docs/TEST_CASES.md) for expected outcomes
 
 Select a job and click **Apply** to open the safest official destination. Login, CAPTCHA, required questions, review, and submission stay on that platform. Opening Apply never changes application status. After submitting, explicitly select **I have applied to this job**; the record is labelled as manually recorded, not platform-verified.
 
+With Browserbase configured, select **Use Browserbase for this application**, then **Apply here**. The actual destination opens inside the queue. You operate its login, questions, verification and Submit controls yourself; Job Hunter does not auto-submit. When you click a file field on that page, Job Hunter offers **Attach saved CV** or **Document for this application** and **Attach selected document**. Each attachment sends the chosen PDF/DOC/DOCX (at most 5 MB) to the requesting site through Browserbase, even in criteria-based mode; this separate explicit action is not part of scoring. Attaching is not submission.
+
+Use **Close application browser** when finished. Opening another job requires closing the existing browser first. Each app session has its own remote browser, with a 15-minute maximum and closure after about 60 seconds without the queue's heartbeat (for example, after navigating away or closing the app). Sign-out/account switching requests closure. Platform cookies and sign-ins are not saved between remote sessions; saved Job Hunter CVs and application records are unaffected. A lost connection cannot guarantee recovery of an unfinished form. The external **Apply** link remains available if a site blocks remote access, login, or embedding. Phone keyboard behavior in the remote view is provider-limited; desktop is the initial test target.
+
 ## API Setup
 
 Create `.streamlit/secrets.toml` locally or add these values in Streamlit Community Cloud secrets:
@@ -129,6 +134,8 @@ GEMINI_MODEL = "gemini-3.8-flash"
 `SERPAPI_API_KEY` enables dependable Google-backed source discovery and custom domains. Without it, the app uses a limited public-search fallback that may be blocked or incomplete. `GEMINI_API_KEY` enables Gemini matching. Without it, searches still work with a clearly labelled deterministic fallback. Never commit real keys or `.streamlit/secrets.toml`.
 
 Use **Check Gemini connection** on Search jobs to test the configured service with synthetic data only. It does not use your CV or SerpAPI. A configured key does not guarantee valid permissions, available model access, or quota; failures are shown with a sanitized reason in this check and in search logs.
+
+Browserbase is disabled by default. Follow [Browserbase Setup](docs/BROWSERBASE_SETUP.md) after completing private account setup. Its API key is separate from SerpAPI and Gemini; the integration does not use an AI agent or additional scoring tokens to operate applications.
 
 If the configured Gemini model returns not found, the app asks Google for available text-generation Flash models and retries once with a supported model, preferring stable versions. Results identify the model actually used. No model name is guessed; authentication and quota errors do not trigger model switching. Model discovery checks at most 100 entries.
 
@@ -157,6 +164,8 @@ Never commit CVs, extracted CV text, contact details, platform credentials, cook
 
 Job Hunter does not bypass login, CAPTCHA, anti-bot controls, or platform terms, and it does not auto-submit applications. Search coverage, full-description extraction, posting dates, and application availability depend on what public providers expose.
 
+Browserbase processes the remote browsing session and documents you explicitly attach. The app disables session recording/logging and does not persist remote browser contexts, control links or document handoff bytes. These settings are not a claim of provider-wide zero retention. Treat the live-view address as a temporary credential; do not share it. Browserbase plans and individual sites can restrict availability. No real employer submission is performed by the automated test suite.
+
 ## Project Layout
 
 | Path | Purpose |
@@ -168,6 +177,8 @@ Job Hunter does not bypass login, CAPTCHA, anti-bot controls, or platform terms,
 | `src/job_hunter/company_lookup.py` | Grounded company-name lookup, official regional careers evidence, safe citation resolution |
 | `src/job_hunter/session_workspace.py` | Session-only CV, jobs, application records, and active run identity |
 | `src/job_hunter/account_*.py` | Native identity gate, private snapshots, encrypted owner-scoped storage and save status |
+| `src/job_hunter/browserbase_provider.py` | Opt-in configuration, validated control URLs, bounded session create/view/release requests |
+| `src/job_hunter/application_browser.py` / `application_ui.py` | Private browser worker, live panel, explicit document handoff and lifecycle cleanup |
 | `config/supabase_accounts.sql` | Service-only database RPCs with atomic revisions and deletion tombstones |
 | `src/job_hunter/job_identity.py` | Canonical links, provider IDs, fingerprints, and source consolidation |
 | `src/job_hunter/queue.py` | Backward-compatible local SQLite queue for CLI use |

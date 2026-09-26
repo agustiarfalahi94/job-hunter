@@ -10,7 +10,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from job_hunter import account_ui
+from job_hunter import account_ui, application_ui
 from job_hunter.account_snapshot import MAX_CV_BYTES
 from job_hunter.app_ui import filter_jobs, jobs_to_rows, provider_status_label
 from job_hunter.application_links import (
@@ -549,6 +549,7 @@ def _render_queue_actions(workspace: SessionWorkspace, jobs) -> None:
         "Review the destination before submitting. Login, CAPTCHA, and required questions "
         "remain in the platform page. Opening Apply does not mark the job as applied."
     )
+    application_ui.render_application_browser(workspace, job, destination)
 
 
 def _render_posting_editor(workspace: SessionWorkspace, job) -> None:

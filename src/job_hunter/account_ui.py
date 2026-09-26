@@ -102,6 +102,9 @@ def render_save_status(state: MutableMapping[str, object]) -> None:
 
 
 def clear_session(state: MutableMapping[str, object]) -> None:
+    browser = state.get("application_browser")
+    if browser is not None:
+        browser.close()
     controller = state.get("search_controller")
     if controller is not None:
         controller.cancel()

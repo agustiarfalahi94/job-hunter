@@ -250,8 +250,17 @@
 - Complete owner OAuth/Supabase setup and real private-account sign-in/reboot verification for v1.18.0. The gated implementation now exists; [Account Setup](ACCOUNT_SETUP.md) records what remains external and unverified.
 - Add more provider adapters where public APIs or platform terms permit them.
 - Improve full-description extraction with provider-specific fixtures.
-- Keep job-platform login, CAPTCHA, and final submission outside the hosted app;
-  Google login to Job Hunter does not authorize job-board account access.
+- Verify owner-configured Browserbase access and individual platform compatibility;
+  Google login to Job Hunter does not authenticate the remote job-board session.
+
+## v1.19 - User-Operated Browserbase Applications
+
+- Add opt-in, private-account-gated inline application sessions and explicit per-job consent.
+- Handle PDF/Word attachments through live file-chooser requests, including an explicit saved-CV option.
+- Keep final submission and Applied recording manual; retain the external link.
+- Disable recording/logging, enforce session/heartbeat limits and release on account cleanup.
+- Cover provider errors, ownership, widget reruns and synthetic browser uploads without production applications.
+- Live API/project credentials, private-account setup and employer-specific acceptance remain owner deployment checks.
 
 ## v1.18 - Optional Private Google Accounts
 

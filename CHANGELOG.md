@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.19.0 - 2026-09-27
+
+### Added
+
+- Optional Browserbase **Apply here** panel for authorized private accounts, with explicit consent and an external-page fallback.
+- Live file-chooser handoff for saved CVs or selected PDF/DOC/DOCX documents up to 5 MB, without public file URLs or automatic attachment.
+- Safe provider-error messages, validated control/destination URLs, session timeout, abandoned-view cleanup and sign-out/account-switch release.
+- Validate redirect destinations, expire upload requests after two minutes or navigation, and keep surviving application tabs open when another tab closes.
+- Setup/runbook and synthetic browser integration tests; production Browserbase and platform login/submission remain separately unverified until owner setup.
+
+### Privacy And Limits
+
+- Disable Browserbase session recording/logging, proxies, automatic CAPTCHA solving and persistent browser contexts.
+- Keep remote sessions out of account snapshots; require fresh platform login per remote session. One browser per app session, up to 15 minutes.
+- No automatic login, answers, CAPTCHA bypass or final submission. Browser creation, document attachment and browser closure never change Applied status.
+
 ## 1.18.5 - 2026-09-20
 
 ### Added

@@ -18,7 +18,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql
+      - name: Install browser for synthetic application test
+        run: python -m playwright install --with-deps chromium
       - name: Run tests
         env:
           REQUIRE_ACCOUNT_SQL_TESTS: "1"
+          JOB_HUNTER_TEST_CHROME: bundled
         run: ./tool/check.sh

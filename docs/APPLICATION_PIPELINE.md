@@ -29,7 +29,7 @@ Session-only queue + primary-posting duplicate checks
 Actionable / All / Already applied review
                 |
                 v
-Safe external Apply page
+Safe external Apply page OR authorized Browserbase live panel
                 |
                 v
 User login, review, submit, and manual status record
@@ -59,3 +59,9 @@ Background workers publish immutable events; only the Streamlit thread accepts c
 - The user explicitly records Applied or Not applied.
 - Applied records include a UTC time and the fixed evidence text: `Marked manually by the user; not verified with the job platform.`
 - Login, CAPTCHA, questions, review, and submission remain on the destination platform.
+- Since v1.19.0, configured private accounts can operate that destination inside
+  an embedded Browserbase session. The human still performs all submission and
+  verification steps. Documents are attached only after explicit selection of a
+  live file input and confirmation in Job Hunter; no bulk or automatic Apply.
+- Browserbase failures keep the external link available. Remote activity never
+  implies success or marks the job applied. See [Browserbase Setup](BROWSERBASE_SETUP.md).
