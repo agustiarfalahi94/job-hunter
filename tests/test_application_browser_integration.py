@@ -17,6 +17,31 @@ CHROME = os.environ.get("JOB_HUNTER_TEST_CHROME", "")
 
 @unittest.skipUnless(CHROME, "Set JOB_HUNTER_TEST_CHROME to run synthetic browser integration")
 class RealBrowserUploadTest(unittest.TestCase):
+    def test_initial_popup_failure_preserves_existing_application(self):
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as playwright:
+            kwargs = {} if CHROME == "bundled" else {"executable_path": CHROME}
+            browser = playwright.chromium.launch(headless=True, **kwargs)
+            try:
+                context = browser.new_context()
+                page = context.new_page()
+                controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig(), time.time() + 3600)
+                controller._track_page(page)
+                context.on("page", controller._track_page)
+                context.route("**/*", controller._route_navigation)
+                page.route("https://careers.example.test/apply", lambda route: route.fulfill(
+                    content_type="text/html", body='<button onclick="window.open(\'https://popup.example.test/login\')">Sign in</button>'))
+                with patch("job_hunter.application_browser._hostname_resolves_public", return_value=True):
+                    page.goto("https://careers.example.test/apply")
+                    controller._publish(state="ready")
+                    page.get_by_role("button", name="Sign in").click()
+                    page.wait_for_timeout(100)
+                    self.assertEqual(controller.snapshot().state, "ready")
+                    self.assertIn("original", controller.snapshot().message)
+                    self.assertFalse(page.is_closed())
+            finally:
+                browser.close()
+
     def test_redirect_cannot_reach_private_http_destination(self):
         from playwright.sync_api import Error, sync_playwright
         requests = []

@@ -130,6 +130,23 @@ class UploadTest(unittest.TestCase):
 
 
 class BrowserLifecycleTest(unittest.TestCase):
+    def test_navigation_dispatched_during_upload_validation_cancels_attachment(self):
+        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(), time.time() + 3600)
+        chooser = Mock()
+        chooser.element.owner_frame.return_value.url = "https://example.com/job"
+        request = UploadRequest("one", "https://example.com/job")
+        controller._chooser, controller._request = chooser, request
+        controller._publish(state="ready", upload_request=request)
+        controller.upload("owner", "one", "cv.pdf", b"synthetic")
+        def validate_element(*args):
+            controller._invalidate_upload()
+            return True
+        chooser.element.evaluate.side_effect = validate_element
+        controller._attach_pending()
+        chooser.set_files.assert_not_called()
+        self.assertIsNone(controller.snapshot().upload_request)
+        self.assertNotIn("Document attached", controller.snapshot().message)
+
     def test_tab_close_keeps_other_application_tab_alive(self):
         from playwright.sync_api import Error
         client = Mock()

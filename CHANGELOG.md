@@ -8,6 +8,7 @@
 - Live file-chooser handoff for saved CVs or selected PDF/DOC/DOCX documents up to 5 MB, without public file URLs or automatic attachment.
 - Safe provider-error messages, validated control/destination URLs, session timeout, abandoned-view cleanup and sign-out/account-switch release.
 - Validate redirect destinations, expire upload requests after two minutes or navigation, and keep surviving application tabs open when another tab closes.
+- Recheck queued attachment authorization after browser events; block unverifiable initial popups with an external-page fallback while preserving the current session.
 - Setup/runbook and synthetic browser integration tests; production Browserbase and platform login/submission remain separately unverified until owner setup.
 
 ### Privacy And Limits

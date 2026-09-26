@@ -45,8 +45,8 @@ marks a job applied; the existing explicit manual record remains authoritative.
 
 ## Verification Record
 
-- 2026-09-27: 25 focused provider/controller/UI/browser tests pass locally.
-- Full local suite: 386 tests, OK with one PostgreSQL integration class skipped
+- 2026-09-27: 27 focused provider/controller/UI/browser tests pass locally.
+- Full local suite: 388 tests, OK with one PostgreSQL integration class skipped
   because local database tools are absent. CI requires that database coverage.
 - Dependency compatibility, Python compilation and whitespace checks pass.
 - Synthetic Chrome forms verify explicit upload without submission, rejected
@@ -55,6 +55,8 @@ marks a job applied; the existing explicit manual record remains authoritative.
   values survive fragment refreshes and Close removes the embedded view.
 - Independent review findings about redirects, stale uploads and tab closure
   have regression coverage. CI gates are required before release.
+- Queued attachment checks revalidate after event dispatch. Initial popups with
+  unavailable frames fail closed, with a visible fallback and the current tab intact.
 - Real Browserbase creation, privacy flags, platform login and provider-side
   release remain unverified until owner credentials and account setup are available.
 

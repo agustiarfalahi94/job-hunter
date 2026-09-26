@@ -69,7 +69,8 @@ class BrowserSnapshot:
     seconds_remaining: int = 900
 
 
-def attach_document(chooser, request: UploadRequest, request_id: str, filename: str, data: bytes) -> None:
+def attach_document(chooser, request: UploadRequest, request_id: str, filename: str, data: bytes,
+                    *, is_current=lambda: True) -> None:
     name = filename.replace("\\", "/").rsplit("/", 1)[-1]
     extension = name.rsplit(".", 1)[-1].lower()
     if extension not in DOCUMENT_TYPES or not data or len(data) > MAX_DOCUMENT_BYTES:
@@ -78,6 +79,9 @@ def attach_document(chooser, request: UploadRequest, request_id: str, filename: 
     if (time.monotonic() >= request.expires_at or request_id != request.request_id or
             frame is None or frame.url != request.frame_url or
             not chooser.element.evaluate("element => element.isConnected")):
+        raise BrowserError("The upload field changed. Select the file field again before attaching a document.")
+    # Playwright calls above dispatch navigation events that can revoke this request.
+    if not is_current() or time.monotonic() >= request.expires_at:
         raise BrowserError("The upload field changed. Select the file field again before attaching a document.")
     chooser.set_files({"name": name, "mimeType": DOCUMENT_TYPES[extension], "buffer": data}, timeout=10000)
 
@@ -181,10 +185,17 @@ class ApplicationBrowser:
         page.on("framedetached", self._invalidate_upload)
         page.on("close", self._invalidate_upload)
         # Playwright routes only the first request in a redirect chain. CDP pauses each hop.
-        session = page.context.new_cdp_session(page)
-        self._cdp_sessions[page] = session
-        session.on("Fetch.requestPaused", lambda event: self._guard_navigation(session, event))
-        session.send("Fetch.enable", {"patterns": [{"resourceType": "Document", "requestStage": "Request"}]})
+        try:
+            session = page.context.new_cdp_session(page)
+            session.on("Fetch.requestPaused", lambda event: self._guard_navigation(session, event))
+            session.send("Fetch.enable", {"patterns": [{"resourceType": "Document", "requestStage": "Request"}]})
+            self._cdp_sessions[page] = session
+        except PlaywrightError:
+            try:
+                page.close()
+            except PlaywrightError:
+                pass
+            self._publish(message="This browser tab could not be verified. Use the original application page.")
 
     def _guard_navigation(self, session, event) -> None:
         try:
@@ -211,7 +222,14 @@ class ApplicationBrowser:
             try:
                 validate_destination(route.request.url)
                 self._track_page(route.request.frame.page)
+                if route.request.frame.page not in self._cdp_sessions:
+                    raise BrowserError("Browser tab could not be verified.")
             except BrowserError:
+                route.abort()
+                return
+            except PlaywrightError:
+                # Initial popups can have no frame yet, so redirect interception is unavailable.
+                self._publish(message="This popup could not be verified. Use the original application page for this step.")
                 route.abort()
                 return
         route.continue_()
@@ -226,7 +244,9 @@ class ApplicationBrowser:
         try:
             if self._stop.is_set() or self._chooser is None or self._request is None:
                 return
-            attach_document(self._chooser, self._request, request_id, filename, data)
+            request = self._request
+            attach_document(self._chooser, request, request_id, filename, data,
+                            is_current=lambda: self._request is request and not self._stop.is_set())
             self._publish(message="Document attached. Review the application before submitting.")
         except BrowserError as exc:
             self._publish(message=str(exc))

@@ -64,6 +64,10 @@ remote browsers; test each destination and respect its access restrictions.
   or the external link. No stealth/proxy fallback or automated CAPTCHA solver is
   enabled. Mobile keyboard support depends on Live View; desktop is the first
   supported test target.
+- Some initial popup navigations cannot be inspected before the browser creates
+  their frame. These are blocked with an original-page fallback; the existing
+  application tab stays open. Complete popup-dependent sign-in or applications
+  using the external Apply link, rather than bypassing destination checks.
 - An active remote form is not a durable draft. Restart/disconnection can lose
   unsent answers. Job Hunter's saved CV, search criteria and manual application
   history remain separate from remote browser lifetime.
