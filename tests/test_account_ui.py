@@ -14,6 +14,29 @@ class StopRendering(Exception):
 
 
 class AccountUITest(unittest.TestCase):
+    def test_fragment_save_failure_refreshes_account_controls_once(self):
+        secrets = account_secrets()
+        config = load_account_config(secrets)
+        store = MagicMock()
+        store.load.return_value = StoredAccount(0, None)
+        store.save.side_effect = AccountStorageError("Synthetic outage")
+        session = AccountSession(identity_from_claims(google_claims(), config), config, store)
+        restored = session.restore()
+        state = {account_ui.ACCOUNT_KEY: session, WORKSPACE_KEY: restored.workspace,
+                 "search_settings": dict(restored.settings, hard_skip_keywords=["new exclusion"])}
+        with patch.object(account_ui, "st") as st:
+            st.secrets = secrets
+            st.user.is_logged_in = True
+            st.user.get.side_effect = google_claims().get
+            st.rerun.side_effect = StopRendering
+            with self.assertRaises(StopRendering):
+                account_ui.persist_account(state, refresh_on_error=True)
+            self.assertEqual(session.error, "Synthetic outage")
+            st.rerun.assert_called_once_with(scope="app")
+            self.assertFalse(account_ui.persist_account(state, refresh_on_error=True))
+            st.rerun.assert_called_once()
+        store.save.assert_called_once()
+
     def test_disabled_accounts_preserve_existing_guest_cv(self):
         workspace = SessionWorkspace()
         workspace.save_cv("synthetic.docx", b"synthetic", "synthetic experience")

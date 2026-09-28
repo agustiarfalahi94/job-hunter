@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
+from threading import RLock
 
 from job_hunter.account_config import AccountConfig, AccountIdentity
 from job_hunter.account_snapshot import RestoredAccount, SnapshotError, decode_snapshot, encode_snapshot
@@ -23,8 +24,14 @@ class AccountSession:
         self.error = ""
         self.message = "Private account ready."
         self._saved_digest = ""
+        self._lock = RLock()
+        self._generation = 0
 
     def restore(self) -> RestoredAccount:
+        with self._lock:
+            return self._restore()
+
+    def _restore(self) -> RestoredAccount:
         self.load_attempted = True
         self.ready = False
         try:
@@ -37,6 +44,7 @@ class AccountSession:
             self.revision = None
             raise
         self.revision = stored.revision
+        self._generation += 1
         self._saved_digest = _digest(canonical)
         self.ready = True
         self.conflicted = False
@@ -45,6 +53,14 @@ class AccountSession:
         return restored
 
     def flush(self, workspace: SessionWorkspace, settings: dict[str, object], mode: str, *, retry: bool = False) -> bool:
+        generation = self._generation
+        # Fast Streamlit reruns can overlap an earlier script's network request.
+        with self._lock:
+            if generation != self._generation:
+                return False
+            return self._flush(workspace, settings, mode, retry=retry)
+
+    def _flush(self, workspace: SessionWorkspace, settings: dict[str, object], mode: str, *, retry: bool) -> bool:
         if not self.ready or self.conflicted or (self.error and not retry):
             return False
         try:
@@ -68,6 +84,10 @@ class AccountSession:
         return True
 
     def clear(self) -> RestoredAccount:
+        with self._lock:
+            return self._clear()
+
+    def _clear(self) -> RestoredAccount:
         if not self.ready or self.conflicted or self.revision is None:
             raise AccountStorageError("Reload saved account data before deleting it.")
         try:
@@ -81,6 +101,7 @@ class AccountSession:
             raise
         content = self._empty_payload()
         self.revision = revision
+        self._generation += 1
         self._saved_digest = _digest(content)
         self.error = ""
         self.message = "Saved account data deleted."

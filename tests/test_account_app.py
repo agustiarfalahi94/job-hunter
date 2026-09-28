@@ -58,6 +58,48 @@ def signed_in(rpc, claims=None):
 
 
 class AccountAppTest(unittest.TestCase):
+    def test_conflict_is_shown_once_in_sidebar_without_overwriting_other_tab(self):
+        secrets, rpc = account_secrets(), MemoryRPC()
+        with signed_in(rpc):
+            first = private_app(secrets).run(timeout=10)
+            second = private_app(secrets).run(timeout=10)
+            next(widget for widget in first.multiselect if widget.label == "Hard skip keywords").set_value(["first tab"]).run(timeout=10)
+            saved_rows = dict(rpc.rows)
+            next(widget for widget in second.multiselect if widget.label == "Hard skip keywords").set_value(["second tab"]).run(timeout=10)
+            self.assertEqual(len(second.exception), 0)
+            self.assertEqual(len(second.warning), 1)
+            self.assertEqual(len(second.sidebar.warning), 1)
+            self.assertEqual(rpc.rows, saved_rows)
+            self.assertEqual(second.session_state["search_settings"]["hard_skip_keywords"], ["second tab"])
+            reload_button = next(button for button in second.button if button.label == "Reload saved data")
+            self.assertTrue(reload_button.disabled)
+            next(widget for widget in second.checkbox if widget.label == "Discard unsaved changes and reload saved data").check().run(timeout=10)
+            next(button for button in second.button if button.label == "Reload saved data").click().run(timeout=10)
+            self.assertFalse(second.warning)
+            self.assertEqual(second.session_state["search_settings"]["hard_skip_keywords"], ["first tab"])
+
+    def test_new_save_error_is_visible_in_sidebar_with_working_retry(self):
+        secrets, rpc = account_secrets(), MemoryRPC()
+        unavailable = False
+
+        def transport(url, **kwargs):
+            if unavailable and url.endswith("job_hunter_save"):
+                return response({}, 503)
+            return rpc(url, **kwargs)
+
+        with signed_in(transport):
+            test = private_app(secrets).run(timeout=10)
+            unavailable = True
+            next(widget for widget in test.multiselect if widget.label == "Hard skip keywords").set_value(["keep this"]).run(timeout=10)
+            self.assertEqual(len(test.exception), 0)
+            self.assertEqual(len(test.warning), 1)
+            self.assertEqual(len(test.sidebar.warning), 1)
+            unavailable = False
+            next(button for button in test.button if button.label == "Retry saving").click().run(timeout=10)
+            self.assertFalse(test.warning)
+            restored = private_app(secrets).run(timeout=10)
+            self.assertEqual(restored.session_state["search_settings"]["hard_skip_keywords"], ["keep this"])
+
     def test_accepted_background_results_save_before_terminal_refresh(self):
         import app
         from unittest.mock import MagicMock

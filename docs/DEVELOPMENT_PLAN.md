@@ -253,6 +253,14 @@
 - Verify owner-configured Browserbase access and individual platform compatibility;
   Google login to Job Hunter does not authenticate the remote job-board session.
 
+## v1.19.1 - Account Save Warnings
+
+- Reproduce overlapping-save conflicts with a delayed response and duplicate banners with signed-in Streamlit tests.
+- Serialize session saves, reloads and deletion; invalidate queued writes after reload/deletion without changing database conflict protection.
+- Show account status once in the sidebar after page saves, with expanded recovery details on failure. Refresh the panel when a fragment first encounters a save error.
+- Verify ordinary persistence, rapid edits, stale tabs, outages/retry and destructive-action safeguards; update release notes and run feature/main CI.
+- Live account persistence after deployment still needs the owner's sign-out/reboot check; automated tests use synthetic accounts only.
+
 ## v1.19 - User-Operated Browserbase Applications
 
 - Add opt-in, private-account-gated inline application sessions and explicit per-job consent.

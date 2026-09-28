@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.19.1 - 2026-09-28
+
+### Fixed
+
+- Serialize overlapping saves within one private account session so a fast Streamlit rerun cannot reuse a revision while the previous save response is pending.
+- Keep reload/deletion serialized and invalidate older queued saves; preserve genuine cross-tab conflict checks and explicit reload confirmation.
+- Remove repeated account-save banners from the search progress area and page footer. Show one compact sidebar warning with details and recovery controls under **Saved data**.
+- Render account controls after page saves and refresh them when a fragment first encounters a save error. Preserve the search activity log before that refresh.
+- Report a changed saved version without assuming it was caused by another tab.
+
+### Tests
+
+- Add delayed-response overlap, queued-write invalidation, single-sidebar-warning, stale-tab/reload, outage/retry and fragment-error regressions using synthetic account data.
+- No database migration, new secrets, search-provider calls or live employer applications are required by this patch.
+
 ## 1.19.0 - 2026-09-27
 
 ### Added

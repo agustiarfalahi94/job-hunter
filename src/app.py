@@ -79,6 +79,9 @@ def main() -> None:
 
     _inject_table_styles()
     _render_header(private_account)
+    if private_account:
+        with st.sidebar:
+            account_panel = st.container()
     _render_sidebar(workspace, provider_config, preferences)
     _consume_page_request()
     visible_pages = PAGES if st.session_state.get("search_mode") == SEARCH_MODES[1] else PAGES[1:]
@@ -92,7 +95,9 @@ def main() -> None:
     else:
         _render_queue(workspace, preferences)
     account_ui.persist_account(st.session_state)
-    account_ui.render_save_status(st.session_state)
+    if private_account:
+        with account_panel:
+            account_ui.render_account_controls(st.session_state)
 
 
 def _render_header(private_account: bool = False) -> None:
@@ -397,9 +402,9 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
     logs = list(st.session_state.get("run_logs", []))
     for match in matches:
         workspace.accept_completed(match)
-    account_ui.persist_account(st.session_state)
     logs.extend(event.message for event in events)
     st.session_state["run_logs"] = logs[-30:]
+    account_ui.persist_account(st.session_state, refresh_on_error=True)
     snapshot = controller.snapshot()
     if (snapshot.state in {"completed", "cancelled", "failed"} and snapshot.run_id
             and st.session_state.get("terminal_refreshed_run") != snapshot.run_id):
@@ -441,8 +446,6 @@ def _render_run_fragment(workspace: SessionWorkspace) -> None:
         )
     else:
         st.caption("Ready to search. Progress and current activity will appear here.")
-    account_ui.render_save_status(st.session_state)
-
     if snapshot.completed or workspace.list_jobs():
         if st.button(
             "Review Job queue",

@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.19.0 is a public Streamlit job-discovery and matching app with optional private Google accounts and user-operated Browserbase applications. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.19.1 is a public Streamlit job-discovery and matching app with optional private Google accounts and user-operated Browserbase applications. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 

@@ -1,6 +1,6 @@
 # Job Hunter
 
-Job Hunter v1.19.0 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first. Optional Browserbase integration opens a user-operated application browser inside the queue; see [Browserbase Setup](docs/BROWSERBASE_SETUP.md).
+Job Hunter v1.19.1 is a Streamlit app that discovers, scores, and organizes data jobs. The live app is [jobs-hunter.streamlit.app](https://jobs-hunter.streamlit.app/). Optional private Google accounts save CVs, criteria, jobs and manually recorded application history across restarts; account mode requires the owner's OAuth and Supabase setup first. Optional Browserbase integration opens a user-operated application browser inside the queue; see [Browserbase Setup](docs/BROWSERBASE_SETUP.md).
 
 ## What It Does
 
@@ -20,7 +20,7 @@ Job Hunter v1.19.0 is a Streamlit app that discovers, scores, and organizes data
 
 ### Private Account Or Guest Session
 
-When the owner enables private accounts, sign in with the permitted Google account. Your saved workspace loads before you edit it. Changes save automatically; check the account save status. A **Not saved** warning means changes can be lost after sign-out or restart. Retry saving after an outage. A conflicting tab must reload saved data with explicit confirmation, discarding its unsaved edits; it cannot overwrite a newer tab silently.
+When the owner enables private accounts, sign in with the permitted Google account. Your saved workspace loads before you edit it. Changes save automatically; check the Account sidebar for save status. **Changes aren't saved** appears once there if saving fails, with details and recovery controls in the expanded **Saved data** section. Unsaved changes can be lost after sign-out or restart. Retry saving after an outage. A conflicting tab must reload saved data with explicit confirmation, discarding its unsaved edits; it cannot overwrite a newer tab silently. Keep a note of any unsaved edits you need before confirming reload.
 
 Mark submitted jobs using **I have applied to this job**. This saves the manual record and its timestamp, not a platform-confirmed submission. In **Account > Saved data**, you can reload or explicitly delete your saved CV, criteria, queue and history. Sign-out clears the browser's app state and cancels search work, but keeps saved account data. Deletion clears the current encrypted payload, not provider backups, and retains an opaque revision tombstone to prevent stale tabs recreating it.
 

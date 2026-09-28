@@ -58,11 +58,11 @@ def prepare_account(state: MutableMapping[str, object], secrets: Mapping[str, ob
         st.button("Retry loading saved data", on_click=_retry_load, args=(state, session), icon=":material/refresh:")
         st.button("Sign out", icon=":material/logout:", on_click=logout)
         st.stop()
-    _render_account_controls(state, session)
     return True
 
 
-def persist_account(state: MutableMapping[str, object], *, retry: bool = False) -> bool:
+def persist_account(state: MutableMapping[str, object], *, retry: bool = False,
+                    refresh_on_error: bool = False) -> bool:
     session = state.get(ACCOUNT_KEY)
     if not isinstance(session, AccountSession):
         return False
@@ -71,8 +71,12 @@ def persist_account(state: MutableMapping[str, object], *, retry: bool = False) 
     workspace = state.get(WORKSPACE_KEY)
     if workspace is None:
         return False
-    return session.flush(workspace, state.get("search_settings", {}),
-                         str(state.get("search_mode", "Criteria-based search")), retry=retry)
+    previous_error = session.error
+    saved = session.flush(workspace, state.get("search_settings", {}),
+                          str(state.get("search_mode", "Criteria-based search")), retry=retry)
+    if refresh_on_error and session.error != previous_error:
+        st.rerun(scope="app")
+    return saved
 
 
 def _authorize_session(state: MutableMapping[str, object], session: AccountSession) -> bool:
@@ -96,7 +100,7 @@ def render_save_status(state: MutableMapping[str, object]) -> None:
     session = state.get(ACCOUNT_KEY)
     if isinstance(session, AccountSession):
         if session.error:
-            st.warning(f"Not saved to your account: {session.error} Unsaved changes can be lost on sign-out or restart.")
+            st.warning("Changes aren't saved. See Saved data below.")
         else:
             st.caption(session.message)
 
@@ -171,19 +175,23 @@ def _delete(state: MutableMapping[str, object], session: AccountSession) -> None
     _apply_restored(state, session, restored)
 
 
-def _render_account_controls(state: MutableMapping[str, object], session: AccountSession) -> None:
-    with st.sidebar:
-        st.subheader("Account")
-        st.caption(f"Signed in as {session.identity.email}")
-        render_save_status(state)
-        if session.error and not session.conflicted:
-            st.button("Retry saving", on_click=_retry_save, args=(state,), icon=":material/cloud_upload:")
-        st.button("Sign out", on_click=logout, icon=":material/logout:")
-        with st.expander("Saved data"):
-            st.checkbox("Discard unsaved changes and reload saved data", key="_account_reload_confirm")
-            st.button("Reload saved data", disabled=state.get("_account_reload_confirm") is not True,
-                      on_click=_reload, args=(state, session), icon=":material/refresh:")
-            st.caption("Deleting saved data removes your CV, settings, queue and application history. Provider backups may retain older data under their retention policy.")
-            st.checkbox("Permanently delete my saved account data", key="_account_delete_confirm")
-            st.button("Delete saved data", disabled=state.get("_account_delete_confirm") is not True or session.conflicted,
-                      on_click=_delete, args=(state, session), icon=":material/delete:")
+def render_account_controls(state: MutableMapping[str, object]) -> None:
+    session = state.get(ACCOUNT_KEY)
+    if not isinstance(session, AccountSession):
+        return
+    st.subheader("Account")
+    st.caption(f"Signed in as {session.identity.email}")
+    render_save_status(state)
+    st.button("Sign out", on_click=logout, icon=":material/logout:")
+    with st.expander("Saved data", expanded=bool(session.error)):
+        if session.error:
+            st.caption(f"{session.error} Unsaved changes can be lost on sign-out or restart.")
+            if not session.conflicted:
+                st.button("Retry saving", on_click=_retry_save, args=(state,), icon=":material/cloud_upload:")
+        st.checkbox("Discard unsaved changes and reload saved data", key="_account_reload_confirm")
+        st.button("Reload saved data", disabled=state.get("_account_reload_confirm") is not True,
+                  on_click=_reload, args=(state, session), icon=":material/refresh:")
+        st.caption("Deleting saved data removes your CV, settings, queue and application history. Provider backups may retain older data under their retention policy.")
+        st.checkbox("Permanently delete my saved account data", key="_account_delete_confirm")
+        st.button("Delete saved data", disabled=state.get("_account_delete_confirm") is not True or session.conflicted,
+                  on_click=_delete, args=(state, session), icon=":material/delete:")

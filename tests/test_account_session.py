@@ -1,4 +1,6 @@
 import unittest
+from concurrent.futures import ThreadPoolExecutor, wait
+from threading import Event, Lock, RLock, get_ident
 from unittest.mock import MagicMock
 
 from job_hunter.account_config import identity_from_claims, load_account_config
@@ -52,6 +54,76 @@ class AccountSessionTest(unittest.TestCase):
         self.assertEqual(restarted.workspace.cv, workspace.cv)
         self.assertEqual(restarted.workspace.list_jobs()[0].application_status, "applied")
         self.assertEqual(restarted.settings["hard_skip_keywords"], ["AZURE"])
+
+    def test_overlapping_saves_wait_for_the_prior_revision_acknowledgement(self):
+        self.session.restore()
+        committed, release_response, second_started = Event(), Event(), Event()
+        database_lock = Lock()
+        stored = [0, None]
+
+        def save(identity, revision, payload):
+            with database_lock:
+                if revision != stored[0]:
+                    raise AccountConflict("Revision changed")
+                stored[:] = [revision + 1, payload]
+            if revision == 0:
+                committed.set()
+                if not release_response.wait(5):
+                    raise RuntimeError("Test did not release the first response")
+            return revision + 1
+
+        self.store.save.side_effect = save
+        workspace = private_workspace()
+
+        def second_save():
+            second_started.set()
+            return self.session.flush(workspace, dict(SETTINGS, hard_skip_keywords=["new exclusion"]), "Criteria-based search")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first = executor.submit(self.session.flush, workspace, SETTINGS, "Criteria-based search")
+            try:
+                self.assertTrue(committed.wait(5))
+                second = executor.submit(second_save)
+                self.assertTrue(second_started.wait(5))
+                second_finished_early = bool(wait([second], timeout=0.1).done)
+            finally:
+                release_response.set()
+            self.assertTrue(first.result(timeout=5))
+            self.assertTrue(second.result(timeout=5))
+        self.assertFalse(second_finished_early)
+        self.assertFalse(self.session.conflicted)
+        self.assertEqual(self.session.revision, 2)
+        self.store.load.return_value = StoredAccount(*stored)
+        restored = AccountSession(self.identity, self.config, self.store).restore()
+        self.assertEqual(restored.settings["hard_skip_keywords"], ["new exclusion"])
+
+    def test_queued_save_cannot_restore_data_after_reload_or_deletion(self):
+        for operation in ("restore", "clear"):
+            with self.subTest(operation=operation):
+                self.session.restore()
+                self.store.clear.return_value = 1
+                self.store.save.reset_mock()
+                waiting = Event()
+                main_thread = get_ident()
+                lock = RLock()
+
+                class ObservedLock:
+                    def __enter__(self):
+                        if get_ident() != main_thread:
+                            waiting.set()
+                        lock.acquire()
+
+                    def __exit__(self, *args):
+                        lock.release()
+
+                self.session._lock = ObservedLock()
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    with lock:
+                        pending = executor.submit(self.session.flush, private_workspace(), SETTINGS, "CV-based search")
+                        self.assertTrue(waiting.wait(5))
+                        getattr(self.session, operation)()
+                    self.assertFalse(pending.result(timeout=5))
+                self.store.save.assert_not_called()
 
     def test_failed_load_cannot_save_or_delete_existing_account(self):
         self.store.load.side_effect = AccountStorageError("Safe unavailable message")

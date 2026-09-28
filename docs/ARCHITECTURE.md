@@ -1,6 +1,6 @@
 # Architecture
 
-Current release: v1.19.0.
+Current release: v1.19.1.
 
 ## User-Operated Application Browser
 
@@ -53,6 +53,8 @@ v1.18.0 gates the workspace behind native Google OIDC when `accounts.enabled` is
 The account adapter restores a versioned snapshot before widget creation, and saves only changed snapshots after settings callbacks, CV changes, posting/application edits and accepted background results. Snapshot contents are Fernet-encrypted CV bytes/text, settings/mode and JobRecords. Controllers, caches, API keys and provider tokens stay session-local. Native OIDC identity is not Supabase `auth.uid()`; server-only Supabase secret-key RPCs operate with service-role privileges, with app owner checks plus revoked anon/authenticated table/function access.
 
 Database writes use atomic compare-and-swap revisions. Conflicting tabs stop saving until explicit reload; failed loads never permit writes/clear. Deletion increments revision and nulls the payload rather than removing its tombstone. Logout/account changes cancel controllers and clear all session/widget state. Account save errors remain visible; retries are explicit after failure. Backend requests have bounded timeouts and never follow redirects. See [Account Setup](ACCOUNT_SETUP.md) for trust boundaries, limits, encryption-key recovery and real deployment checks.
+
+Within an account session, a lock serializes save/load/clear through receipt of the database revision. Streamlit fast reruns must not start another write while the previous response is pending. Reload/deletion advances a local generation so already queued saves cannot restore discarded data. This does not merge or overwrite genuine cross-session conflicts. The account panel renders once in a reserved sidebar container after page saves; a newly failed fragment save requests one full app rerun to expose recovery controls. Search progress and the page footer do not duplicate account warnings.
 
 ## Components
 

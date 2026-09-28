@@ -87,7 +87,7 @@ class SupabaseAccountStore:
         except requests.RequestException:
             raise AccountStorageError("Private account storage is unreachable. Changes remain unsaved; retry when connectivity returns.") from None
         if response.status_code == 409:
-            raise AccountConflict("Saved data changed in another tab. Reload saved data before making more changes.")
+            raise AccountConflict("The saved version changed. Reload saved data before making more changes.")
         if response.status_code in {401, 403}:
             raise AccountStorageError("Account storage access was denied. Check the server secret key and database grants.")
         if response.status_code == 404:

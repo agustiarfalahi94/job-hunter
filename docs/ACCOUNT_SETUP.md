@@ -53,8 +53,8 @@ Sign-out removes session state but keeps the saved snapshot. Confirmed deletion 
 ## Recovery
 
 - **Setup incomplete / denied:** verify enabled account fields, OAuth callback, verified-email allowlist, modern Supabase secret key, SQL migration and grants. Invalid enabled setup deliberately has no guest bypass.
-- **Not saved / outage:** leave the session open; choose Retry saving after connectivity returns. Avoid sign-out/reboot until saving succeeds. Automatic polling does not hammer a failed backend with retries.
-- **Another tab changed data:** review which tab has the latest records; explicitly discard the stale tab's edits and reload saved data. There is no automatic overwrite/merge.
+- **Changes aren't saved / outage:** one compact warning appears in the Account sidebar. Open **Saved data** for the reason and **Retry saving** after connectivity returns. Avoid sign-out/reboot until saving succeeds. Automatic polling does not hammer a failed backend with retries.
+- **Saved version changed:** keep a note of unsaved edits you need, then use **Account > Saved data > Discard unsaved changes and reload saved data** and **Reload saved data**. Reapply needed edits after the saved version loads. There is no automatic overwrite/merge. v1.19.1 serializes overlapping saves within one session to prevent false revision conflicts during rapid edits; existing conflicted sessions still require explicit reload.
 - **Cannot decrypt:** restore the original deployment encryption key from private backup. Do not rotate blindly, clear the account to bypass an error, or overwrite after a failed load. This release does not implement key rotation.
 - **Expired sign-in:** sign out and sign in again. Saved records remain; unsaved changes cannot be guaranteed after reauthentication.
 
