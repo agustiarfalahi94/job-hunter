@@ -99,10 +99,9 @@ def _connect_browser(url: str):
 
 class ApplicationBrowser:
     def __init__(self, owner_id: str, job_id: int, destination: str, config: BrowserConfig,
-                 identity_expires_at: float, *, client=None, connect=None):
+                 *, client=None, connect=None):
         self.owner_id, self.job_id = owner_id, job_id
         self.destination, self.config = destination, config
-        self.identity_expires_at = identity_expires_at
         self.client = client or BrowserbaseClient(config)
         self.connect = connect or _connect_browser
         self.commands: Queue = Queue(maxsize=1)
@@ -264,13 +263,12 @@ class ApplicationBrowser:
         try:
             if not self.config.enabled:
                 raise BrowserError("The application browser is disabled.")
-            if not self.owner_id or self.identity_expires_at - time.time() < 60:
+            if not self.owner_id:
                 raise BrowserError("Sign in again before starting an application browser.")
             validate_destination(self.destination)
             if self._stop.is_set():
                 return
-            timeout = min(self.config.timeout_seconds, int(self.identity_expires_at - time.time()))
-            created = self.client.create(timeout)
+            created = self.client.create(self.config.timeout_seconds)
             session_id = created.session_id
             if self._stop.is_set():
                 return
@@ -287,7 +285,7 @@ class ApplicationBrowser:
                 self._publish(state="ready", message="Application browser ready. Submission remains under your control.",
                               live_url=self.client.live_url(session_id))
                 while not self._stop.is_set():
-                    remaining = min(deadline - time.monotonic(), self.identity_expires_at - time.time())
+                    remaining = deadline - time.monotonic()
                     with self._lock:
                         abandoned = time.monotonic() - self._heartbeat > HEARTBEAT_SECONDS
                     if remaining <= 0 or abandoned:

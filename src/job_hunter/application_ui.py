@@ -49,8 +49,7 @@ def render_application_browser(workspace, job, destination: str) -> None:
         consent = st.checkbox("Use Browserbase for this application", key=f"_browser_consent_{job.id}")
         if st.button("Apply here", icon=":material/web:", type="primary",
                      disabled=not consent or not destination or job.availability == "expired"):
-            controller = ApplicationBrowser(account.identity.owner_id, job.id, destination, config,
-                                            account.identity.expires_at)
+            controller = ApplicationBrowser(account.identity.owner_id, job.id, destination, config)
             st.session_state[BROWSER_KEY] = controller
             controller.start()
             st.rerun(scope="app")

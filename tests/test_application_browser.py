@@ -131,7 +131,7 @@ class UploadTest(unittest.TestCase):
 
 class BrowserLifecycleTest(unittest.TestCase):
     def test_navigation_dispatched_during_upload_validation_cancels_attachment(self):
-        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(), time.time() + 3600)
+        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig())
         chooser = Mock()
         chooser.element.owner_frame.return_value.url = "https://example.com/job"
         request = UploadRequest("one", "https://example.com/job")
@@ -160,7 +160,7 @@ class BrowserLifecycleTest(unittest.TestCase):
         def connect(url):
             yield browser
         controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(True, "key", SESSION_ID),
-                                        time.time() + 3600, client=client, connect=connect)
+                                        client=client, connect=connect)
         def close_first(*args):
             context.pages = [second]
             first.is_closed.return_value = True
@@ -174,9 +174,10 @@ class BrowserLifecycleTest(unittest.TestCase):
         second.wait_for_timeout.assert_called_once()
         self.assertEqual(controller.snapshot().state, "closed")
         client.release.assert_called_once_with(SESSION_ID)
+        client.create.assert_called_once_with(900)
 
     def test_expiry_and_missing_heartbeat_release_session(self):
-        for reason in ("heartbeat", "identity", "timeout"):
+        for reason in ("heartbeat", "timeout"):
             with self.subTest(reason=reason):
                 client = Mock()
                 client.create.return_value.session_id = SESSION_ID
@@ -192,13 +193,11 @@ class BrowserLifecycleTest(unittest.TestCase):
 
                 controller = ApplicationBrowser("owner", 1, "https://example.com/job",
                                                 BrowserConfig(True, "key", SESSION_ID, 0 if reason == "timeout" else 900),
-                                                time.time() + 3600, client=client, connect=connect)
+                                                client=client, connect=connect)
 
                 def loaded(*args, **kwargs):
                     if reason == "heartbeat":
                         controller._heartbeat = time.monotonic() - 61
-                    elif reason == "identity":
-                        controller.identity_expires_at = time.time() - 1
 
                 page.goto.side_effect = loaded
                 with patch("job_hunter.application_browser.validate_destination", side_effect=lambda value: value):
@@ -212,7 +211,7 @@ class BrowserLifecycleTest(unittest.TestCase):
                 page.wait_for_timeout.assert_not_called()
 
     def test_changed_owner_immediately_hides_view_and_stops_worker(self):
-        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(), time.time() + 3600)
+        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig())
         controller._publish(state="ready", live_url=LIVE_URL)
         with self.assertRaises(BrowserError):
             controller.touch("different-owner")
@@ -220,7 +219,7 @@ class BrowserLifecycleTest(unittest.TestCase):
         self.assertTrue(controller._stop.is_set())
 
     def test_close_is_idempotent_after_worker_has_finished(self):
-        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(), time.time() + 3600)
+        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig())
         controller.start()
         controller.join(2)
         terminal = controller.snapshot()
@@ -230,7 +229,7 @@ class BrowserLifecycleTest(unittest.TestCase):
     def test_disabled_configuration_never_creates_session(self):
         client = Mock()
         controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(),
-                                        time.time() + 3600, client=client)
+                                        client=client)
         with patch("job_hunter.application_browser.validate_destination", side_effect=lambda value: value):
             controller.start()
             controller.join(2)
@@ -246,7 +245,7 @@ class BrowserLifecycleTest(unittest.TestCase):
             return type("Created", (), {"session_id": SESSION_ID, "connect_url": CONNECT_URL})()
         client.create.side_effect = create
         controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(True, "key", SESSION_ID),
-                                        time.time() + 3600, client=client)
+                                        client=client)
         with patch("job_hunter.application_browser.validate_destination", side_effect=lambda value: value):
             controller.start()
             self.assertTrue(started.wait(2))
@@ -258,17 +257,17 @@ class BrowserLifecycleTest(unittest.TestCase):
         client.release.assert_called_once_with(SESSION_ID)
         client.live_url.assert_not_called()
 
-    def test_identity_expiry_prevents_provider_call(self):
+    def test_missing_owner_prevents_provider_call(self):
         client = Mock()
-        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(True, "key", SESSION_ID),
-                                        time.time() - 1, client=client)
+        controller = ApplicationBrowser("", 1, "https://example.com/job", BrowserConfig(True, "key", SESSION_ID),
+                                        client=client)
         controller.start()
         controller.join(2)
         client.create.assert_not_called()
         self.assertEqual(controller.snapshot().state, "error")
 
     def test_owner_guard_rejects_upload(self):
-        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig(), time.time() + 3600)
+        controller = ApplicationBrowser("owner", 1, "https://example.com/job", BrowserConfig())
         with self.assertRaises(BrowserError):
             controller.upload("other", "req", "cv.pdf", b"private")
         self.assertTrue(controller.commands.empty())

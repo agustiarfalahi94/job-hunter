@@ -17,11 +17,18 @@ class ReleaseDocumentationTest(unittest.TestCase):
         self.assertTrue(Path("docs/ACCOUNT_SETUP.md").is_file())
 
     def test_release_version_is_consistent(self):
-        self.assertIn('version = "1.19.1"', Path("pyproject.toml").read_text())
-        self.assertIn("v1.19.1", Path("README.md").read_text())
-        self.assertIn("v1.19.1", Path("src/job_hunter/__init__.py").read_text())
-        self.assertIn("v1.19.1", Path("AGENTS.md").read_text())
-        self.assertIn("v1.19.1", Path("docs/ARCHITECTURE.md").read_text())
+        self.assertIn('version = "1.19.2"', Path("pyproject.toml").read_text())
+        self.assertIn("v1.19.2", Path("README.md").read_text())
+        self.assertIn("v1.19.2", Path("src/job_hunter/__init__.py").read_text())
+        self.assertIn("v1.19.2", Path("AGENTS.md").read_text())
+        self.assertIn("v1.19.2", Path("docs/ARCHITECTURE.md").read_text())
+        self.assertIn("## 1.19.2 - 2026-09-29", Path("CHANGELOG.md").read_text())
+
+    def test_remembered_login_and_remote_browser_limits_are_documented(self):
+        for path in ("README.md", "docs/ACCOUNT_SETUP.md", "docs/ARCHITECTURE.md", "docs/BROWSERBASE_SETUP.md"):
+            self.assertIn("30-day", Path(path).read_text())
+        self.assertIn("15-minute", Path("docs/BROWSERBASE_SETUP.md").read_text())
+        self.assertIn("already open tabs can remain logged in", Path("docs/ACCOUNT_SETUP.md").read_text())
 
     def test_browserbase_template_is_disabled_with_root_level_empty_secrets(self):
         raw = tomllib.loads(Path(".streamlit/secrets.example.toml").read_text())

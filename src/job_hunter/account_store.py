@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import math
-import time
 from typing import Callable
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -73,11 +71,11 @@ class SupabaseAccountStore:
         return saved_revision
 
     def _rpc(self, identity: AccountIdentity, name: str, payload: dict[str, object]) -> dict[str, object]:
+        # The Streamlit account gate authorizes every load/save callback first.
         if (not self._config.enabled or identity.email not in self._config.allowed_emails
                 or not isinstance(identity.subject, str) or not identity.subject.strip()
-                or type(identity.expires_at) not in {int, float}
-                or not math.isfinite(identity.expires_at) or identity.expires_at <= time.time()):
-            raise AccountStorageError("Account access is not authorized or has expired. Sign in again.")
+                or len(identity.subject) > 255):
+            raise AccountStorageError("Account access is not authorized. Sign in again.")
         try:
             response = self._post(
                 f"{self._config.supabase_url}/rest/v1/rpc/{name}", json=payload,

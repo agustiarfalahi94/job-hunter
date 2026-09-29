@@ -1,6 +1,6 @@
 # Architecture
 
-Current release: v1.19.1.
+Current release: v1.19.2.
 
 ## User-Operated Application Browser
 
@@ -15,9 +15,10 @@ must be public HTTPS, including redirects checked with CDP Document interception
 Cross-origin job-platform authentication remains manual.
 
 Creation disables recording, logging, proxies, automatic CAPTCHA solving and
-persistent contexts. The worker maintains CDP without paid keep-alive, closes at
-identity expiry, and enforces a 15-minute maximum plus a 60-second UI heartbeat
-lease. Close, sign-out, reload and account switch request release; server/process
+persistent contexts. The worker maintains CDP without paid keep-alive and enforces
+a 15-minute maximum plus a 60-second UI heartbeat lease. Heartbeats and uploads
+require current native login/owner authorization in the UI; Google ID-token expiry
+does not shorten the browser lifetime. Close, sign-out, reload and account switch request release; server/process
 loss is covered by the provider timeout. Uncertain create/release requests are
 not automatically retried and display safe warnings without response bodies.
 
@@ -48,7 +49,9 @@ The hosted app never creates `JobQueue` or `CVStore`. SQLite and disk-backed CV 
 
 ## Optional Private Accounts
 
-v1.18.0 gates the workspace behind native Google OIDC when `accounts.enabled` is true. Verified email gates access; canonical Google issuer + stable subject hashes to the owner ID. Invalid setup, signed-out/denied/expired identities and failed initial loads cannot reach the workspace. Account mode is off by default.
+v1.18.0 gates the workspace behind native Google OIDC when `accounts.enabled` is true. Verified email gates access; canonical Google issuer + stable subject hashes to the owner ID. Invalid setup, native signed-out/denied identities and failed initial loads cannot reach the workspace. Account mode is off by default.
+
+Since v1.19.2, native `st.user.is_logged_in` is the session authority, checked before claims at both page entry and every account/browser callback. Streamlit validates Google OIDC on login and owns the signed 30-day identity cookie. The app still checks issuer, audience, subject and verified-email allowlist, but neither identity/storage nor Browserbase treats Google's short-lived `exp` as the remembered-login deadline. No provider token is refreshed, extended or stored by the app, and no custom sliding expiry is introduced. Cookie expiry is checked on session creation; existing sessions and other open tabs follow [native Streamlit behavior](https://docs.streamlit.io/develop/concepts/connections/authentication), not a separate active-tab revocation timer. The internal storage adapter accepts only identities obtained through this server-side gate.
 
 The account adapter restores a versioned snapshot before widget creation, and saves only changed snapshots after settings callbacks, CV changes, posting/application edits and accepted background results. Snapshot contents are Fernet-encrypted CV bytes/text, settings/mode and JobRecords. Controllers, caches, API keys and provider tokens stay session-local. Native OIDC identity is not Supabase `auth.uid()`; server-only Supabase secret-key RPCs operate with service-role privileges, with app owner checks plus revoked anon/authenticated table/function access.
 

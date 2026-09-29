@@ -25,7 +25,7 @@ class RealBrowserUploadTest(unittest.TestCase):
             try:
                 context = browser.new_context()
                 page = context.new_page()
-                controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig(), time.time() + 3600)
+                controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig())
                 controller._track_page(page)
                 context.on("page", controller._track_page)
                 context.route("**/*", controller._route_navigation)
@@ -63,7 +63,7 @@ class RealBrowserUploadTest(unittest.TestCase):
                 try:
                     context = browser.new_context()
                     page = context.new_page()
-                    controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig(), time.time() + 3600)
+                    controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig())
                     controller._track_page(page)
                     context.route("**/*", controller._route_navigation)
                     page.route("https://careers.example.test/**", lambda route: route.fulfill(
@@ -87,7 +87,7 @@ class RealBrowserUploadTest(unittest.TestCase):
             try:
                 context = browser.new_context()
                 page = context.new_page()
-                controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig(), time.time() + 3600)
+                controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply", BrowserConfig())
                 controller._track_page(page)
                 page.route("**/*", lambda route: route.fulfill(content_type="text/html", body='<label>Resume<input type="file"></label>'))
                 with patch("job_hunter.application_browser._hostname_resolves_public", return_value=True):
@@ -142,7 +142,7 @@ class RealBrowserUploadTest(unittest.TestCase):
                         browser.close()
 
         controller = ApplicationBrowser("owner", 1, "https://careers.example.test/apply",
-                                        BrowserConfig(True, "synthetic", "project"), time.time() + 3600,
+                                        BrowserConfig(True, "synthetic", "project"),
                                         client=client, connect=connect)
         with patch("job_hunter.application_browser.validate_destination", side_effect=lambda value: value):
             controller.start()

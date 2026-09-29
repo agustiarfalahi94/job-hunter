@@ -71,6 +71,11 @@ remote browsers; test each destination and respect its access restrictions.
 - An active remote form is not a durable draft. Restart/disconnection can lose
   unsent answers. Job Hunter's saved CV, search criteria and manual application
   history remain separate from remote browser lifetime.
+- Job Hunter's remembered Google sign-in follows Streamlit's 30-day cookie as of
+  v1.19.2. This does not extend Browserbase's 15-minute maximum or 60-second
+  heartbeat lease, and it does not remember job-board logins. Native account
+  authorization is rechecked before each heartbeat and upload; sign-out or
+  access denial closes the current app session's remote browser.
 
 ## Verification And Rollback
 

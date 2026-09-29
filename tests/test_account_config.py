@@ -38,6 +38,12 @@ def google_claims(subject="test-subject", email="owner@example.test"):
 
 
 class AccountConfigTest(unittest.TestCase):
+    def test_remembered_native_identity_outlives_google_id_token(self):
+        config = load_account_config(account_secrets())
+        identity = identity_from_claims(dict(google_claims(), exp=1), config)
+        self.assertEqual(identity.email, "owner@example.test")
+        self.assertEqual(identity.owner_id, identity_from_claims(google_claims(), config).owner_id)
+
     def test_accounts_are_disabled_without_explicit_enablement(self):
         self.assertFalse(load_account_config({}).enabled)
         self.assertFalse(load_account_config({"accounts": {"enabled": False}}).enabled)
@@ -98,9 +104,9 @@ class AccountConfigTest(unittest.TestCase):
         secrets = account_secrets()
         secrets["accounts"]["allowed_emails"].append("second@example.test")
         config = load_account_config(secrets)
-        first = identity_from_claims(google_claims(), config, now=100)
-        renamed = identity_from_claims(google_claims(email="second@example.test"), config, now=100)
-        other = identity_from_claims(google_claims(subject="other"), config, now=100)
+        first = identity_from_claims(google_claims(), config)
+        renamed = identity_from_claims(google_claims(email="second@example.test"), config)
+        other = identity_from_claims(google_claims(subject="other"), config)
         self.assertEqual(first.owner_id, renamed.owner_id)
         self.assertNotEqual(first.owner_id, other.owner_id)
         self.assertEqual(first.owner_id, hashlib.sha256(b"https://accounts.google.com\0test-subject").hexdigest())
@@ -108,20 +114,20 @@ class AccountConfigTest(unittest.TestCase):
     def test_google_issuer_variants_share_the_same_owner(self):
         config = load_account_config(account_secrets())
         claims = google_claims()
-        first = identity_from_claims(claims, config, now=100)
+        first = identity_from_claims(claims, config)
         claims["iss"] = "accounts.google.com"
-        self.assertEqual(first.owner_id, identity_from_claims(claims, config, now=100).owner_id)
+        self.assertEqual(first.owner_id, identity_from_claims(claims, config).owner_id)
 
     def test_invalid_claims_and_disallowed_accounts_are_denied(self):
         config = load_account_config(account_secrets())
-        for field, value in (("iss", "https://evil.test"), ("sub", ""), ("email", "other@example.test"), ("email_verified", False), ("email_verified", "true"), ("aud", "another-client"), ("exp", 99), ("exp", "future"), ("exp", True)):
+        for field, value in (("iss", "https://evil.test"), ("sub", ""), ("email", "other@example.test"), ("email_verified", False), ("email_verified", "true"), ("aud", "another-client")):
             claims = google_claims()
             claims[field] = value
             with self.subTest(field=field, value=value), self.assertRaises(AccountAccessError):
-                identity_from_claims(claims, config, now=100)
+                identity_from_claims(claims, config)
 
     def test_email_allowlist_comparison_ignores_capitalization(self):
-        identity = identity_from_claims(google_claims(email="OWNER@EXAMPLE.TEST"), load_account_config(account_secrets()), now=100)
+        identity = identity_from_claims(google_claims(email="OWNER@EXAMPLE.TEST"), load_account_config(account_secrets()))
         self.assertEqual(identity.email, "owner@example.test")
 
     def test_malformed_issuer_claims_fail_closed(self):

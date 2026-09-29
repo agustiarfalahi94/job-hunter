@@ -81,11 +81,12 @@ class AccountStoreTest(unittest.TestCase):
         with self.assertRaises(AccountStorageError):
             SupabaseAccountStore(self.config, post=MagicMock(return_value=response({"revision": 99}))).save(self.identity, 4, "private")
 
-    def test_nonfinite_identity_never_reaches_storage(self):
-        for expiry in (float("nan"), float("inf"), True, "future"):
+    def test_invalid_identity_never_reaches_storage(self):
+        for subject, email in (("", "owner@example.test"), (" " * 2, "owner@example.test"),
+                               ("x" * 256, "owner@example.test"), ("test-subject", "denied@example.test")):
             post = MagicMock()
-            identity = AccountIdentity("test-subject", "owner@example.test", expiry)
-            with self.subTest(expiry=expiry), self.assertRaises(AccountStorageError):
+            identity = AccountIdentity(subject, email)
+            with self.subTest(subject=subject, email=email), self.assertRaises(AccountStorageError):
                 SupabaseAccountStore(self.config, post=post).load(identity)
             post.assert_not_called()
 

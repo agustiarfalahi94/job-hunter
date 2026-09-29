@@ -142,23 +142,25 @@ class AccountUITest(unittest.TestCase):
         self.assertIs(state[WORKSPACE_KEY], workspace)
         self.assertIn("Synthetic outage", session.error)
 
-    def test_expired_identity_cancels_search_before_save(self):
+    def test_native_signed_out_cancels_work_before_save_even_with_valid_claims(self):
         secrets = account_secrets()
         config = load_account_config(secrets)
         store = MagicMock()
         session = AccountSession(identity_from_claims(google_claims(), config), config, store)
-        controller = MagicMock()
-        state = {account_ui.ACCOUNT_KEY: session, WORKSPACE_KEY: SessionWorkspace(), "search_controller": controller}
+        controller, browser = MagicMock(), MagicMock()
+        state = {account_ui.ACCOUNT_KEY: session, WORKSPACE_KEY: SessionWorkspace(),
+                 "search_controller": controller, "application_browser": browser}
         with patch.object(account_ui, "st") as st:
             st.secrets = secrets
-            st.user.is_logged_in = True
-            st.user.get.side_effect = dict(google_claims(), exp=1).get
+            st.user.is_logged_in = False
+            st.user.get.side_effect = google_claims().get
             st.rerun.side_effect = StopRendering
             with self.assertRaises(StopRendering):
                 account_ui.persist_account(state)
         self.assertEqual(state, {})
         store.save.assert_not_called()
         controller.cancel.assert_called_once()
+        browser.close.assert_called_once()
 
     def test_access_revocation_blocks_callbacks_and_fragment_saves(self):
         for operation in ("delete", "save"):

@@ -58,6 +58,31 @@ def signed_in(rpc, claims=None):
 
 
 class AccountAppTest(unittest.TestCase):
+    def test_remembered_login_restores_and_saves_after_id_token_expiry(self):
+        secrets, rpc = account_secrets(), MemoryRPC()
+        with signed_in(rpc):
+            first = private_app(secrets).run(timeout=10)
+            first.session_state[WORKSPACE_KEY] = private_workspace()
+            first.run(timeout=10)
+        with signed_in(rpc, dict(google_claims(), exp=1)):
+            remembered = private_app(secrets).run(timeout=10)
+            self.assertEqual(len(remembered.exception), 0)
+            self.assertFalse(remembered.error)
+            self.assertIsNotNone(remembered.session_state[WORKSPACE_KEY].cv)
+            self.assertEqual(remembered.session_state[WORKSPACE_KEY].list_jobs()[0].application_status, "applied")
+            next(widget for widget in remembered.multiselect if widget.label == "Hard skip keywords").set_value(["remember this"]).run(timeout=10)
+            self.assertFalse(remembered.warning)
+            restored = private_app(secrets).run(timeout=10)
+            self.assertEqual(restored.session_state["search_settings"]["hard_skip_keywords"], ["remember this"])
+        saved_rows = dict(rpc.rows)
+        user = NativeUser(google_claims())
+        user.is_logged_in = False
+        with patch.object(account_ui.st, "user", user):
+            remembered.run(timeout=10)
+            self.assertIn("Sign in with Google", [button.label for button in remembered.button])
+            self.assertNotIn(WORKSPACE_KEY, remembered.session_state)
+        self.assertEqual(rpc.rows, saved_rows)
+
     def test_conflict_is_shown_once_in_sidebar_without_overwriting_other_tab(self):
         secrets, rpc = account_secrets(), MemoryRPC()
         with signed_in(rpc):

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.19.2 - 2026-09-29
+
+### Fixed
+
+- Follow Streamlit's native 30-day remembered-login cookie instead of rejecting an otherwise signed-in user when Google's short-lived ID token expires.
+- Keep workspace restore/save and Browserbase access usable during remembered sign-in. Preserve native login checks, issuer/audience validation, verified-email allowlists, account ownership and cleanup on sign-out/access denial.
+- Keep application browsers independently bounded to 15 minutes with a 60-second authorized UI heartbeat; remembered login does not extend remote forms or job-board logins.
+
+### Documentation And Tests
+
+- Document cookie lifetime versus active sessions, earlier sign-in causes, shared-device precautions and unchanged saved-data retention.
+- Add expired-token remembered-login restore/save regressions and native signed-out-with-claims denial; verify browser consent, provider timeout and heartbeat cleanup.
+- No new secrets, SQL migration, encryption-key change or live provider calls are required. Automated tests do not establish 30 days of elapsed production use.
+
 ## 1.19.1 - 2026-09-28
 
 ### Fixed

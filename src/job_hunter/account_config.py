@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
-import math
 import re
-import time
 from typing import Mapping
 from urllib.parse import urlsplit
 
@@ -39,7 +37,6 @@ class AccountConfig:
 class AccountIdentity:
     subject: str = field(repr=False)
     email: str = field(repr=False)
-    expires_at: float
 
     @property
     def owner_id(self) -> str:
@@ -103,21 +100,18 @@ def load_account_config(secrets: Mapping[str, object]) -> AccountConfig:
 
 
 def identity_from_claims(
-    claims: Mapping[str, object], config: AccountConfig, *, now: float | None = None,
+    claims: Mapping[str, object], config: AccountConfig,
 ) -> AccountIdentity:
-    # Claims must come from st.user after native OIDC validation, never client input.
+    # Only call for a logged-in st.user. Streamlit owns the 30-day identity cookie;
+    # Google's short-lived ID-token exp is not the remembered sign-in deadline.
     email = claims.get("email")
     subject = claims.get("sub")
-    expiry = claims.get("exp")
     if (not config.enabled or claims.get("iss") not in (GOOGLE_ISSUER, "accounts.google.com")
             or not isinstance(subject, str) or not subject.strip() or len(subject) > 255
             or not isinstance(email, str) or email.strip().casefold() not in config.allowed_emails
             or claims.get("email_verified") is not True or claims.get("aud") != config.client_id):
         raise AccountAccessError("This Google account is not authorized for this private workspace.")
-    if (type(expiry) not in {int, float} or not math.isfinite(expiry)
-            or expiry <= (time.time() if now is None else now)):
-        raise AccountAccessError("Your Google sign-in expired. Sign out and sign in again.")
-    return AccountIdentity(subject, email.strip().casefold(), float(expiry))
+    return AccountIdentity(subject, email.strip().casefold())
 
 
 def _required(section: Mapping[str, object], name: str) -> str:

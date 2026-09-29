@@ -14,7 +14,7 @@ from job_hunter.session_workspace import WORKSPACE_KEY
 
 
 ACCOUNT_KEY = "account_session"
-CLAIM_KEYS = ("iss", "sub", "email", "email_verified", "aud", "exp")
+CLAIM_KEYS = ("iss", "sub", "email", "email_verified", "aud")
 
 
 def prepare_account(state: MutableMapping[str, object], secrets: Mapping[str, object]) -> bool:
@@ -83,10 +83,10 @@ def _authorize_session(state: MutableMapping[str, object], session: AccountSessi
     # Widget callbacks execute before main's gate, so validate them separately.
     try:
         config = load_account_config(st.secrets)
-        if config != session.config:
+        if not st.user.is_logged_in or config != session.config:
             raise AccountAccessError()
         identity = identity_from_claims(_claims(), config)
-        if not st.user.is_logged_in or identity.owner_id != session.identity.owner_id:
+        if identity.owner_id != session.identity.owner_id:
             raise AccountAccessError()
     except (AccountAccessError, AccountConfigError):
         clear_session(state)

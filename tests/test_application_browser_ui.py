@@ -8,7 +8,7 @@ from job_hunter import account_ui
 from job_hunter.application_browser import BROWSER_KEY, BrowserSnapshot
 from job_hunter.session_workspace import WORKSPACE_KEY
 from test_account_app import MemoryRPC, private_app, signed_in
-from test_account_config import account_secrets
+from test_account_config import account_secrets, google_claims
 from test_account_snapshot import private_workspace
 
 
@@ -47,16 +47,16 @@ class ApplicationBrowserUITest(unittest.TestCase):
         self.assertNotIn("Apply here", [button.label for button in test.button])
         self.assertTrue(any("private account" in element.value for element in test.info))
 
-    def test_start_requires_consent_and_rerenders_do_not_create_again(self):
+    def test_remembered_login_can_start_browser_with_consent_after_id_token_expiry(self):
         from job_hunter import application_ui
         controller = Mock()
         controller.config = None
         controller.snapshot.return_value = BrowserSnapshot("ready", "Ready", "https://www.browserbase.com/devtools?test=1")
         controller.is_alive.return_value = True
-        def build(owner, job_id, destination, config, expiry):
+        def build(owner, job_id, destination, config):
             controller.owner_id, controller.job_id, controller.config = owner, job_id, config
             return controller
-        with signed_in(MemoryRPC()), patch.object(application_ui, "ApplicationBrowser", side_effect=build) as factory:
+        with signed_in(MemoryRPC(), dict(google_claims(), exp=1)), patch.object(application_ui, "ApplicationBrowser", side_effect=build) as factory:
             test = open_queue(private_app(enabled_secrets()).run(timeout=10))
             start = next(button for button in test.button if button.label == "Apply here")
             self.assertTrue(start.disabled)

@@ -253,6 +253,13 @@
 - Verify owner-configured Browserbase access and individual platform compatibility;
   Google login to Job Hunter does not authenticate the remote job-board session.
 
+## v1.19.2 - Remembered Sign-In
+
+- Follow Streamlit's native 30-day identity cookie instead of imposing the Google ID-token expiry on accounts, storage and application browsers.
+- Preserve page/callback authorization, verified-email allowlist and owner scoping; keep Browserbase's independent 15-minute timeout and heartbeat cleanup.
+- Test expired Google-token claims with native login still active, restore/save persistence, native sign-out with retained claims, access denial and browser consent/lifetime.
+- Update version, changelog, setup/user/security docs; run local tests, independent review and feature/main CI. A live 30-day elapsed test remains outside automated verification.
+
 ## v1.19.1 - Account Save Warnings
 
 - Reproduce overlapping-save conflicts with a delayed response and duplicate banners with signed-in Streamlit tests.
