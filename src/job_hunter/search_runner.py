@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 from job_hunter.descriptions import JobDescription
 from job_hunter.job_identity import canonicalize_job_url, job_source, vacancy_fingerprint
+from job_hunter.locations import location_rejection_reason
 from job_hunter.matching import MatchContext, MatchResult, MatchingConfig, score_match
 from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
@@ -386,8 +387,9 @@ class SearchRunController:
                 return _ProcessedCandidate(None, None, availability_evidence)
             if metadata.locations:
                 job_location, geographic_match = match_job_locations(metadata, request.criteria.location_targets)
-                if geographic_match is False:
-                    return _ProcessedCandidate(None, None, f"Job location {', '.join(metadata.locations)} does not match {request.criteria.location_label}.")
+                location_reason = location_rejection_reason(job_location, request.criteria.location_targets, result=geographic_match)
+                if location_reason:
+                    return _ProcessedCandidate(None, None, location_reason)
             description = metadata.description
             posted_date = metadata.posted_date or posted_date
             apply_url = metadata.apply_url or apply_url
@@ -417,10 +419,10 @@ class SearchRunController:
                 None,
                 _stale_reason(replace(candidate, posted_date=posted_date), request.criteria),
             )
-        if job_location and _job_location_matches(job_location, request.criteria.location_targets) is False:
-            return _ProcessedCandidate(None, None, f"Job location {job_location} does not match {request.criteria.location_label}.")
-        if job_location and _job_location_matches(job_location, request.criteria.location_targets) is None:
-            job_location = ""
+        location_reason = location_rejection_reason(job_location, request.criteria.location_targets,
+            result=_job_location_matches(job_location, request.criteria.location_targets))
+        if location_reason:
+            return _ProcessedCandidate(None, None, location_reason)
         required_apply = APPLICATION_FILTERS.get(candidate.platform)
         if required_apply in request.criteria.application_filters and quick_apply != required_apply:
             return _ProcessedCandidate(None, None, f"{required_apply} could not be verified on this posting; strict platform filter.")
@@ -455,7 +457,7 @@ class SearchRunController:
         )
         if not job_location:
             result = replace(result, remarks=(*result.remarks,
-                "Job location was not exposed. The selected location is a search hint, not verified posting evidence."))
+                "Job location was not exposed; geographic coverage is not verified."))
         return _ProcessedCandidate(job, result)
 
     def _publish_processed(

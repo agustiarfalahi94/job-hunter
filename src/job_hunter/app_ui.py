@@ -10,6 +10,7 @@ from job_hunter.application_links import (
     application_destination_url,
 )
 from job_hunter.eligibility import hard_skip_matches
+from job_hunter.locations import location_matches, location_rejection_reason
 from job_hunter.queue import JobRecord
 from job_hunter.search import SearchRunSummary
 
@@ -70,6 +71,7 @@ def filter_jobs(
     status: str = "all",
     hard_skip_keywords: object = (),
     application_view: str = "actionable",
+    target_locations: Iterable[str] = (),
 ) -> list[JobRecord]:
     filtered = exclude_hard_skipped_jobs(jobs, hard_skip_keywords)
     if decision != "all":
@@ -78,6 +80,9 @@ def filter_jobs(
         filtered = [job for job in filtered if job.status == status]
     if application_view == "actionable":
         filtered = [job for job in filtered if job.application_status != "applied" and job.availability != "expired"]
+        targets = tuple(target_locations)
+        filtered = [job for job in filtered if not location_rejection_reason(
+            job.location, targets, result=location_matches(job.location, targets))]
     elif application_view == "applied":
         filtered = [job for job in filtered if job.application_status == "applied"]
     elif application_view != "all":

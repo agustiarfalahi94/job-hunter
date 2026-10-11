@@ -9,6 +9,12 @@ from job_hunter.scoring import score_job
 
 
 class LocationScopesTest(unittest.TestCase):
+    def test_city_name_cannot_override_conflicting_country(self):
+        for observed, city in (("Kuala Lumpur, Brazil", "Kuala Lumpur"), ("Jakarta, US", "Jakarta")):
+            for locality in (None, city):
+                with self.subTest(observed=observed, locality=locality):
+                    self.assertIs(location_matches(observed, ("Kuala Lumpur", "Jakarta"), locality=locality), False)
+
     def test_multiple_cities_match_either_case_insensitively(self):
         targets = ("Kuala Lumpur", "Jakarta")
         self.assertIs(location_matches("JAKARTA, ID", targets), True)

@@ -1,4 +1,4 @@
-"""Job Hunter v1.19.2."""
+"""Job Hunter v1.19.3."""
 
 __all__ = [
     "account_config",

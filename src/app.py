@@ -484,6 +484,7 @@ def _render_queue(workspace: SessionWorkspace, preferences: dict[str, object]) -
         all_jobs,
         decision=str(decision),
         application_view=application_view,
+        target_locations=_active_preferences(preferences).get("target_locations", ()),
     )
     if not filtered:
         st.info("No jobs match the current filters.")

@@ -18,7 +18,7 @@ from job_hunter.application_links import KNOWN_ATS_DOMAINS, is_safe_application_
 from job_hunter.descriptions import JobDescription, extract_job_description
 from job_hunter.eligibility import hard_skip_matches
 from job_hunter.job_identity import canonicalize_job_url, stable_job_id
-from job_hunter.locations import is_known_area, location_matches, location_search_terms
+from job_hunter.locations import is_known_area, location_matches, location_rejection_reason, location_search_terms
 from job_hunter.queue import JobQueue
 from job_hunter.queue_types import JobInput
 from job_hunter.runtime_config import SearchProviderConfig
@@ -394,7 +394,7 @@ def match_job_locations(metadata: JobPageMetadata, targets: tuple[str, ...]) -> 
                    for place in metadata.locations]
     matching = [place for place, matches in comparisons if matches is True]
     state = True if matching else None if not comparisons or any(result is None for _, result in comparisons) else False
-    return "; ".join(matching), state
+    return "; ".join(matching or metadata.locations), state
 
 
 class SearchProviderError(RuntimeError):
@@ -776,10 +776,11 @@ def run_public_search(
                     selected_location = candidate.location
                     if metadata.locations:
                         selected_location, geographic_match = match_job_locations(metadata, criteria.location_targets)
-                        if geographic_match is False:
+                        location_reason = location_rejection_reason(selected_location, criteria.location_targets, result=geographic_match)
+                        if location_reason:
                             skipped += 1
                             _report_progress(logs, progress_callback, stage="skipped", checked=checked,
-                                total=search_limit, message=f"Skipped {candidate.title}: job location {', '.join(metadata.locations)} does not match {criteria.location_label}.")
+                                total=search_limit, message=f"Skipped {candidate.title}: {location_reason}")
                             continue
                     candidate = replace(
                         candidate,
@@ -864,13 +865,13 @@ def run_public_search(
                             ),
                         )
                         continue
-            if candidate.location and _job_location_matches(candidate.location, criteria.location_targets) is False:
+            location_reason = location_rejection_reason(candidate.location, criteria.location_targets,
+                result=_job_location_matches(candidate.location, criteria.location_targets))
+            if location_reason:
                 skipped += 1
                 _report_progress(logs, progress_callback, stage="skipped", checked=checked,
-                                 total=search_limit, message=f"Skipped {candidate.title}: job location {candidate.location} does not match {criteria.location_label}.")
+                                 total=search_limit, message=f"Skipped {candidate.title}: {location_reason}")
                 continue
-            if candidate.location and _job_location_matches(candidate.location, criteria.location_targets) is None:
-                candidate = replace(candidate, location="")
             result = queue.add_job(
                 JobInput(
                     title=candidate.title,

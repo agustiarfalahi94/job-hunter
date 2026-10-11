@@ -163,6 +163,7 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
         for scope in scopes:
             region = _region(scope)
             code = _country_code(scope)
+            requested_country = CITY_COUNTRIES.get(scope.casefold().strip())
             if region:
                 if _region(place) == region:
                     results.append(True)
@@ -170,8 +171,9 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
                     results.append(bool(codes.intersection(REGION_COUNTRIES[region])) if codes else None)
             elif code:
                 results.append(code in codes if codes else None)
+            elif requested_country and codes and requested_country not in codes:
+                results.append(False)
             elif locality is not None:
-                requested_country = CITY_COUNTRIES.get(scope.casefold().strip())
                 if locality.strip():
                     results.append(f" {_normalized(scope)} " in f" {_normalized(locality)} ")
                 else:
@@ -179,7 +181,6 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
             elif f" {_normalized(scope)} " in f" {normalized} ":
                 results.append(True)
             elif codes:
-                requested_country = CITY_COUNTRIES.get(scope.casefold().strip())
                 known_city = any(f" {_normalized(city)} " in f" {normalized} " for city in CITY_COUNTRIES)
                 results.append(False if known_city or
                                (requested_country and requested_country not in codes) else None)
@@ -188,6 +189,20 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
             else:
                 results.append(None)
     return True if True in results else None if None in results else False
+
+
+def location_rejection_reason(
+    observed: str, requested: Iterable[str] | str, *, result: bool | None,
+) -> str:
+    """Apply the same strict location policy to address and page-level evidence."""
+    scopes = (requested,) if isinstance(requested, str) else tuple(requested)
+    scopes = tuple(scope for scope in scopes if scope.strip())
+    if result is True or not scopes or is_global(scopes):
+        return ""
+    target = " OR ".join(scopes)
+    if result is False:
+        return f"Job location {observed} does not match {target}."
+    return f"Job location could not be verified for {target} (reported: {observed or 'not provided'})."
 
 
 def fetch_malaysia_cities(fetcher: Callable[..., Any] | None = None) -> tuple[str, ...]:

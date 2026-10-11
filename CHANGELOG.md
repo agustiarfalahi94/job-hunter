@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.19.3 - 2026-10-11
+
+### Fixed
+
+- Require a verified match to at least one selected non-Global location before scoring. Previously, unverified labels such as Latin America could be cleared and still reach the queue for Kuala Lumpur OR Jakarta.
+- Skip missing, remote-only, insufficient country-only, and mismatched geography with activity-log reasons in both hosted and legacy search. Preserve observed labels and existing Global/unrestricted CLI behavior.
+- Give explicit conflicting countries precedence over matching city names, while retaining any-address OR matching for multi-location postings.
+- Apply current Location selections to Actionable queue results, including older saved entries. All and Already applied retain location-independent history; no saved jobs or application records are deleted.
+
+### Documentation And Tests
+
+- Cover page/provider location evidence, blocked-page fallback, Latin America/LATAM, missing/remote/country-only labels, contradictory countries, multi-address jobs, Global and queue navigation with synthetic regressions.
+- Document strict-filter coverage limits, skip reasons and historical queue views. No new secrets, database migration or live provider quota is required.
+
 ## 1.19.2 - 2026-09-29
 
 ### Fixed

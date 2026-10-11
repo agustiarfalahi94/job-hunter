@@ -104,6 +104,30 @@ CLOSED_LINKEDIN_HTML = """
 
 
 class SearchTest(unittest.TestCase):
+    def test_legacy_search_skips_unknown_location_but_global_preserves_it(self):
+        import json
+        source = "https://my.linkedin.com/jobs/view/123"
+        for targets, reported, expected in (
+            (("Kuala Lumpur", "Jakarta"), "Latin America", 0),
+            (("Kuala Lumpur", "Jakarta"), "", 0),
+            (("Kuala Lumpur", "Jakarta"), "Jakarta, Indonesia", 1),
+            (("Global",), "Latin America", 1),
+            ((), "", 1),
+        ):
+            with self.subTest(targets=targets, reported=reported), tempfile.TemporaryDirectory() as tmpdir:
+                queue = JobQueue(Path(tmpdir) / "jobs.db")
+                criteria = SearchCriteria(("BI Analyst",), (), "", ("LinkedIn",), locations=targets, posted_within_days=None)
+                payload = json.dumps({"organic_results": [{"title": "BI Analyst", "link": source}]})
+                page = f'<main><span class="topcard__flavor--bullet">{reported}</span></main>'
+                summary = run_public_search(criteria, {}, queue,
+                    fetcher=lambda url: payload if "serpapi.com" in url else page,
+                    provider_config=SearchProviderConfig(serpapi_key="test"))
+                self.assertEqual(summary.added, expected)
+                if not expected:
+                    self.assertTrue(any("location could not be verified" in log for log in summary.logs))
+                else:
+                    self.assertEqual(queue.list_jobs()[0].location, reported)
+
     def test_verified_company_queries_preserve_regional_career_path(self):
         criteria = SearchCriteria(title_terms=("Data Analyst",), description_terms=(), location="Kuala Lumpur", platforms=(),
                                   custom_domains=("jobs.deloitte.com",), custom_site_filters=("site:jobs.deloitte.com/sea/go/Malaysia",))
@@ -570,6 +594,7 @@ class SearchTest(unittest.TestCase):
             location="Kuala Lumpur",
             platforms=("LinkedIn",),
             max_results=2,
+            posted_within_days=None,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -596,6 +621,7 @@ class SearchTest(unittest.TestCase):
             location="Kuala Lumpur",
             platforms=("JobStreet",),
             max_results=1,
+            posted_within_days=None,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -604,7 +630,7 @@ class SearchTest(unittest.TestCase):
                 criteria,
                 preferences,
                 queue,
-                fetcher=lambda url: SERPAPI_JSON,
+                fetcher=lambda url: SERPAPI_JSON if "serpapi.com" in url else '<main><span data-automation="job-detail-location">Kuala Lumpur, Malaysia</span></main>',
                 provider_config=SearchProviderConfig(serpapi_key="secret-key"),
             )
 

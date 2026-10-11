@@ -4,11 +4,15 @@
 
 Location is an empty-by-default multiselect. Any selected scope can match (OR), ignoring capitalization. Select cities, countries, or presets together, for example Kuala Lumpur OR Jakarta, or Malaysia OR Indonesia. Custom typed areas remain available after navigating away and returning. Legacy CLI `--location` remains a single-string input; `SearchCriteria.locations` provides multi-scope input internally.
 
-Europe OR APAC is supported. Global (also typed Worldwide / Whole world) removes geographic query constraints and accepts any observed geography. It overrides other areas, does not award a universal location-score bonus, and does not increase source coverage or budgets.
+Europe OR APAC is supported. Global (also typed Worldwide / Whole world) removes geographic query constraints and accepts any observed geography, including an unknown location. It overrides other areas, does not award a universal location-score bonus, and does not increase source coverage or budgets.
 
 Country names, common aliases, and ISO two/three-letter codes use pycountry. Short codes count only as whole address components, not prose words such as `in`. Known city-country mappings support common examples; unknown cities without country evidence are not guessed. Structured job addresses are associated with the selected vacancy, not neighboring vacancies on the same page.
 
-Matching is three-valued: a confirmed match accepts, confirmed mismatches skip before scoring, and insufficient evidence stays unverified with a result remark. Any verified matching address is enough for a multi-location vacancy. Country-only evidence cannot prove a requested city. A selected search location is never recorded as observed posting geography.
+The geographic classifier is three-valued: confirmed match, confirmed mismatch, or unverified. Since v1.19.3, selected non-Global scopes require a confirmed match before either hosted or legacy search sends a job to scoring. Mismatches and unverified results are skipped with a reason in the activity log. Reported labels are retained for that explanation instead of being cleared. Any verified matching address is enough for a multi-location vacancy. A conflicting explicit country takes precedence over a city-name match. Country-only evidence cannot prove a requested city, and a selected search location is never recorded as observed posting geography.
+
+For `Kuala Lumpur` OR `Jakarta`, readable `Kuala Lumpur, Malaysia` or `Jakarta, Indonesia` can pass; `Latin America`, `Remote - LATAM`, bare `Remote`, country-only `Malaysia`, and missing location evidence cannot. Global and legacy CLI calls with no requested location remain unrestricted. Strict checks may exclude otherwise suitable jobs when their locations cannot be read or verified; they do not claim that the source posting itself has no location.
+
+The Actionable queue rechecks saved job locations against the current selection. Previously saved out-of-area and unverified jobs are hidden there without deleting them or changing application status. All and Already applied retain location-independent history, subject to the other queue filters. Changing the selected locations immediately changes Actionable visibility; Global removes that location filter.
 
 ## Presets
 

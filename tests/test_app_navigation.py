@@ -12,6 +12,25 @@ from streamlit.testing.v1 import AppTest
 
 
 class AppNavigationTest(unittest.TestCase):
+    def test_queue_rechecks_selected_locations_without_deleting_history(self):
+        app_path = Path(__file__).resolve().parents[1] / "src" / "app.py"
+        app_test = AppTest.from_file(str(app_path)).run(timeout=10)
+        workspace = app_test.session_state[WORKSPACE_KEY]
+        for number, location in enumerate(("Kuala Lumpur", "Jakarta", "Latin America", ""), 1):
+            workspace.add_scored_job(JobInput(f"Analyst {number}", location=location, source_url=f"https://example.com/jobs/{number}"),
+                MatchResult(95, "shortlist", ("Relevant",), (), "Gemini", "test", False))
+        next(widget for widget in app_test.multiselect if widget.label == "Location :red[*]").set_value(["Kuala Lumpur", "Jakarta"]).run(timeout=10)
+        app_test.segmented_control[0].set_value("Job queue").run(timeout=10)
+        self.assertEqual(set(app_test.dataframe[0].value["Title"]), {"Analyst 1", "Analyst 2"})
+        next(widget for widget in app_test.segmented_control if widget.label == "Applications").set_value("All").run(timeout=10)
+        self.assertEqual(len(app_test.dataframe[0].value), 4)
+        self.assertEqual(len(workspace.list_jobs()), 4)
+        app_test.segmented_control[0].set_value("Search jobs").run(timeout=10)
+        next(widget for widget in app_test.multiselect if widget.label == "Location :red[*]").set_value(["Jakarta"]).run(timeout=10)
+        app_test.segmented_control[0].set_value("Job queue").run(timeout=10)
+        self.assertEqual(set(app_test.dataframe[0].value["Title"]), {"Analyst 2"})
+        self.assertFalse(app_test.exception)
+
     def test_terminal_fragment_refreshes_search_controls_once(self):
         controller = MagicMock()
         controller.drain.return_value = ((), ())

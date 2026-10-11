@@ -253,6 +253,14 @@
 - Verify owner-configured Browserbase access and individual platform compatibility;
   Google login to Job Hunter does not authenticate the remote job-board session.
 
+## v1.19.3 - Strict Location Filtering
+
+- Reproduce unverified Latin America results reaching scoring for Kuala Lumpur OR Jakarta and city-name matches overriding conflicting countries.
+- Require positive observed membership before scoring in hosted and legacy searches; keep Global and unrestricted legacy input exempt, preserve multiple-address OR matches, and explain skips without clearing reported labels.
+- Recheck current locations in Actionable while retaining All/Already applied history and all saved records.
+- Verify detail-page and provider-only evidence, missing/country-only/remote geography, country conflicts, queue navigation and unchanged search limits with synthetic fixtures.
+- Update version, changelog and location/user/architecture documentation; complete independent review, local checks, feature/main CI and public startup smoke. No secrets or database migration change.
+
 ## v1.19.2 - Remembered Sign-In
 
 - Follow Streamlit's native 30-day identity cookie instead of imposing the Google ID-token expiry on accounts, storage and application browsers.

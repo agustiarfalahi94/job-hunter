@@ -20,6 +20,19 @@ from job_hunter.search import SearchRunSummary
 
 
 class AppUiTest(unittest.TestCase):
+    def test_actionable_locations_are_strict_without_erasing_saved_history(self):
+        from dataclasses import replace
+        template = JobRecord(1, "Analyst", "Example", "", "Power BI", "", 95, "shortlist", "new")
+        jobs = [replace(template, id=index, location=location) for index, location in enumerate(
+            ("Kuala Lumpur, MY", "Jakarta, ID", "Latin America", "", "Bogota, Colombia"), 1)]
+        jobs.append(replace(jobs[-1], id=6, application_status="applied"))
+        targets = ("Kuala Lumpur", "Jakarta")
+        self.assertEqual([job.id for job in filter_jobs(jobs, decision="all", target_locations=targets)], [1, 2])
+        self.assertEqual(filter_jobs(jobs, decision="all", application_view="all", target_locations=targets), jobs)
+        self.assertEqual([job.id for job in filter_jobs(jobs, decision="all", application_view="applied", target_locations=targets)], [6])
+        self.assertEqual(len(filter_jobs(jobs, decision="all", target_locations=("Global",))), 5)
+        self.assertEqual(len(filter_jobs(jobs, decision="all")), 5)
+
     def test_jobs_to_rows_contains_decision_and_remarks(self):
         rows = jobs_to_rows(
             [

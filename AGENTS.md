@@ -2,7 +2,7 @@
 
 ## Start Here
 
-Job Hunter v1.19.2 is a public Streamlit job-discovery and matching app with optional private Google accounts and user-operated Browserbase applications. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
+Job Hunter v1.19.3 is a public Streamlit job-discovery and matching app with optional private Google accounts and user-operated Browserbase applications. Read this file, `README.md`, and the relevant files in `docs/` before changing behavior.
 
 ## Non-Negotiable Rules
 
@@ -18,7 +18,7 @@ Job Hunter v1.19.2 is a public Streamlit job-discovery and matching app with opt
 10. Run `./tool/check.sh` before every commit. Report anything unverified instead of guessing.
 11. New criteria-mode sessions start with no selected titles, keywords, locations, platforms, or companies. CV mode may merge supported CV evidence and configured role/hard-skip rules once per saved CV; never overwrite later manual edits. Keep selected web settings separate from disposable widget keys.
 12. Company-name lookup sends only public company name and requested region to Gemini Google Search. Require grounded official/regional pages and an official careers link, validate HTTPS/public network destinations, and cache lookup successes/failures per session. Never guess a domain or send CV text for this lookup.
-13. Locations are OR scopes: cities, ISO countries, or documented regional presets. Apply identical geographic membership to discovery, pre-scoring checks, and deterministic scoring. Missing geography remains unverified. Preserve legacy single-location CLI input.
+13. Locations are OR scopes: cities, ISO countries, or documented regional presets. Apply identical geographic membership to discovery, pre-scoring checks, and deterministic scoring. Selected non-Global scopes require positive observed location evidence before scoring; log and skip mismatched or unverified geography, never invent it from a query. Recheck current locations in Actionable without deleting All/Already applied history. Preserve Global and unrestricted legacy CLI input.
 14. Keep at most five selected/resolved company sites and five company/region lookup pairs per selection. Validate lookup budgets before contacting Gemini; regional presets count as one company-verification region rather than dozens of country calls.
 15. Optional quick-apply filters apply only to their named platform and require vacancy-associated controls, never description words. Manual date/expiry corrections retain user provenance; merge dates and verification atomically. No alternate-source storage/display; retain primary-identity duplicate checks.
 16. Discovery errors must never be reported as empty success. Report API web-result/eligible-link counts and safe error classifications; never expose query URLs with keys or raw provider errors. Zero scored jobs require a warning, not a queue-success claim.

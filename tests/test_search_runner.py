@@ -60,6 +60,65 @@ def _score(job, context, config, cache, *, cancel):
 
 
 class SearchRunnerTest(unittest.TestCase):
+    def test_provider_location_is_checked_when_detail_page_is_unavailable(self):
+        from unittest.mock import Mock
+        from job_hunter.runtime_config import SearchProviderConfig
+        for targets, location, accepted in (
+            (("Kuala Lumpur", "Jakarta"), "Latin America", False),
+            (("Kuala Lumpur", "Jakarta"), "Jakarta, Indonesia", True),
+            (("Global",), "Latin America", True),
+            (("Global",), "", True),
+        ):
+            with self.subTest(targets=targets, location=location):
+                payload = json.dumps({"jobs_results": [{"title": "BI Analyst", "location": location,
+                    "apply_options": [{"link": "https://my.linkedin.com/jobs/view/123"}]}]})
+                scorer = Mock(side_effect=_score)
+                controller = SearchRunController(discovery_fetcher=lambda _: payload, page_fetcher=lambda _: "", scorer=scorer)
+                controller.start(replace(_request(), criteria=replace(_request().criteria, location="", locations=targets),
+                    provider_config=SearchProviderConfig(serpapi_key="test")))
+                self.assertTrue(controller.wait(2))
+                _, matches = controller.drain()
+                self.assertEqual(len(matches), int(accepted))
+                self.assertEqual(scorer.call_count, int(accepted))
+                if accepted:
+                    self.assertEqual(matches[0].job.location, location)
+
+    def test_multi_address_posting_needs_only_one_verified_selected_city(self):
+        from job_hunter.runtime_config import SearchProviderConfig
+        page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": [
+            {"address": {"addressRegion": "Latin America"}},
+            {"address": {"addressLocality": "Jakarta", "addressCountry": "Indonesia"}},
+        ]}) + '</script>'
+        controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+            {"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}),
+            page_fetcher=lambda _: page, scorer=_score)
+        controller.start(replace(_request(), criteria=replace(_request().criteria, location="", locations=("Kuala Lumpur", "Jakarta")),
+            provider_config=SearchProviderConfig(serpapi_key="test")))
+        self.assertTrue(controller.wait(2))
+        _, matches = controller.drain()
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].job.location, "Jakarta, Indonesia")
+
+    def test_city_search_rejects_unverified_locations_before_scoring(self):
+        from unittest.mock import Mock
+        from job_hunter.runtime_config import SearchProviderConfig
+        request = replace(_request(), criteria=replace(_request().criteria, location="", locations=("Kuala Lumpur", "Jakarta")),
+                          provider_config=SearchProviderConfig(serpapi_key="test"))
+        for location in ("Latin America", "Remote - LATAM", "Malaysia", "", "Remote"):
+            with self.subTest(location=location):
+                page = f'<main><span class="topcard__flavor--bullet">{location}</span><div class="description">Power BI. Work with Kuala Lumpur and Jakarta teams.</div></main>'
+                scorer = Mock(side_effect=_score)
+                controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+                    {"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}),
+                    page_fetcher=lambda _: page, scorer=scorer)
+                controller.start(request)
+                self.assertTrue(controller.wait(2))
+                events, matches = controller.drain()
+                self.assertEqual(matches, ())
+                scorer.assert_not_called()
+                self.assertTrue(any("location" in event.message.casefold() and "verified" in event.message for event in events))
+                self.assertEqual(controller.snapshot().skipped, 1)
+
     def test_quick_apply_filter_skips_unverified_own_platform_only(self):
         from job_hunter.runtime_config import SearchProviderConfig
         source = "https://my.linkedin.com/jobs/view/123"
@@ -151,7 +210,8 @@ class SearchRunnerTest(unittest.TestCase):
 
     def test_unknown_location_stays_unknown_and_has_remark(self):
         from job_hunter.runtime_config import SearchProviderConfig
-        request = replace(_request(), provider_config=SearchProviderConfig(serpapi_key="test"))
+        request = replace(_request(), criteria=replace(_request().criteria, location="Global"),
+                          provider_config=SearchProviderConfig(serpapi_key="test"))
         controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [{"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}), page_fetcher=lambda _: '<main>Power BI dashboards</main>', scorer=_score)
         controller.start(request)
         self.assertTrue(controller.wait(2))
@@ -181,14 +241,15 @@ class SearchRunnerTest(unittest.TestCase):
         self.assertEqual(matches, ())
         self.assertTrue(any("New York" in event.message and "location" in event.message for event in events))
 
-    def test_country_only_evidence_keeps_city_unverified_instead_of_skipping(self):
+    def test_country_only_page_evidence_cannot_confirm_search_card_city(self):
         controller = SearchRunController(discovery_fetcher=lambda _: SEARCH_HTML.format(cards=CARD.format(job_id=1)),
             page_fetcher=lambda _: '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {"address": {"addressCountry": "MY"}}}) + '</script>', scorer=_score)
         controller.start(_request())
         self.assertTrue(controller.wait(2))
-        _, matches = controller.drain()
-        self.assertEqual(matches[0].job.location, "")
-        self.assertIn("not verified", matches[0].result.remarks[-1])
+        events, matches = controller.drain()
+        self.assertEqual(matches, ())
+        self.assertEqual(controller.snapshot().scoring_attempts, 0)
+        self.assertTrue(any("could not be verified" in event.message for event in events))
 
     def test_cancel_stops_new_page_fetches_and_preserves_completed_results(self):
         first_completed = threading.Event()
