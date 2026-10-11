@@ -146,6 +146,24 @@ def _observed_countries(observed: str) -> set[str]:
     return codes
 
 
+def _observed_places(observed: str) -> list[str]:
+    places = []
+    for label in re.split(r"[;/|]", observed):
+        place = re.sub(
+            r"\s*(?:\(\s*|[-\u2013\u2014]\s*|\s+)(?:remote|hybrid|on[- ]?site)\s*\)?\s*$",
+            "", label, flags=re.IGNORECASE,
+        ).strip()
+        if not place:
+            continue
+        # A country-only component qualifies a preceding city, not a second address.
+        if (places and _country_code(place) and place.casefold() not in CITY_COUNTRIES
+                and not any(_country_code(part.strip()) for part in places[-1].split(","))):
+            places[-1] += f", {place}"
+        else:
+            places.append(place)
+    return places
+
+
 def location_matches(observed: str, requested: Iterable[str] | str, *, locality: str | None = None) -> bool | None:
     """True for verified OR membership, False for a mismatch, None if unverified."""
     scopes = (requested,) if isinstance(requested, str) else tuple(requested)
@@ -157,7 +175,7 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
     if is_global(scopes):
         return True
     results = []
-    for place in observed.split(";"):
+    for place in _observed_places(observed):
         normalized = _normalized(place)
         codes = _observed_countries(place)
         for scope in scopes:

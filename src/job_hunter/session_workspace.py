@@ -214,6 +214,7 @@ class SessionWorkspace:
             )
             self._jobs[index] = replace(
                 existing,
+                location=existing.location.strip() or incoming.location.strip(),
                 description=(
                     incoming.description if use_incoming_description else existing.description
                 ),

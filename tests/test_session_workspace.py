@@ -1,5 +1,7 @@
 import unittest
+from dataclasses import replace
 
+from job_hunter.app_ui import filter_jobs
 from job_hunter.queue_types import JobInput
 from job_hunter.matching import MatchResult
 from job_hunter.scoring import DEFAULT_WEIGHTS, ScoreResult
@@ -7,6 +9,33 @@ from job_hunter.session_workspace import SessionWorkspace, get_session_workspace
 
 
 class SessionWorkspaceTest(unittest.TestCase):
+    def test_rediscovery_fills_missing_location_without_losing_application_history(self):
+        from job_hunter.search_runner import CompletedMatch
+
+        for applied in (False, True):
+            with self.subTest(applied=applied):
+                workspace = SessionWorkspace()
+                job = JobInput("BI Analyst", source_url="https://example.com/jobs/1")
+                score = MatchResult(90, "shortlist", ("Power BI",), (), "Gemini", "test", False)
+                job_id = workspace.add_scored_job(job, score).job_id
+                if applied:
+                    workspace.update_application_status(job_id, True)
+                before = workspace.list_jobs()[0]
+                self.assertEqual(filter_jobs([before], "all", target_locations=("Kuala Lumpur",)), [])
+                workspace.activate_run("rediscovery")
+                incoming = replace(job, location="Kuala Lumpur, MY")
+                self.assertTrue(workspace.accept_completed(CompletedMatch("rediscovery", incoming, score)))
+                jobs = workspace.list_jobs()
+                self.assertEqual(len(jobs), 1)
+                self.assertEqual(jobs[0].location, "Kuala Lumpur, MY")
+                self.assertEqual(jobs[0].id, job_id)
+                for field in ("application_status", "application_recorded_at", "application_evidence"):
+                    self.assertEqual(getattr(jobs[0], field), getattr(before, field))
+                view = "applied" if applied else "actionable"
+                self.assertEqual(filter_jobs(jobs, "all", application_view=view, target_locations=("Kuala Lumpur",)), jobs)
+                workspace.add_scored_job(job, score)
+                self.assertEqual(workspace.list_jobs()[0].location, "Kuala Lumpur, MY")
+
     def test_accept_completed_rejects_stale_run_and_accepts_active_run(self):
         from job_hunter.search_runner import CompletedMatch
 

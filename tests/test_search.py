@@ -111,6 +111,9 @@ class SearchTest(unittest.TestCase):
             (("Kuala Lumpur", "Jakarta"), "Latin America", 0),
             (("Kuala Lumpur", "Jakarta"), "", 0),
             (("Kuala Lumpur", "Jakarta"), "Jakarta, Indonesia", 1),
+            (("Kuala Lumpur", "Jakarta"), "Jakarta, US (Remote)", 0),
+            (("Kuala Lumpur",), "Kuala Lumpur, Malaysia / Jakarta, Indonesia", 1),
+            (("Jakarta",), "Kuala Lumpur, Malaysia | Jakarta, Indonesia", 1),
             (("Global",), "Latin America", 1),
             ((), "", 1),
         ):
@@ -124,7 +127,9 @@ class SearchTest(unittest.TestCase):
                     provider_config=SearchProviderConfig(serpapi_key="test"))
                 self.assertEqual(summary.added, expected)
                 if not expected:
-                    self.assertTrue(any("location could not be verified" in log for log in summary.logs))
+                    self.assertTrue(any("Job location" in log and (
+                        "could not be verified" in log or "does not match" in log
+                    ) for log in summary.logs))
                 else:
                     self.assertEqual(queue.list_jobs()[0].location, reported)
 

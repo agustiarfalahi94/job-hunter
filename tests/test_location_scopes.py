@@ -9,6 +9,32 @@ from job_hunter.scoring import score_job
 
 
 class LocationScopesTest(unittest.TestCase):
+    def test_multiple_address_labels_match_each_address_independently(self):
+        for separator in (";", "/", "|"):
+            observed = f"Kuala Lumpur, Malaysia {separator} Jakarta, Indonesia"
+            for scope in ("Kuala Lumpur", "Jakarta", "Malaysia", "Indonesia"):
+                with self.subTest(separator=separator, scope=scope):
+                    self.assertIs(location_matches(observed, (scope,)), True)
+            self.assertIs(location_matches(observed, ("Bangkok",)), False)
+        self.assertIs(location_matches("Malaysia / Indonesia", ("Malaysia",)), True)
+        self.assertIs(location_matches("Kuala Lumpur, Malaysia / Indonesia", ("Kuala Lumpur",)), True)
+
+    def test_work_mode_suffix_does_not_hide_conflicting_country(self):
+        for suffix in ("(Remote)", "(Hybrid)", "(On-site)", " - Remote", "remote"):
+            with self.subTest(suffix=suffix):
+                observed = f"Jakarta, US {suffix}"
+                self.assertIs(location_matches(observed, ("Jakarta",)), False)
+                self.assertIs(location_matches(observed, ("Indonesia",)), False)
+                self.assertIs(location_matches(observed, ("United States",)), True)
+                self.assertIs(location_matches(f"Jakarta, ID {suffix}", ("Jakarta",)), True)
+
+    def test_separated_country_component_still_qualifies_preceding_city(self):
+        for separator in ("/", "|"):
+            with self.subTest(separator=separator):
+                self.assertIs(location_matches(f"Jakarta {separator} US (Remote)", ("Jakarta",)), False)
+                self.assertIs(location_matches(f"Kuala Lumpur {separator} Brazil", ("Kuala Lumpur",)), False)
+                self.assertIs(location_matches(f"Jakarta {separator} ID", ("Jakarta",)), True)
+
     def test_city_name_cannot_override_conflicting_country(self):
         for observed, city in (("Kuala Lumpur, Brazil", "Kuala Lumpur"), ("Jakarta, US", "Jakarta")):
             for locality in (None, city):

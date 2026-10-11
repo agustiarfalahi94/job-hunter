@@ -98,6 +98,8 @@ General search candidates have no observed location merely because the query inc
 
 Actionable queue filtering uses current saved Location selections to hide historical mismatches and unverified rows without mutating the workspace. All and Already applied bypass only that location check, preserving history and other existing queue filters. No account snapshot or database migration is required.
 
+Geographic label parsing separates multiple addresses before applying country precedence and removes recognized work-mode suffixes for country-code matching. Duplicate ingestion fills an empty saved location from incoming observed evidence without replacing an existing nonempty location or touching application records.
+
 Multi-location company lookup deduplicates selected cities into verification regions, caches each region independently, and resolves all verified regional hosts through source validation. Source validation checks the five company/region pair ceiling before provider calls and the five resolved-site ceiling before search. Broad presets use one regional grounded verification rather than one call per member country. Web queries group source, keyword, and location OR clauses; regional alternatives do not multiply SerpAPI requests. Direct LinkedIn fallback expands country requests and interleaves other platform queries inside the twelve-request ceiling.
 
 Gemini receives one mode-specific candidate payload and one job payload. Criteria mode cannot carry CV text. Errors are classified into sanitized user-facing fallback reasons; raw API errors and keys are not logged.

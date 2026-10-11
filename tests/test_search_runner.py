@@ -66,6 +66,9 @@ class SearchRunnerTest(unittest.TestCase):
         for targets, location, accepted in (
             (("Kuala Lumpur", "Jakarta"), "Latin America", False),
             (("Kuala Lumpur", "Jakarta"), "Jakarta, Indonesia", True),
+            (("Kuala Lumpur", "Jakarta"), "Jakarta, US (Remote)", False),
+            (("Kuala Lumpur",), "Kuala Lumpur, Malaysia / Jakarta, Indonesia", True),
+            (("Jakarta",), "Kuala Lumpur, Malaysia | Jakarta, Indonesia", True),
             (("Global",), "Latin America", True),
             (("Global",), "", True),
         ):

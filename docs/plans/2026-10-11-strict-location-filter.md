@@ -11,6 +11,8 @@ The user selected Kuala Lumpur OR Jakarta but received a Latin America job. A sy
 3. Preserve Global and legacy calls without location constraints. Hide old mismatches in Actionable without deleting records or changing All/Already applied location-independent history.
 4. Update v1.19.3 documentation, regression tests and release metadata. Keep provider budgets, account storage and browser-application behavior unchanged.
 
+Independent review added regressions for slash/pipe-separated addresses, decorated country codes such as `US (Remote)`, and filling a blank saved location on rediscovery. These prevent strict filtering from hiding valid multi-location jobs or permanently hiding an older blank-location record; manual application history remains unchanged.
+
 ## Verification And Release
 
 - Failing regressions reproduce unverified Latin America/remote/missing locations reaching scoring and explicit-country conflicts matching a city.
