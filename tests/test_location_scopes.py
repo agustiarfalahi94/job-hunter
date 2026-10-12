@@ -19,6 +19,14 @@ class LocationScopesTest(unittest.TestCase):
         self.assertIs(location_matches("Malaysia / Indonesia", ("Malaysia",)), True)
         self.assertIs(location_matches("Kuala Lumpur, Malaysia / Indonesia", ("Kuala Lumpur",)), True)
 
+    def test_mixed_address_labels_do_not_share_another_city_country(self):
+        for suffix in ("Remote", "Hybrid", "(Remote)"):
+            observed = f"Jakarta, US | Bandung, ID | {suffix}"
+            with self.subTest(suffix=suffix):
+                self.assertIsNot(location_matches(observed, ("Kuala Lumpur", "Jakarta")), True)
+                self.assertIs(location_matches(observed, ("United States",)), True)
+                self.assertIs(location_matches(f"Kuala Lumpur, MY | Bandung, ID | {suffix}", ("Kuala Lumpur",)), True)
+
     def test_work_mode_suffix_does_not_hide_conflicting_country(self):
         for suffix in ("(Remote)", "(Hybrid)", "(On-site)", " - Remote", "remote"):
             with self.subTest(suffix=suffix):

@@ -112,6 +112,7 @@ class SearchTest(unittest.TestCase):
             (("Kuala Lumpur", "Jakarta"), "", 0),
             (("Kuala Lumpur", "Jakarta"), "Jakarta, Indonesia", 1),
             (("Kuala Lumpur", "Jakarta"), "Jakarta, US (Remote)", 0),
+            (("Kuala Lumpur", "Jakarta"), "Jakarta, US | Bandung, ID | Remote", 0),
             (("Kuala Lumpur",), "Kuala Lumpur, Malaysia / Jakarta, Indonesia", 1),
             (("Jakarta",), "Kuala Lumpur, Malaysia | Jakarta, Indonesia", 1),
             (("Global",), "Latin America", 1),

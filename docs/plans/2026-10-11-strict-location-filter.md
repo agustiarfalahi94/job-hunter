@@ -15,6 +15,8 @@ Independent review added regressions for slash/pipe-separated addresses, decorat
 
 Follow-up review reproduced loss of structured address boundaries. Keep a structured locality attached to its country, preserve semicolons between saved independent addresses, and only split slash/pipe alternatives with their own country evidence. Cover both search paths and Global extraction through saving and subsequent Actionable selection.
 
+Final review added mixed-list and structured-field punctuation round trips. Parse complete country-qualified groups independently of later unverified labels, and normalize address-field delimiters before serializing structured evidence. Synthetic cases cover both hosted and legacy filtering and Global-to-city queue changes.
+
 ## Verification And Release
 
 - Failing regressions reproduce unverified Latin America/remote/missing locations reaching scoring and explicit-country conflicts matching a city.

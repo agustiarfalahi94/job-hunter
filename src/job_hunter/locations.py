@@ -157,15 +157,18 @@ def _observed_places(observed: str) -> list[str]:
     places = []
     # Semicolons preserve the separate addresses emitted by structured extraction.
     for label in observed.split(";"):
-        alternatives = [_without_work_mode(part) for part in re.split(r"[/|]", label)]
-        if len(alternatives) > 1 and all(
-            any(_country_code(part.strip()) for part in place.split(","))
-            for place in alternatives
-        ):
-            places.extend(alternatives)
-        else:
-            # Otherwise a trailing country can qualify every city in this label.
-            places.append(_without_work_mode(label))
+        pending = []
+        for part in re.split(r"[/|]", label):
+            place = _without_work_mode(part)
+            if not place:
+                continue
+            pending.append(place)
+            # Close this address at its country before reading later alternatives.
+            if any(_country_code(component.strip()) for component in place.split(",")):
+                places.append(" / ".join(pending))
+                pending = []
+        if pending:
+            places.append(" / ".join(pending))
     return [place for place in places if place]
 
 

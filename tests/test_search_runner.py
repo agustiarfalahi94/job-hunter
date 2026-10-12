@@ -67,6 +67,7 @@ class SearchRunnerTest(unittest.TestCase):
             (("Kuala Lumpur", "Jakarta"), "Latin America", False),
             (("Kuala Lumpur", "Jakarta"), "Jakarta, Indonesia", True),
             (("Kuala Lumpur", "Jakarta"), "Jakarta, US (Remote)", False),
+            (("Kuala Lumpur", "Jakarta"), "Jakarta, US | Bandung, ID | Remote", False),
             (("Kuala Lumpur",), "Kuala Lumpur, Malaysia / Jakarta, Indonesia", True),
             (("Jakarta",), "Kuala Lumpur, Malaysia | Jakarta, Indonesia", True),
             (("Global",), "Latin America", True),
@@ -148,7 +149,7 @@ class SearchRunnerTest(unittest.TestCase):
         from job_hunter.runtime_config import SearchProviderConfig
         request = replace(_request(), criteria=replace(_request().criteria, location="", locations=("Kuala Lumpur", "Jakarta")),
                           provider_config=SearchProviderConfig(serpapi_key="test"))
-        for location in ("Latin America", "Remote - LATAM", "Malaysia", "", "Remote", "(Remote)"):
+        for location in ("Latin America", "Remote - LATAM", "Malaysia", "", "Remote", "(Remote)", "Jakarta, US | Bandung, ID | Remote"):
             with self.subTest(location=location):
                 page = f'<main><span class="topcard__flavor--bullet">{location}</span><div class="description">Power BI. Work with Kuala Lumpur and Jakarta teams.</div></main>'
                 scorer = Mock(side_effect=_score)
@@ -162,6 +163,28 @@ class SearchRunnerTest(unittest.TestCase):
                 scorer.assert_not_called()
                 self.assertTrue(any("location" in event.message.casefold() and "verified" in event.message for event in events))
                 self.assertEqual(controller.snapshot().skipped, 1)
+
+    def test_global_structured_locality_punctuation_keeps_country_after_saving(self):
+        from job_hunter.app_ui import filter_jobs
+        from job_hunter.runtime_config import SearchProviderConfig
+        from job_hunter.session_workspace import SessionWorkspace
+        for locality in ("Kuala Lumpur; Jakarta", "Kuala Lumpur / Jakarta", "Kuala Lumpur | Jakarta", "Kuala Lumpur, MY; Jakarta"):
+            with self.subTest(locality=locality):
+                page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {
+                    "address": {"addressLocality": locality, "addressCountry": "US"},
+                }}) + '</script>'
+                controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+                    {"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}),
+                    page_fetcher=lambda _: page, scorer=_score)
+                controller.start(replace(_request(), criteria=replace(_request().criteria, location="", locations=("Global",)),
+                    provider_config=SearchProviderConfig(serpapi_key="test")))
+                self.assertTrue(controller.wait(2))
+                _, matches = controller.drain()
+                self.assertEqual(len(matches), 1)
+                workspace = SessionWorkspace()
+                workspace.activate_run(matches[0].run_id)
+                self.assertTrue(workspace.accept_completed(matches[0]))
+                self.assertEqual(filter_jobs(workspace.list_jobs(), "all", target_locations=("Kuala Lumpur", "Jakarta")), [])
 
     def test_quick_apply_filter_skips_unverified_own_platform_only(self):
         from job_hunter.runtime_config import SearchProviderConfig
