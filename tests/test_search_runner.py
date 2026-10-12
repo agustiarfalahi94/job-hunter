@@ -168,7 +168,7 @@ class SearchRunnerTest(unittest.TestCase):
         from job_hunter.app_ui import filter_jobs
         from job_hunter.runtime_config import SearchProviderConfig
         from job_hunter.session_workspace import SessionWorkspace
-        for locality in ("Kuala Lumpur; Jakarta", "Kuala Lumpur / Jakarta", "Kuala Lumpur | Jakarta", "Kuala Lumpur, MY; Jakarta"):
+        for locality in ("Kuala Lumpur; Jakarta", "Kuala Lumpur / Jakarta", "Kuala Lumpur | Jakarta", "Kuala Lumpur, MY; Jakarta", "Jakarta, US"):
             with self.subTest(locality=locality):
                 page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {
                     "address": {"addressLocality": locality, "addressCountry": "US"},
@@ -185,6 +185,29 @@ class SearchRunnerTest(unittest.TestCase):
                 workspace.activate_run(matches[0].run_id)
                 self.assertTrue(workspace.accept_completed(matches[0]))
                 self.assertEqual(filter_jobs(workspace.list_jobs(), "all", target_locations=("Kuala Lumpur", "Jakarta")), [])
+
+    def test_country_embedded_in_structured_locality_stays_explicit(self):
+        from unittest.mock import Mock
+        from job_hunter.runtime_config import SearchProviderConfig
+        from job_hunter.search import match_job_locations
+        for locality in ("Jakarta, US", "Jakarta / US", "Jakarta; US", "Jakarta | US"):
+            with self.subTest(locality=locality):
+                page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {
+                    "address": {"addressLocality": locality},
+                }}) + '</script>'
+                source = "https://my.linkedin.com/jobs/view/123"
+                metadata = extract_job_metadata(page, source)
+                self.assertIs(match_job_locations(metadata, ("Kuala Lumpur", "Jakarta"))[1], False)
+                self.assertIs(_job_location_matches(metadata.locations[0], ("Kuala Lumpur", "Jakarta")), False)
+                scorer = Mock(side_effect=_score)
+                controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+                    {"title": "BI Analyst", "link": source}]}), page_fetcher=lambda _: page, scorer=scorer)
+                controller.start(replace(_request(), criteria=replace(_request().criteria, location="", locations=("Kuala Lumpur", "Jakarta")),
+                    provider_config=SearchProviderConfig(serpapi_key="test")))
+                self.assertTrue(controller.wait(2))
+                _, matches = controller.drain()
+                self.assertFalse(matches)
+                scorer.assert_not_called()
 
     def test_quick_apply_filter_skips_unverified_own_platform_only(self):
         from job_hunter.runtime_config import SearchProviderConfig

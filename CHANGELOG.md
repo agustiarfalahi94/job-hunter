@@ -10,6 +10,7 @@
 - Handle semicolon/slash/pipe-separated addresses and work-mode suffixes such as `US (Remote)` without losing the country attached to each city.
 - Preserve structured address boundaries through saving and queue filtering; a locality containing multiple city names cannot bypass its explicit country restriction.
 - Keep country evidence tied to its own address in mixed lists with unverified labels, including `Jakarta, US | Bandung, ID | Remote`.
+- Retain explicit country codes embedded in structured city fields when no separate country field is supplied.
 - Apply current Location selections to Actionable queue results, including older saved entries. All and Already applied retain location-independent history; no saved jobs or application records are deleted.
 - Fill a previously blank saved location when the same vacancy is rediscovered with observed geography, preserving its identity and manual application record.
 

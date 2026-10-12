@@ -1266,7 +1266,7 @@ def _find_job_location_evidence(value: object) -> list[tuple[str, str]]:
                         part = part.get("name", "")
                     if isinstance(part, str) and part.strip():
                         # Reserve delimiters for real address boundaries after saving.
-                        parts.append(" ".join(re.sub(r"[,;/|]", " ", part).split()))
+                        parts.append(" ".join(re.sub(r"[;/|]", ", ", part).split()))
                 if parts:
                     locality = address.get("addressLocality", "")
                     locations.append((", ".join(parts), locality.strip() if isinstance(locality, str) else ""))
