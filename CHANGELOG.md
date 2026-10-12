@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.19.3 - 2026-10-11
+## 1.19.3 - 2026-10-12
 
 ### Fixed
 
@@ -8,6 +8,7 @@
 - Skip missing, remote-only, insufficient country-only, and mismatched geography with activity-log reasons in both hosted and legacy search. Preserve observed labels and existing Global/unrestricted CLI behavior.
 - Give explicit conflicting countries precedence over matching city names, while retaining any-address OR matching for multi-location postings.
 - Handle semicolon/slash/pipe-separated addresses and work-mode suffixes such as `US (Remote)` without losing the country attached to each city.
+- Preserve structured address boundaries through saving and queue filtering; a locality containing multiple city names cannot bypass its explicit country restriction.
 - Apply current Location selections to Actionable queue results, including older saved entries. All and Already applied retain location-independent history; no saved jobs or application records are deleted.
 - Fill a previously blank saved location when the same vacancy is rediscovered with observed geography, preserving its identity and manual application record.
 

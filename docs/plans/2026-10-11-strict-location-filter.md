@@ -13,6 +13,8 @@ The user selected Kuala Lumpur OR Jakarta but received a Latin America job. A sy
 
 Independent review added regressions for slash/pipe-separated addresses, decorated country codes such as `US (Remote)`, and filling a blank saved location on rediscovery. These prevent strict filtering from hiding valid multi-location jobs or permanently hiding an older blank-location record; manual application history remains unchanged.
 
+Follow-up review reproduced loss of structured address boundaries. Keep a structured locality attached to its country, preserve semicolons between saved independent addresses, and only split slash/pipe alternatives with their own country evidence. Cover both search paths and Global extraction through saving and subsequent Actionable selection.
+
 ## Verification And Release
 
 - Failing regressions reproduce unverified Latin America/remote/missing locations reaching scoring and explicit-country conflicts matching a city.

@@ -22,7 +22,7 @@ class ReleaseDocumentationTest(unittest.TestCase):
         self.assertIn("v1.19.3", Path("src/job_hunter/__init__.py").read_text())
         self.assertIn("v1.19.3", Path("AGENTS.md").read_text())
         self.assertIn("v1.19.3", Path("docs/ARCHITECTURE.md").read_text())
-        self.assertIn("## 1.19.3 - 2026-10-11", Path("CHANGELOG.md").read_text())
+        self.assertIn("## 1.19.3 - 2026-10-12", Path("CHANGELOG.md").read_text())
 
     def test_remembered_login_and_remote_browser_limits_are_documented(self):
         for path in ("README.md", "docs/ACCOUNT_SETUP.md", "docs/ARCHITECTURE.md", "docs/BROWSERBASE_SETUP.md"):

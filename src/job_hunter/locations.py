@@ -146,22 +146,27 @@ def _observed_countries(observed: str) -> set[str]:
     return codes
 
 
+def _without_work_mode(label: str) -> str:
+    return re.sub(
+        r"\s*(?:\(\s*|[-\u2013\u2014]\s*|\s+)(?:remote|hybrid|on[- ]?site)\s*\)?\s*$",
+        "", label, flags=re.IGNORECASE,
+    ).strip()
+
+
 def _observed_places(observed: str) -> list[str]:
     places = []
-    for label in re.split(r"[;/|]", observed):
-        place = re.sub(
-            r"\s*(?:\(\s*|[-\u2013\u2014]\s*|\s+)(?:remote|hybrid|on[- ]?site)\s*\)?\s*$",
-            "", label, flags=re.IGNORECASE,
-        ).strip()
-        if not place:
-            continue
-        # A country-only component qualifies a preceding city, not a second address.
-        if (places and _country_code(place) and place.casefold() not in CITY_COUNTRIES
-                and not any(_country_code(part.strip()) for part in places[-1].split(","))):
-            places[-1] += f", {place}"
+    # Semicolons preserve the separate addresses emitted by structured extraction.
+    for label in observed.split(";"):
+        alternatives = [_without_work_mode(part) for part in re.split(r"[/|]", label)]
+        if len(alternatives) > 1 and all(
+            any(_country_code(part.strip()) for part in place.split(","))
+            for place in alternatives
+        ):
+            places.extend(alternatives)
         else:
-            places.append(place)
-    return places
+            # Otherwise a trailing country can qualify every city in this label.
+            places.append(_without_work_mode(label))
+    return [place for place in places if place]
 
 
 def location_matches(observed: str, requested: Iterable[str] | str, *, locality: str | None = None) -> bool | None:
@@ -175,7 +180,8 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
     if is_global(scopes):
         return True
     results = []
-    for place in _observed_places(observed):
+    places = [_without_work_mode(observed)] if locality is not None else _observed_places(observed)
+    for place in places:
         normalized = _normalized(place)
         codes = _observed_countries(place)
         for scope in scopes:
@@ -206,7 +212,7 @@ def location_matches(observed: str, requested: Iterable[str] | str, *, locality:
                 results.append(None)
             else:
                 results.append(None)
-    return True if True in results else None if None in results else False
+    return True if True in results else None if not results or None in results else False
 
 
 def location_rejection_reason(

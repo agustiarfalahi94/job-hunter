@@ -35,6 +35,19 @@ class LocationScopesTest(unittest.TestCase):
                 self.assertIs(location_matches(f"Kuala Lumpur {separator} Brazil", ("Kuala Lumpur",)), False)
                 self.assertIs(location_matches(f"Jakarta {separator} ID", ("Jakarta",)), True)
 
+    def test_structured_locality_does_not_detach_from_its_country(self):
+        for separator in ("/", "|"):
+            locality = f"Kuala Lumpur {separator} Jakarta"
+            observed = f"{locality}, US"
+            for supplied_locality in (None, locality):
+                with self.subTest(separator=separator, locality=supplied_locality):
+                    self.assertIs(location_matches(observed, ("Kuala Lumpur", "Jakarta"), locality=supplied_locality), False)
+
+    def test_semicolon_preserves_independent_structured_address_boundary(self):
+        self.assertIs(location_matches("Jakarta; US", ("Jakarta",)), True)
+        self.assertIs(location_matches("Jakarta; US", ("United States",)), True)
+        self.assertIs(location_matches("(Remote)", ("Jakarta",)), None)
+
     def test_city_name_cannot_override_conflicting_country(self):
         for observed, city in (("Kuala Lumpur, Brazil", "Kuala Lumpur"), ("Jakarta, US", "Jakarta")):
             for locality in (None, city):

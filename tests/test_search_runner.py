@@ -102,12 +102,53 @@ class SearchRunnerTest(unittest.TestCase):
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0].job.location, "Jakarta, Indonesia")
 
+    def test_structured_multiple_city_locality_cannot_bypass_country(self):
+        from unittest.mock import Mock
+        from job_hunter.runtime_config import SearchProviderConfig
+        page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {
+            "address": {"addressLocality": "Kuala Lumpur / Jakarta", "addressCountry": "US"},
+        }}) + '</script>'
+        scorer = Mock(side_effect=_score)
+        controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+            {"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}),
+            page_fetcher=lambda _: page, scorer=scorer)
+        controller.start(replace(_request(), criteria=replace(_request().criteria, location="", locations=("Kuala Lumpur", "Jakarta")),
+            provider_config=SearchProviderConfig(serpapi_key="test")))
+        self.assertTrue(controller.wait(2))
+        events, matches = controller.drain()
+        self.assertFalse(matches)
+        scorer.assert_not_called()
+        self.assertTrue(any("does not match" in event.message for event in events))
+
+    def test_global_structured_addresses_remain_independent_in_saved_queue(self):
+        from job_hunter.app_ui import filter_jobs
+        from job_hunter.runtime_config import SearchProviderConfig
+        from job_hunter.session_workspace import SessionWorkspace
+        page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": [
+            {"address": {"addressLocality": "Jakarta"}},
+            {"address": {"addressCountry": "US"}},
+        ]}) + '</script>'
+        controller = SearchRunController(discovery_fetcher=lambda _: json.dumps({"organic_results": [
+            {"title": "BI Analyst", "link": "https://my.linkedin.com/jobs/view/123"}]}),
+            page_fetcher=lambda _: page, scorer=_score)
+        controller.start(replace(_request(), criteria=replace(_request().criteria, location="", locations=("Global",)),
+            provider_config=SearchProviderConfig(serpapi_key="test")))
+        self.assertTrue(controller.wait(2))
+        _, matches = controller.drain()
+        self.assertEqual(len(matches), 1)
+        workspace = SessionWorkspace()
+        workspace.activate_run(matches[0].run_id)
+        self.assertTrue(workspace.accept_completed(matches[0]))
+        jobs = workspace.list_jobs()
+        self.assertEqual(jobs[0].location, "Jakarta; US")
+        self.assertEqual(filter_jobs(jobs, "all", target_locations=("Jakarta",)), jobs)
+
     def test_city_search_rejects_unverified_locations_before_scoring(self):
         from unittest.mock import Mock
         from job_hunter.runtime_config import SearchProviderConfig
         request = replace(_request(), criteria=replace(_request().criteria, location="", locations=("Kuala Lumpur", "Jakarta")),
                           provider_config=SearchProviderConfig(serpapi_key="test"))
-        for location in ("Latin America", "Remote - LATAM", "Malaysia", "", "Remote"):
+        for location in ("Latin America", "Remote - LATAM", "Malaysia", "", "Remote", "(Remote)"):
             with self.subTest(location=location):
                 page = f'<main><span class="topcard__flavor--bullet">{location}</span><div class="description">Power BI. Work with Kuala Lumpur and Jakarta teams.</div></main>'
                 scorer = Mock(side_effect=_score)

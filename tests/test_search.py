@@ -133,6 +133,22 @@ class SearchTest(unittest.TestCase):
                 else:
                     self.assertEqual(queue.list_jobs()[0].location, reported)
 
+    def test_legacy_search_keeps_structured_locality_attached_to_country(self):
+        import json
+        source = "https://my.linkedin.com/jobs/view/123"
+        payload = json.dumps({"organic_results": [{"title": "BI Analyst", "link": source}]})
+        page = '<script type="application/ld+json">' + json.dumps({"@type": "JobPosting", "jobLocation": {
+            "address": {"addressLocality": "Kuala Lumpur / Jakarta", "addressCountry": "US"},
+        }}) + '</script>'
+        with tempfile.TemporaryDirectory() as tmpdir:
+            queue = JobQueue(Path(tmpdir) / "jobs.db")
+            criteria = SearchCriteria(("BI Analyst",), (), "", ("LinkedIn",), locations=("Kuala Lumpur", "Jakarta"), posted_within_days=None)
+            summary = run_public_search(criteria, {}, queue,
+                fetcher=lambda url: payload if "serpapi.com" in url else page,
+                provider_config=SearchProviderConfig(serpapi_key="test"))
+            self.assertEqual(summary.added, 0)
+            self.assertTrue(any("does not match" in log for log in summary.logs))
+
     def test_verified_company_queries_preserve_regional_career_path(self):
         criteria = SearchCriteria(title_terms=("Data Analyst",), description_terms=(), location="Kuala Lumpur", platforms=(),
                                   custom_domains=("jobs.deloitte.com",), custom_site_filters=("site:jobs.deloitte.com/sea/go/Malaysia",))

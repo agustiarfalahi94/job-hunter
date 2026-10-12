@@ -14,7 +14,7 @@ For `Kuala Lumpur` OR `Jakarta`, readable `Kuala Lumpur, Malaysia` or `Jakarta, 
 
 The Actionable queue rechecks saved job locations against the current selection. Previously saved out-of-area and unverified jobs are hidden there without deleting them or changing application status. All and Already applied retain location-independent history, subject to the other queue filters. Changing the selected locations immediately changes Actionable visibility; Global removes that location filter.
 
-Labels containing several addresses separated by semicolons, slashes, or pipes are checked per address. Country-only components still qualify a preceding city without country evidence; work-mode suffixes such as `US (Remote)` do not hide the explicit country. Rediscovering the same vacancy can fill a previously blank saved location without replacing its existing location or manual application record.
+Semicolons preserve independent addresses, including when structured extraction saves `Jakarta; US`. Slash/pipe alternatives are separated only when each has its own explicit country; otherwise a trailing country qualifies the city list, so `Kuala Lumpur / Jakarta, US` does not match either selected city. A structured locality always stays attached to its own country. Work-mode suffixes such as `US (Remote)` do not hide the explicit country. Rediscovering the same vacancy can fill a previously blank saved location without replacing its existing location or manual application record.
 
 ## Presets
 
